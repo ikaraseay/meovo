@@ -49,8 +49,10 @@ pnpm dev                           # 开发服务器
 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 放的是占位符，
 构建前由 `scripts/apply-config.mjs` 把真值填回去。
 
-站点文案（站名 / 笔名 / 邮箱 / 标语）在 `config/site.json` —— 同样是占位值，
-换成你自己的。
+站点文案（站名 / 笔名 / 邮箱 / 标语）在 `config/site.json` —— 仓库里放的是**默认值**
+（`Meovo` / `你的笔名` / `you@example.com`）。个人的那几处不要提交进仓库，在后台「设置」里改
+（存 D1，构建期导出成 `frontend/i18n/overrides.ts`），这样公开仓库里只有默认配置。
+`LICENSE` 的版权行同样是通用占位（`Meovo contributors`），想换成自己的名字就自己改 —— 它也会公开。
 
 ## 目录结构
 

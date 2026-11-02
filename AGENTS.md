@@ -162,10 +162,14 @@
   **代码里用到的 key 都在词典里**（缺了就静默显示成 key 本身）。
 - **站点名与笔名是两回事** —— `site.name` 是品牌名（og:site_name / RSS），
   导航栏那个 logo 现在是**作者头像**（`/avatar.png`），
-  `site.author` 是笔名（标题后缀与署名）。两者的真值都在 `config/site.json`（本地真值，仓库里是占位符）。
+  `site.author` 是笔名（标题后缀与署名）。
+  ⚠️ 仓库里的 `config/site.json` 只放**默认值**（Meovo / 你的笔名 / you@example.com）：
+  公开仓库不带个人文字，个人那几处走**后台「设置」**（D1 `settings` → 构建期导出
+  `frontend/i18n/overrides.ts`），别手写回 `config/site.json`。
   署名的地方都用笔名：页脚版权、文章页 JSON-LD 的 author、头像的 alt。
 - **站点常用文字在 `config/site.json`** —— 站点名 / 笔名 / 标语 / 首页大标题 / 关于页引言 / 邮箱，
-  单独一个配置文件（入库，一眼看就懂）。其余长尾文案在 `frontend/i18n/ui.ts` 的词典里。
+  单独一个配置文件（入库，一眼看就懂）。仓库里是默认值；个人文字在后台设置（D1），
+  不进仓库。其余长尾文案在 `frontend/i18n/ui.ts` 的词典里。
   - 三层叠加，后者盖前者：**词典 → `config/site.json` → `frontend/i18n/overrides.ts`**（后台改的）
   - `config/site.json` 与词典同形：`{"<i18n key>": {"zh": "…", "en": "…"}}`
   - ⚠️ JSON 没有注释 —— 想写说明就写进 AGENTS.md，别往 JSON 里塞字段
@@ -331,10 +335,12 @@
   - `scripts/apply-config.mjs` **只填有值的项** —— 没有 config.env / 环境变量时不动文件，
     干净检出沿用仓库里已提交的值。⚠️ 别把空值拼成替换串：会写成字面量 `"undefined"`，
     `astro build` 直接报 Invalid URL（CI / Cloudflare 构建都跑在干净检出里）
+  - `LICENSE` 的版权行是通用占位（`Meovo contributors`），个人名字/邮箱不进仓库
   - `.scratch/`（开发笔记）不进仓库 ✓
 - **环境值只写在 `config.env`**（仓库根，**不入库**；模板 `config.env.example` 入库）。
   这是全项目唯一一处要改的环境值来源 —— `scripts/ops.sh` 负责读写它。
-  - 站点**文案**不在这里（它要进版本库、要中英两套）—— 在 `config/site.json`。
+  - 站点**文案**不在这里：默认值在 `config/site.json`（仓库里是默认值，可公开）；
+    个人文字在后台设置（D1 `settings`）→ 构建期导出 `frontend/i18n/overrides.ts`。
     `config.env` 里有一段指路，别把两处混了
   - `D1_DATABASE_ID` 与 `cloudflare/wrangler.jsonc` 的 `database_id` 要一致
     （导出脚本 `backend/scripts/export-d1-posts.mjs` 优先读 `config.env` 里的这个），
