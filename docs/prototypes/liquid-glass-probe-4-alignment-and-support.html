@@ -1,0 +1,173 @@
+<!doctype html>
+<!-- 存档原型：调研阶段的方案实现，未采用。结论见 docs/prototypes/README.md -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>liquid glass probe v4</title>
+<style>
+  body {
+    margin: 0; min-height: 100vh; background: #1a1a1a;
+    display: grid; place-items: center; gap: 48px; grid-auto-flow: row;
+    padding: 48px 20px; font: 12px/1.6 ui-monospace, monospace; color: #9aa;
+  }
+  .stage { position: relative; width: 340px; }
+  .stripes {
+    position: absolute; inset: 0; height: 150px;
+    background: repeating-linear-gradient(90deg, #ff3b30 0 10px, #34c759 10px 20px, #0a84ff 20px 30px);
+  }
+  .glass {
+    position: absolute; left: 50%; transform: translate(-50%,-50%);
+    display: grid; place-items: center; color: #fff; font-weight: 700;
+    background: rgba(255,255,255,.18);
+    outline: 1px dashed rgba(255,255,255,.55);
+  }
+  .bar   { top: 50%; width: 250px; height: 50px; border-radius: 16px; }
+  .panel { top: 50%; width: 152px; height: 120px; border-radius: 16px; }
+  .tag { position: relative; margin-top: 6px; }
+  pre { background: #111; padding: 10px; border-radius: 8px; font-size: 11px; color: #7fd; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <p style="position:fixed;inset-block-end:0;inset-inline:0;margin:0;padding:8px 14px;background:#000;color:#7fd;font:12px/1.5 ui-monospace,monospace;text-align:center">存档原型 · <b>未采用</b> · 结论见 <a style="color:#7fd" href="README.md">docs/prototypes/README.md</a></p>
+
+<div class="stage">
+  <div class="stripes"></div>
+  <div class="glass bar" id="barUser">bar / userSpaceOnUse</div>
+  <div class="tag">bar 250x50 — userSpaceOnUse region</div>
+</div>
+
+<div class="stage">
+  <div class="stripes"></div>
+  <div class="glass panel" id="panelUser">panel</div>
+  <div class="tag">panel 152x120 — userSpaceOnUse region</div>
+</div>
+
+<div class="stage">
+  <div class="stripes"></div>
+  <div class="glass bar" id="barBBox">bar</div>
+  <div class="tag">bar 250x50 — objectBoundingBox region</div>
+</div>
+
+<pre id="out"></pre>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg'
+  let seq = 0
+  const log = []
+
+  log.push('CSS.supports backdrop-filter url(): ' + CSS.supports('backdrop-filter', 'url(#x)'))
+  const t = document.createElement('div')
+  t.style.backdropFilter = 'url(#x)'
+  log.push('style parse kept: ' + JSON.stringify(t.style.backdropFilter))
+  const t2 = document.createElement('div')
+  t2.style.backdropFilter = 'blur(3px) saturate(180%)'
+  log.push('style parse blur: ' + JSON.stringify(t2.style.backdropFilter))
+
+  /**
+   * 位移图：中心中性灰 128（零位移），向边缘渐变（最大位移）。
+   * R = X 位移场，B = Y 位移场。中间用模糊圆角矩形把中心「压回」中性。
+   */
+  function buildMap(w, h, radius, scale) {
+    const maxD = Math.max(Math.abs(scale) * 0.5, 20)
+    const pad = Math.ceil(maxD)
+    const totalW = w + pad * 2
+    const totalH = h + pad * 2
+    const canvas = document.createElement('canvas')
+    canvas.width = totalW
+    canvas.height = totalH
+    const ctx = canvas.getContext('2d')
+
+    ctx.fillStyle = 'rgb(128,128,128)'
+    ctx.fillRect(0, 0, totalW, totalH)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(pad, pad, w, h, radius)
+    ctx.clip()
+
+    ctx.fillStyle = '#000'
+    ctx.fillRect(pad, pad, w, h)
+
+    // 横向位移场：右→左，R 从 0 到 255
+    const gx = ctx.createLinearGradient(pad + w, pad, pad, pad)
+    gx.addColorStop(0, '#000')
+    gx.addColorStop(1, '#f00')
+    ctx.fillStyle = gx
+    ctx.fillRect(pad, pad, w, h)
+
+    // 纵向位移场：上→下，B 从 0 到 255。difference 混合把两个通道并进一张图
+    ctx.globalCompositeOperation = 'difference'
+    const gy = ctx.createLinearGradient(pad, pad, pad, pad + h)
+    gy.addColorStop(0, '#000')
+    gy.addColorStop(1, '#00f')
+    ctx.fillStyle = gy
+    ctx.fillRect(pad, pad, w, h)
+
+    // 中心中性化：模糊的圆角矩形把中心压回 128
+    ctx.globalCompositeOperation = 'source-over'
+    const inset = Math.min(w, h) * 0.035
+    ctx.filter = 'blur(11px)'
+    ctx.fillStyle = 'hsla(0,0%,50%,0.93)'
+    ctx.beginPath()
+    ctx.roundRect(pad + inset, pad + inset, w - inset * 2, h - inset * 2, radius)
+    ctx.fill()
+    ctx.restore()
+
+    return { uri: canvas.toDataURL(), w, h, pad, maxD }
+  }
+
+  function install(el, radius, scale, mode) {
+    const rect = el.getBoundingClientRect()
+    const w = Math.round(rect.width)
+    const h = Math.round(rect.height)
+    const { uri, pad } = buildMap(w, h, radius, scale)
+    const id = 'lg' + ++seq
+
+    const svg = document.createElementNS(NS, 'svg')
+    svg.setAttribute('width', '0')
+    svg.setAttribute('height', '0')
+    svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none'
+
+    // region：向左上扩 maxD，保证位移采样得到内容
+    const region =
+      mode === 'user'
+        ? `filterUnits="userSpaceOnUse" x="${-pad}" y="${-pad}" width="${w + pad * 2}" height="${h + pad * 2}"`
+        : `x="-${Math.ceil((pad / w) * 100)}%" y="-${Math.ceil((pad / h) * 100)}%" width="${100 + Math.ceil((pad / w) * 100) * 2}%" height="${100 + Math.ceil((pad / h) * 100) * 2}%"`
+
+    const imgX = mode === 'user' ? `${-pad}` : `0%`
+    const imgY = mode === 'user' ? `${-pad}` : `0%`
+    const imgW = mode === 'user' ? `${w + pad * 2}` : `100%`
+    const imgH = mode === 'user' ? `${h + pad * 2}` : `100%`
+
+    svg.innerHTML = `
+      <defs>
+        <filter id="${id}" ${region} color-interpolation-filters="sRGB" primitiveUnits="userSpaceOnUse">
+          <feImage result="map" preserveAspectRatio="none" x="${imgX}" y="${imgY}" width="${imgW}" height="${imgH}"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale}" result="d0"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale + 10}" result="d1"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale + 20}" result="d2"/>
+          <feColorMatrix in="d0" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>
+          <feColorMatrix in="d1" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>
+          <feColorMatrix in="d2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>
+          <feBlend in="cr" in2="cg" mode="screen" result="crg"/>
+          <feBlend in="crg" in2="cb" mode="screen"/>
+        </filter>
+      </defs>`
+    document.body.appendChild(svg)
+
+    const feImage = svg.querySelector('feImage')
+    feImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', uri)
+    feImage.setAttribute('href', uri)
+
+    el.style.backdropFilter = `url(#${id}) blur(2px) saturate(180%)`
+    log.push(`${id} ${mode}: el ${w}x${h} pad=${pad}`)
+  }
+
+  install(document.getElementById('barUser'), 16, -46, 'user')
+  install(document.getElementById('panelUser'), 16, -46, 'user')
+  install(document.getElementById('barBBox'), 16, -46, 'bbox')
+
+  document.getElementById('out').textContent = log.join('\n')
+</script>
+</body>
+</html>

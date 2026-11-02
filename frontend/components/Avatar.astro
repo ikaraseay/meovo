@@ -1,0 +1,37 @@
+---
+/**
+ * 作者头像 —— 全站只有一位作者，图片在 `cloudflare/public/avatar.png`。
+ *
+ * 尺寸由 props 给：不同场合给不同的值（首页小卡 56 / 关于页 96）。
+ * 图片本身已经是圆角方块（PNG 里带透明角），这里不再压圆角。
+ */
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+  /** 显示尺寸（px）—— 同时写进 width/height，避免布局跳动 */
+  size?: number
+}
+
+const { locale, size = 96 } = Astro.props
+---
+
+<img
+  class="avatar"
+  src="/avatar.png"
+  width={size}
+  height={size}
+  alt={t(locale, 'site.author')}
+  decoding="async"
+  style={`--avatar-size: ${size}px`}
+/>
+
+<style>
+  .avatar {
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    display: block;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+</style>

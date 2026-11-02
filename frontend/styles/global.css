@@ -1,0 +1,344 @@
+/* =========================================================
+   全局层 · reset + 排版基线 + 页面外壳
+   ---------------------------------------------------------
+   加载顺序（BaseLayout.astro 里 import 本文件）：
+     tokens.css              → 结构刻度 + 共享原语
+     themes/liquid-glass.css → 语义色层
+     global.css（本文件）    → reset + 基线
+
+   ⚠️ 颜色一律走 token，不要在组件里写死色值。
+   ========================================================= */
+
+@import './tokens.css';
+@import './themes/liquid-glass.css';
+@import './prose.css';
+@import './terminal.css';
+@import './admin.css';
+
+/* =========================================================
+   Reset
+   ========================================================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  tab-size: 4;
+  /* 底色画在 html 上，body 透明 —— 固定层的 .ui-background（z-index:-1）
+     才能透出来，又不被 body 的不透明背景挡住。 */
+  background: var(--ui-bg);
+}
+
+/* 锚点平滑滚动只在用户没有要求「减少动态效果」时开 */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: var(--ui-text);
+  font-family: var(--ui-font-body);
+  font-size: 1rem;
+  line-height: 1.65;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 中英混排：严格断行 + 行首行尾标点不悬挂到容器外 */
+  line-break: strict;
+  overflow-wrap: break-word;
+}
+
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* hidden 属性要能盖住组件里的 display（否则 hidden 的元素照样显示） */
+[hidden] {
+  display: none !important;
+}
+
+/* =========================================================
+   背景 —— 极光色斑
+   ---------------------------------------------------------
+   固定铺满视口，藏在内容下面（z-index:-1）。
+   毛玻璃折射的就是这几团光。渐变自带软边，无需再叠 blur 滤镜。
+   ========================================================= */
+.ui-aurora {
+  position: fixed;
+  inset: -15%;
+  z-index: var(--ui-z-bg);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ui-aurora__blob {
+  position: absolute;
+  width: 44vmax;
+  height: 44vmax;
+  border-radius: 50%;
+  opacity: 0.5;
+  animation: aurora-drift var(--ui-aurora-dur, 30s) ease-in-out infinite alternate;
+}
+
+.ui-aurora__blob:nth-child(1) {
+  --c: var(--ui-aurora-a);
+  top: -8%;
+  left: -10%;
+  background: radial-gradient(circle at 32% 32%, var(--c) 0%, transparent 66%);
+  --ui-aurora-dur: 26s;
+}
+
+.ui-aurora__blob:nth-child(2) {
+  --c: var(--ui-aurora-b);
+  top: -6%;
+  right: -12%;
+  background: radial-gradient(circle at 60% 34%, var(--c) 0%, transparent 66%);
+  --ui-aurora-dur: 32s;
+}
+
+.ui-aurora__blob:nth-child(3) {
+  --c: var(--ui-aurora-c);
+  bottom: -14%;
+  left: 6%;
+  background: radial-gradient(circle at 42% 58%, var(--c) 0%, transparent 66%);
+  --ui-aurora-dur: 38s;
+}
+
+.ui-aurora__blob:nth-child(4) {
+  --c: var(--ui-aurora-d);
+  bottom: -10%;
+  right: -2%;
+  background: radial-gradient(circle at 50% 50%, var(--c) 0%, transparent 66%);
+  --ui-aurora-dur: 29s;
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vw, -4vh, 0) scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-aurora__blob {
+    animation: none;
+  }
+}
+
+/* =========================================================
+   桌面加载 —— JS 布局完成前先藏起桌面，摆好后淡入
+   ---------------------------------------------------------
+   <html> 上的 .js 由首屏内联脚本加上（同步执行、先于正文），
+   所以桌面一开始就是隐藏的；draggable.ts 摆好位置后补 .desk--ready 再淡入。
+   无 JS（没有 .js）时桌面照常显示，不丢内容。
+   布局期间 .is-laying-out 关掉部件自身的过渡，避免倾斜动画「抖动」。
+   ========================================================= */
+html.js [data-desk] {
+  opacity: 0;
+}
+
+html.js [data-desk].desk--ready {
+  opacity: 1;
+  transition: opacity 500ms var(--ui-ease-out);
+}
+
+.desk.is-laying-out .ui-widget {
+  transition: none !important;
+}
+
+/* =========================================================
+   移动端桌面 —— 卡片退回单列文档流，留出足够间距别粘连
+   ---------------------------------------------------------
+   所有 .desk 统一处理（文章页 / 页脚 / 内容页都适用）。
+   页面里不要再抄一份 —— tokens.css 定 .desk 的定位上下文，这里定移动端的排布。
+   ========================================================= */
+@media not (min-width: 1024px) {
+  .desk {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2xl);
+  }
+}
+
+/* =========================================================
+   加载遮罩 —— 桌面布局完成前盖住整屏，摆好再淡出
+   ---------------------------------------------------------
+   无 JS 时不显示（.page-loader 默认隐藏）；有 JS 且还没 page-ready 时显示。
+   ========================================================= */
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-loader);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-bg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 400ms var(--ui-ease-out),
+    visibility 0s linear 400ms;
+}
+
+html.js:not(.page-ready) .page-loader {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.page-loader__ring {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--ui-border);
+  border-top-color: var(--ui-accent);
+  animation: loader-spin 0.8s linear infinite;
+}
+
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader__ring {
+    animation-duration: 2s;
+  }
+}
+
+/* =========================================================
+   排版基线
+   ========================================================= */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--ui-font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--ui-text-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: color var(--ui-transition-fast);
+}
+
+a:hover {
+  color: var(--ui-accent-dark);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-sm);
+}
+
+::selection {
+  background: var(--ui-selection-bg);
+  color: var(--ui-text);
+}
+
+/* =========================================================
+   页面外壳
+   ========================================================= */
+.container {
+  width: 100%;
+  max-width: var(--ui-page-width, 1120px);
+  margin-inline: auto;
+  padding-inline: var(--ui-space-lg);
+}
+
+/* 桌面（可拖拽卡片）页用更宽的容器 —— 卡片要撒满整屏，别挤在中间 */
+.container--wide {
+  max-width: 1920px;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding-inline: var(--ui-space-md);
+  }
+}
+
+.site-main {
+  flex: 1;
+  padding-block: var(--ui-space-2xl) var(--ui-space-3xl);
+}
+
+/* 移动端贴底有抽屉（最高 130px），正文别被压在下面 */
+@media not (min-width: 1024px) {
+  .site-main {
+    padding-bottom: calc(var(--ui-space-3xl) + 150px);
+  }
+}
+
+/* =========================================================
+   正文列 —— 排版细节在 styles/prose.css
+   ========================================================= */
+
+/* =========================================================
+   工具类
+   ========================================================= */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-md);
+}

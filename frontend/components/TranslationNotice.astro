@@ -1,0 +1,59 @@
+---
+/**
+ * 「本文暂无英文版」提示条。
+ * 只在回退页（英文地址显示中文原文）出现。
+ */
+import { t, localeLabel, type Locale } from '../i18n'
+import { getPostLocale, type Post } from '../lib/posts'
+
+interface Props {
+  /** URL 上的语言 —— 就是缺的那个语言 */
+  locale: Locale
+  /** 实际渲染的原文 */
+  post: Post
+}
+
+const { locale, post } = Astro.props
+
+const contentLocale = getPostLocale(post)
+---
+
+<div class="translation-notice" role="note">
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"></circle>
+    <path
+      d="M12 8v5M12 16.2v.2"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"></path>
+  </svg>
+  <p>
+    {
+      t(locale, 'post.noTranslation', {
+        locale: localeLabel(locale, locale),
+        original: localeLabel(contentLocale, locale),
+      })
+    }
+  </p>
+</div>
+
+<style>
+  .translation-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ui-space-sm);
+    padding-inline-start: var(--ui-space-lg);
+    margin-block-end: var(--ui-space-lg);
+    border-inline-start: 2px solid var(--ui-text);
+    color: var(--ui-text-secondary);
+    font-size: 0.9375rem;
+  }
+
+  .translation-notice svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-block-start: 2px;
+    color: var(--ui-text-accent);
+  }
+</style>

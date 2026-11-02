@@ -1,0 +1,210 @@
+---
+/**
+ * 后台项目 —— 关于页那张卡片的项目（名称 / 简介 / 地址）。
+ * ---------------------------------------------------------
+ * 数据在 D1，页面是 on-demand 的：内容由脚本去接口取。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+---
+
+<AdminLayout
+  locale={locale}
+  section="projects"
+  title={t(locale, 'admin.projects.title')}
+  intro={t(locale, 'admin.projects.intro')}
+>
+  <form class="admin-card admin-project-form" data-admin-project-form>
+    <h2 class="admin-card__title">{t(locale, 'admin.projects.new')}</h2>
+    <div class="admin-grid">
+      <label class="admin-field">
+        <span class="admin-field__label">{t(locale, 'admin.projects.name')}</span>
+        <input class="ui-input" type="text" name="name" maxlength="80" required />
+      </label>
+      <label class="admin-field admin-field--wide">
+        <span class="admin-field__label">{t(locale, 'admin.projects.description')}</span>
+        <input class="ui-input" type="text" name="description" maxlength="200" />
+      </label>
+      <label class="admin-field admin-field--wide">
+        <span class="admin-field__label">{t(locale, 'admin.projects.url')}</span>
+        <input class="ui-input" type="text" name="url" required />
+      </label>
+    </div>
+    <button class="ui-btn ui-btn--primary" type="submit">{t(locale, 'admin.projects.create')}</button>
+  </form>
+
+  <div class="admin-list" data-admin-projects></div>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { t } from '../../../i18n'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  interface ProjectRow {
+    id: string
+    name: string
+    description: string
+    url: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const list = document.querySelector<HTMLElement>('[data-admin-projects]')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+  const form = document.querySelector<HTMLFormElement>('[data-admin-project-form]')
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function field(
+    parent: HTMLElement,
+    name: string,
+    value: string,
+    label: string,
+  ): HTMLInputElement {
+    const wrap = document.createElement('label')
+    wrap.className = 'admin-field'
+    const caption = document.createElement('span')
+    caption.className = 'admin-field__label'
+    caption.textContent = label
+    wrap.appendChild(caption)
+    const input = document.createElement('input')
+    input.className = 'ui-input'
+    input.type = 'text'
+    input.name = name
+    input.value = value
+    wrap.appendChild(input)
+    parent.appendChild(wrap)
+    return input
+  }
+
+  function row(item: ProjectRow): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'admin-project'
+
+    const fields = document.createElement('div')
+    fields.className = 'admin-grid'
+    const name = field(fields, 'name', item.name, t(locale, 'admin.projects.name'))
+    const description = field(
+      fields,
+      'description',
+      item.description,
+      t(locale, 'admin.projects.description'),
+    )
+    const url = field(fields, 'url', item.url, t(locale, 'admin.projects.url'))
+    box.appendChild(fields)
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-project__actions'
+
+    const save = document.createElement('button')
+    save.className = 'ui-btn ui-btn--primary'
+    save.type = 'button'
+    save.textContent = t(locale, 'admin.action.save')
+    save.addEventListener('click', async () => {
+      try {
+        const result = await api<{ buildTriggered?: boolean }>(
+          '/api/admin/projects/' + item.id,
+          {
+            method: 'PUT',
+            body: JSON.stringify({
+              name: name.value,
+              description: description.value,
+              url: url.value,
+            }),
+          },
+        )
+        say(
+          t(
+            locale,
+            result.buildTriggered ? 'admin.hint.savedBuilding' : 'admin.hint.savedNoBuild',
+          ),
+        )
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    actions.appendChild(save)
+
+    const remove = document.createElement('button')
+    remove.className = 'ui-btn admin-btn--danger'
+    remove.type = 'button'
+    remove.textContent = t(locale, 'admin.action.delete')
+    remove.addEventListener('click', async () => {
+      if (!confirm(t(locale, 'admin.confirm.delete'))) return
+      try {
+        await api('/api/admin/projects/' + item.id, { method: 'DELETE' })
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    actions.appendChild(remove)
+
+    box.appendChild(actions)
+    return box
+  }
+
+  async function render() {
+    if (!list) return
+    try {
+      const data = await api<{ projects: ProjectRow[] }>('/api/admin/projects')
+      list.textContent = ''
+      if (data.projects.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const mark = document.createElement('span')
+        mark.className = 'admin-empty__mark'
+        mark.setAttribute('aria-hidden', 'true')
+        mark.textContent = '◈'
+        empty.appendChild(mark)
+        const label = document.createElement('p')
+        label.className = 'admin-empty__text'
+        label.textContent = t(locale, 'admin.projects.empty')
+        empty.appendChild(label)
+        list.appendChild(empty)
+        return
+      }
+      for (const item of data.projects) list.appendChild(row(item))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = new FormData(form)
+    try {
+      const result = await api<{ buildTriggered?: boolean }>('/api/admin/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: String(data.get('name') ?? ''),
+          description: String(data.get('description') ?? ''),
+          url: String(data.get('url') ?? ''),
+        }),
+      })
+      form.reset()
+      say(
+        t(
+          locale,
+          result.buildTriggered ? 'admin.hint.savedBuilding' : 'admin.hint.savedNoBuild',
+        ),
+      )
+      await render()
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  })
+
+  void render()
+</script>

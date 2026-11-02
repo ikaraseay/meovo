@@ -1,0 +1,584 @@
+---
+/**
+ * 文档编辑器 —— 新建 / 修改 / 预览 / 插图 / 导入 .md。
+ * 正文是普通 markdown；发布只是把状态改成 published，站点要等下一次构建。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../../i18n'
+import { LICENSES, LICENSE_IDS } from '../../../../lib/licenses'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+const docId = Astro.params.id ?? 'new'
+const isNew = docId === 'new'
+---
+
+<AdminLayout
+  locale={locale}
+  section="documents"
+  title={t(locale, isNew ? 'admin.editor.new' : 'admin.editor.edit')}
+  intro={t(locale, isNew ? 'admin.editor.newIntro' : 'admin.editor.editIntro')}
+>
+  <div slot="actions" class="admin-head__group">
+    <span class="admin-pill admin-pill--ghost" data-admin-status hidden></span>
+    <a class="ui-btn" data-admin-view hidden target="_blank" rel="noopener">
+      {t(locale, 'admin.action.view')}
+    </a>
+    <button class="ui-btn ui-btn--primary" type="button" data-admin-publish>
+      {t(locale, 'admin.action.publish')}
+    </button>
+  </div>
+
+  <form class="admin" data-admin-editor data-doc-id={docId}>
+    <section class="admin-card">
+      <h2 class="admin-card__title">{t(locale, 'admin.card.basics')}</h2>
+      <div class="admin-grid">
+        <label class="admin-field admin-field--wide">
+          <span class="admin-field__label">{t(locale, 'admin.field.title')}</span>
+          <input class="ui-input" type="text" name="title" required />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.slug')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="slug" required />
+          <span class="admin-field__hint">{t(locale, 'admin.hint.slug')}</span>
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.locale')}</span>
+          <select class="ui-input" name="locale">
+            <option value="zh">zh</option>
+            <option value="en">en</option>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.pubDate')}</span>
+          <input class="ui-input" type="date" name="pubDate" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.updatedDate')}</span>
+          <input class="ui-input" type="date" name="updatedDate" />
+        </label>
+
+        <label class="admin-field admin-field--wide">
+          <span class="admin-field__label">{t(locale, 'admin.field.description')}</span>
+          <input class="ui-input" type="text" name="description" />
+        </label>
+      </div>
+    </section>
+
+    <section class="admin-card">
+      <h2 class="admin-card__title">{t(locale, 'admin.card.taxonomy')}</h2>
+      <div class="admin-grid">
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.category')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="category" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="tags" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
+          <select class="ui-input" name="license">
+            {LICENSE_IDS.map((id) => (
+              <option value={id}>{t(locale, LICENSES[id].nameKey)}</option>
+            ))}
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesId')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="seriesId" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
+          <input class="ui-input" type="text" name="seriesTitle" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesOrder')}</span>
+          <input class="ui-input" type="number" name="seriesOrder" min="1" />
+        </label>
+      </div>
+    </section>
+
+    <section class="admin-card">
+      <div class="admin-card__head">
+        <h2 class="admin-card__title">{t(locale, 'admin.card.bodyAndPreview')}</h2>
+        <button class="ui-btn" type="button" data-admin-parallel aria-pressed="false">
+          {t(locale, 'admin.action.parallel')}
+        </button>
+      </div>
+      <div class="admin-editor" data-admin-editor-panes>
+        <div class="admin-editor__pane">
+          <span class="admin-field__label">{t(locale, 'admin.field.body')}</span>
+          <textarea class="ui-input admin-editor__body" name="body"></textarea>
+        </div>
+        <!-- 对版：同 slug 的另一种语言版本（只读参考） -->
+        <div class="admin-editor__pane" data-admin-parallel-pane hidden>
+          <span class="admin-field__label" data-admin-parallel-label></span>
+          <textarea
+            class="ui-input admin-editor__body admin-editor__body--readonly"
+            data-admin-parallel-body
+            readonly
+          ></textarea>
+          <a class="ui-btn" data-admin-parallel-link hidden target="_blank" rel="noopener"></a>
+        </div>
+        <div class="admin-editor__pane" data-admin-preview-pane>
+          <span class="admin-field__label">{t(locale, 'admin.action.preview')}</span>
+          <div class="admin-preview" data-admin-preview></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="admin-actionbar">
+      <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
+      <div class="admin-actionbar__buttons">
+        <button class="ui-btn" type="button" data-admin-preview-button>
+          {t(locale, 'admin.action.preview')}
+        </button>
+        <button class="ui-btn" type="button" data-admin-media-button>
+          {t(locale, 'admin.action.insertImage')}
+        </button>
+        <label class="ui-btn">
+          {t(locale, 'admin.action.import')}
+          <input type="file" accept=".md,.markdown" hidden data-admin-import />
+        </label>
+        <button class="ui-btn admin-btn--danger" type="button" data-admin-delete hidden>
+          {t(locale, 'admin.action.delete')}
+        </button>
+        <button class="ui-btn ui-btn--primary" type="submit">
+          {t(locale, 'admin.action.save')}
+        </button>
+      </div>
+    </div>
+
+    <div class="admin-media-picker" data-admin-media-picker hidden></div>
+  </form>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../../lib/dom-contract'
+  import { t } from '../../../../i18n'
+  import { api, errorText } from '../../../../../backend/lib/admin/client'
+  import { parseFrontmatter } from '../../../../../backend/lib/admin/frontmatter'
+
+  interface DocumentRow {
+    id: string
+    slug: string
+    locale: string
+    title: string
+    description: string
+    body: string
+    pub_date: string | null
+    updated_date: string | null
+    category: string | null
+    tags: string
+    series_id: string | null
+    series_title: string | null
+    series_order: number | null
+    license: string
+    status: string
+    updated_at: string
+  }
+
+  interface MediaRow {
+    id: string
+    key: string
+    alt: string
+    mime: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const form = document.querySelector<HTMLFormElement>('[' + ATTR.adminEditor + ']')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+  const preview = document.querySelector<HTMLElement>('[' + ATTR.adminPreview + ']')
+  const picker = document.querySelector<HTMLElement>('[' + ATTR.adminMediaPicker + ']')
+  const docId = form?.getAttribute('data-doc-id') ?? 'new'
+  const statusTag = document.querySelector<HTMLElement>('[data-admin-status]')
+  const savedAt = document.querySelector<HTMLElement>('[data-admin-saved-at]')
+  const viewLink = document.querySelector<HTMLAnchorElement>('[data-admin-view]')
+  const deleteButton = document.querySelector<HTMLButtonElement>('[data-admin-delete]')
+  const publishButton = document.querySelector<HTMLButtonElement>('[data-admin-publish]')
+  const parallelButton = document.querySelector<HTMLButtonElement>('[data-admin-parallel]')
+  const parallelPane = document.querySelector<HTMLElement>('[data-admin-parallel-pane]')
+  const parallelBody = document.querySelector<HTMLTextAreaElement>('[data-admin-parallel-body]')
+  const parallelLabel = document.querySelector<HTMLElement>('[data-admin-parallel-label]')
+  const parallelLink = document.querySelector<HTMLAnchorElement>('[data-admin-parallel-link]')
+  const editorPanes = document.querySelector<HTMLElement>('[data-admin-editor-panes]')
+  let parallelOn = false
+  let updatedAt: string | null = null
+  let status = 'draft'
+  let dirty = false
+
+  function field(name: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null {
+    return form?.elements.namedItem(name) as HTMLInputElement | null
+  }
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function setField(name: string, value: string) {
+    const element = field(name)
+    if (element) element.value = value
+  }
+
+  function collect() {
+    return {
+      title: field('title')?.value ?? '',
+      slug: field('slug')?.value ?? '',
+      locale: field('locale')?.value ?? 'zh',
+      description: field('description')?.value ?? '',
+      body: field('body')?.value ?? '',
+      pubDate: field('pubDate')?.value ?? '',
+      updatedDate: field('updatedDate')?.value ?? '',
+      category: field('category')?.value ?? '',
+      tags: field('tags')?.value ?? '',
+      seriesId: field('seriesId')?.value ?? '',
+      seriesTitle: field('seriesTitle')?.value ?? '',
+      seriesOrder: field('seriesOrder')?.value ?? '',
+      license: field('license')?.value ?? 'cc-by',
+      updatedAt: updatedAt ?? '',
+    }
+  }
+
+  function fill(item: DocumentRow) {
+    updatedAt = item.updated_at
+    status = item.status
+    dirty = false
+    setField('title', item.title)
+    setField('slug', item.slug)
+    setField('locale', item.locale)
+    setField('description', item.description)
+    setField('body', item.body)
+    setField('pubDate', (item.pub_date ?? '').slice(0, 10))
+    setField('updatedDate', (item.updated_date ?? '').slice(0, 10))
+    setField('category', item.category ?? '')
+    setField('tags', safeTags(item.tags))
+    setField('seriesId', item.series_id ?? '')
+    setField('seriesTitle', item.series_title ?? '')
+    setField('seriesOrder', item.series_order == null ? '' : String(item.series_order))
+    setField('license', item.license)
+  }
+
+  /** 对版：拉同 slug 的另一种语言版本（只读参考） */
+  async function loadParallel() {
+    if (!parallelOn || !parallelLabel || !parallelBody) return
+    const slug = (field('slug')?.value ?? '').trim()
+    const other = (field('locale')?.value ?? 'zh') === 'zh' ? 'en' : 'zh'
+
+    if (parallelLink) parallelLink.hidden = true
+    if (!slug) {
+      parallelLabel.textContent = t(locale, 'admin.editor.parallelLabel', { locale: other })
+      parallelBody.value = ''
+      return
+    }
+
+    try {
+      const data = await api<{ document: DocumentRow | null }>(
+        '/api/admin/documents?slug=' + encodeURIComponent(slug) + '&locale=' + other,
+      )
+      const sibling = data.document
+      if (!sibling) {
+        parallelLabel.textContent = t(locale, 'admin.editor.parallelMissing', { locale: other })
+        parallelBody.value = ''
+        return
+      }
+      parallelLabel.textContent =
+        t(locale, 'admin.editor.parallelLabel', { locale: other }) + ' · ' + sibling.title
+      parallelBody.value = sibling.body
+      if (parallelLink) {
+        parallelLink.hidden = false
+        parallelLink.href = '/' + locale + '/admin/documents/' + sibling.id
+        parallelLink.textContent = t(locale, 'admin.editor.parallelOpen', { locale: other })
+      }
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  parallelButton?.addEventListener('click', () => {
+    parallelOn = !parallelOn
+    parallelButton.setAttribute('aria-pressed', String(parallelOn))
+    parallelButton.classList.toggle('ui-btn--primary', parallelOn)
+    if (parallelPane) parallelPane.hidden = !parallelOn
+    editorPanes?.classList.toggle('admin-editor--parallel', parallelOn)
+    void loadParallel()
+  })
+
+  // slug 或语言改了 —— 对版要跟着换
+  field('slug')?.addEventListener('change', () => void loadParallel())
+  field('locale')?.addEventListener('change', () => void loadParallel())
+
+  function safeTags(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.join(', ') : ''
+    } catch {
+      return ''
+    }
+  }
+
+  /** 状态条：草稿 / 已发布 + 最后保存时间 + 线上链接 */
+  function renderStatus() {
+    const published = status === 'published'
+    if (statusTag) {
+      statusTag.hidden = false
+      statusTag.className = 'admin-pill' + (published ? ' admin-pill--published' : ' admin-pill--ghost')
+      statusTag.innerHTML =
+        '<span class="admin-pill__dot"></span>' +
+        (published ? t(locale, 'admin.status.published') : t(locale, 'admin.status.draft'))
+    }
+    if (savedAt) {
+      savedAt.hidden = false
+      savedAt.textContent = updatedAt
+        ? t(locale, 'admin.editor.lastSaved', { time: formatTime(updatedAt) })
+        : t(locale, 'admin.editor.notPublished')
+    }
+    if (viewLink) {
+      viewLink.hidden = !published
+      const slug = field('slug')?.value ?? ''
+      if (published && slug) viewLink.href = '/' + (field('locale')?.value ?? locale) + '/posts/' + slug + '/'
+    }
+    if (deleteButton) deleteButton.hidden = docId === 'new'
+    if (publishButton) {
+      publishButton.textContent = published
+        ? t(locale, 'admin.action.unpublish')
+        : t(locale, 'admin.action.publish')
+      publishButton.classList.toggle('ui-btn--primary', !published)
+    }
+  }
+
+  function formatTime(value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+
+  async function save(publish: boolean): Promise<boolean> {
+    const payload = collect()
+    try {
+      if (docId === 'new') {
+        const created = await api<{ id: string }>('/api/admin/documents', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        location.href = '/' + locale + '/admin/documents/' + created.id
+        return true
+      }
+      const saved = await api<{ buildTriggered?: boolean }>('/api/admin/documents/' + docId, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      })
+      dirty = false
+      if (publish) {
+        const result = await api<{ buildTriggered?: boolean }>(
+          '/api/admin/documents/' + docId + '/publish',
+          {
+            method: 'POST',
+            body: JSON.stringify({ published: true }),
+          },
+        )
+        status = 'published'
+        say(
+          t(
+            locale,
+            result.buildTriggered
+              ? 'admin.hint.publishedBuilding'
+              : 'admin.hint.publishedNoBuild',
+          ),
+        )
+      } else {
+        // 已发布的文章保存 → 服务端会敲构建钩子；草稿不触发
+        say(
+          t(
+            locale,
+            saved.buildTriggered
+              ? 'admin.hint.savedBuilding'
+              : status === 'published'
+                ? 'admin.hint.savedNoBuild'
+                : 'admin.hint.saved',
+          ),
+        )
+      }
+      renderStatus()
+      return true
+    } catch (error) {
+      const failure = error as { code?: string; errors?: string[] }
+      const detail = failure.errors?.map((code) => errorText(locale, code)).join(' / ')
+      say(detail || errorText(locale, failure.code ?? 'request_failed'), true)
+      return false
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    await save(false)
+  })
+
+  form?.addEventListener('input', () => {
+    dirty = true
+  })
+
+  publishButton?.addEventListener('click', async () => {
+    if (status === 'published') {
+      // 撤回 —— 只改状态，正文不动
+      try {
+        const result = await api<{ buildTriggered?: boolean }>(
+          '/api/admin/documents/' + docId + '/publish',
+          {
+            method: 'POST',
+            body: JSON.stringify({ published: false }),
+          },
+        )
+        status = 'draft'
+        dirty = false
+        say(
+          t(
+            locale,
+            result.buildTriggered ? 'admin.hint.draftBuilding' : 'admin.hint.draftNoBuild',
+          ),
+        )
+        renderStatus()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+      return
+    }
+    await save(true)
+  })
+
+  deleteButton?.addEventListener('click', async () => {
+    if (!confirm(t(locale, 'admin.confirm.delete'))) return
+    try {
+      await api('/api/admin/documents/' + docId, { method: 'DELETE' })
+      location.href = '/' + locale + '/admin/'
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  })
+
+  document
+    .querySelector<HTMLButtonElement>('[data-admin-preview-button]')
+    ?.addEventListener('click', async () => {
+      try {
+        const data = await api<{ html: string }>('/api/admin/preview', {
+          method: 'POST',
+          body: JSON.stringify({ markdown: field('body')?.value ?? '' }),
+        })
+        if (preview) preview.innerHTML = data.html
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+
+  function insertAtCursor(text: string) {
+    const body = field('body') as HTMLTextAreaElement | null
+    if (!body) return
+    const start = body.selectionStart ?? body.value.length
+    const end = body.selectionEnd ?? body.value.length
+    body.value = body.value.slice(0, start) + text + body.value.slice(end)
+    body.focus()
+    dirty = true
+  }
+
+  document
+    .querySelector<HTMLButtonElement>('[data-admin-media-button]')
+    ?.addEventListener('click', async () => {
+      if (!picker) return
+      if (!picker.hidden) {
+        picker.hidden = true
+        return
+      }
+      try {
+        const data = await api<{ media: MediaRow[] }>('/api/admin/media')
+        picker.textContent = ''
+        for (const item of data.media) {
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.className = 'admin-media-picker__item'
+          const image = document.createElement('img')
+          image.src = '/media/' + item.key
+          image.alt = item.alt
+          image.loading = 'lazy'
+          button.appendChild(image)
+          button.addEventListener('click', () => {
+            insertAtCursor('![' + (item.alt || '') + '](/media/' + item.key + ')')
+          })
+          picker.appendChild(button)
+        }
+        picker.hidden = false
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+
+  document
+    .querySelector<HTMLInputElement>('[data-admin-import]')
+    ?.addEventListener('change', async (event) => {
+      const input = event.target as HTMLInputElement
+      const file = input.files?.[0]
+      if (!file) return
+      const parsed = parseFrontmatter(await file.text())
+      const fields = parsed.fields
+      const title = typeof fields.title === 'string' ? fields.title : ''
+      const description = typeof fields.description === 'string' ? fields.description : ''
+      const category = typeof fields.category === 'string' ? fields.category : ''
+      const license = typeof fields.license === 'string' ? fields.license : ''
+      const pubDate = typeof fields.pubDate === 'string' ? fields.pubDate : ''
+      const tags = Array.isArray(fields.tags) ? fields.tags.join(', ') : ''
+      setField('title', title)
+      setField('description', description)
+      setField('category', category)
+      setField('license', license)
+      setField('pubDate', pubDate.slice(0, 10))
+      setField('tags', tags)
+      setField('body', parsed.body)
+      if (!field('slug')?.value) {
+        setField('slug', title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-'))
+      }
+      dirty = true
+      say(t(locale, 'admin.hint.imported'))
+    })
+
+  async function load() {
+    if (docId === 'new') {
+      renderStatus()
+      return
+    }
+    try {
+      const data = await api<{ document: DocumentRow }>('/api/admin/documents/' + docId)
+      fill(data.document)
+      renderStatus()
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  // 没保存就离开 —— 别把改了一半的内容丢掉
+  window.addEventListener('beforeunload', (event) => {
+    if (!dirty) return
+    event.preventDefault()
+    event.returnValue = ''
+  })
+
+  void load()
+</script>

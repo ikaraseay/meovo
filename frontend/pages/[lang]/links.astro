@@ -1,0 +1,112 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import GlassWidget from '../../components/GlassWidget.astro'
+import { t, locales } from '../../i18n'
+import { friendLinks } from '../../data/links'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { lang: locale }, props: { locale } }))
+}
+
+const { locale } = Astro.props
+---
+
+<BaseLayout locale={locale} title={t(locale, 'links.title')} wide>
+  <div class="desk" data-desk>
+    <GlassWidget id="links-head" width="lg" locale={locale}>
+      <div class="links-head">
+        <h1 class="page-title">{t(locale, 'links.title')}</h1>
+        <p class="page-intro">{t(locale, 'links.intro')}</p>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="links-list" width="lg" locale={locale}>
+      {
+        friendLinks.length === 0 ? (
+          <p class="ui-text--muted">{t(locale, 'links.empty')}</p>
+        ) : (
+          <ul class="link-list">
+            {friendLinks.map((link) => (
+              <li class="link-row">
+                <a class="link-name" href={link.url} target="_blank" rel="noopener noreferrer">
+                  {link.name}
+                </a>
+                {link.description && <span class="link-desc">{link.description}</span>}
+                <span class="link-url">{link.url}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </GlassWidget>
+  </div>
+</BaseLayout>
+
+<style>
+  .links-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-intro {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+    max-width: 40ch;
+  }
+
+  .link-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .link-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    column-gap: var(--ui-space-lg);
+    align-items: baseline;
+    padding-block: var(--ui-space-md);
+    border-block-start: 1px solid var(--ui-border);
+  }
+
+  .link-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--ui-text);
+    text-decoration: none;
+  }
+
+  .link-name:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .link-desc {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .link-url {
+    font-family: var(--ui-font-mono);
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+    text-align: end;
+  }
+
+  @media not (min-width: 1024px) {
+    .link-row {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--ui-space-xs);
+    }
+
+    .link-url {
+      text-align: start;
+    }
+  }
+</style>

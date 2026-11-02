@@ -1,0 +1,160 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import PostCard from '../../components/PostCard.astro'
+import GlassWidget from '../../components/GlassWidget.astro'
+import FluidCursor from '../../components/FluidCursor'
+import { asciiArt, colorizeArt } from '../../lib/ascii-art'
+import { t, locales } from '../../i18n'
+import { getVisiblePosts, resolveItems, getPostSlug } from '../../lib/posts'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { lang: locale }, props: { locale } }))
+}
+
+const { locale } = Astro.props
+
+const posts = await getVisiblePosts()
+
+/** 按翻译组列出：同一篇文章的各语言版本算一条 */
+const items = resolveItems(posts, locale)
+
+const dateFormat = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+
+/** 最新一篇 —— 放在 Hero 里当元信息 */
+const newest = items[0]
+
+---
+
+<BaseLayout locale={locale} wide>
+  <div class="desk" data-desk>
+    <GlassWidget id="hero" width="lg" locale={locale}>
+      <!-- 终端面板：字符画头像 + 命令行文案 -->
+      <div class="term hero-term">
+        <div class="term__bar">
+          <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="term__path">yaesaraki@astro: ~</span>
+        </div>
+
+        <div class="term__body hero-body">
+          <div class="hero-art">
+            <pre class="term__art" aria-hidden="true" set:html={colorizeArt(asciiArt)} />
+          </div>
+
+          <div class="term__console">
+            <p class="term__line">
+              <span class="term__user">yaesaraki@astro</span>
+              <span class="term__dim">$</span> whoami
+            </p>
+
+            <h1 class="term__title">
+              <span class="term__prompt" aria-hidden="true">&gt;</span>
+              {t(locale, 'site.author')}<span class="term__cursor" aria-hidden="true"></span>
+            </h1>
+
+            <p class="term__line term__dim">
+              [ <span class="term__accent">{t(locale, 'site.name')}</span> | Astro 7 ]
+            </p>
+
+            <!-- 流体光标只挂小字区：巨标题要稳定落在部件里 -->
+            <div class="hero-sub">
+              <p class="term__line hero-quote">
+                <span class="term__violet" aria-hidden="true">▌</span>
+                {t(locale, 'home.subtitle')}
+              </p>
+              <p class="term__line term__dim">// {t(locale, 'site.tagline')}</p>
+              <FluidCursor client:visible container=".hero-sub" magnets=".hero-actions a" />
+            </div>
+
+            <p class="term__line term__dim">
+              // {t(locale, 'list.postCount', { count: items.length })}
+              {
+                newest && (
+                  <span>
+                    {' · '}
+                    {t(locale, 'post.publishedOn', {
+                      date: dateFormat.format(newest.post.data.pubDate),
+                    })}
+                  </span>
+                )
+              }
+            </p>
+
+            <div class="hero-actions">
+              <a class="ui-btn ui-btn--primary" href={`/${locale}/archive/`}>
+                {t(locale, 'archive.title')}
+              </a>
+              <a class="ui-btn ui-btn--secondary" href={`/${locale}/about/`}>
+                {t(locale, 'about.title')}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </GlassWidget>
+
+    {
+      items.map((item) => (
+        <GlassWidget id={`post-${getPostSlug(item.post)}`} width="md" locale={locale}>
+          <PostCard
+            post={item.post}
+            locale={locale}
+            href={item.href}
+            isFallback={item.isFallback}
+          />
+        </GlassWidget>
+      ))
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  /* 桌面：欢迎卡是正方形 —— 不铺满整行。窄屏放不下，让它按内容长 */
+  @media (min-width: 1024px) {
+    .hero-term {
+      aspect-ratio: 1;
+    }
+  }
+
+  /* 正方形里：画在上、命令行在下 —— 横排放不下中文标题 */
+  .hero-body {
+    gap: var(--ui-space-md);
+    align-items: flex-start;
+  }
+
+  @media (min-width: 1024px) {
+    .hero-body {
+      height: calc(100% - 2.5rem);
+    }
+  }
+
+  .hero-art {
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .hero-quote {
+    display: flex;
+    gap: var(--ui-space-sm);
+    color: var(--ui-term-fg);
+  }
+
+  .hero-sub {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: var(--ui-space-sm);
+    margin-block-start: var(--ui-space-md);
+    flex-wrap: wrap;
+  }
+</style>

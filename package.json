@@ -1,0 +1,48 @@
+{
+  "name": "meovo",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test": "node --test test/*.test.ts",
+    "prebuild": "node scripts/apply-config.mjs && node backend/scripts/export-d1-posts.mjs",
+    "predev": "node scripts/apply-config.mjs && node backend/scripts/export-d1-posts.mjs --ensure",
+    "pretest": "node backend/scripts/export-d1-posts.mjs --ensure",
+    "precheck": "node backend/scripts/export-d1-posts.mjs --ensure",
+    "clean": "node backend/scripts/clean-generated.mjs",
+    "export:posts": "node backend/scripts/export-d1-posts.mjs",
+    "sync": "node backend/scripts/export-d1-posts.mjs",
+    "guard": "node backend/scripts/check-remote-updates.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "export:posts:local": "node backend/scripts/export-d1-posts.mjs --local",
+    "types": "wrangler types --config cloudflare/wrangler.jsonc",
+    "deploy": "wrangler deploy --config dist/server/wrangler.json",
+    "ops": "bash scripts/ops.sh",
+    "check:i18n": "python3 scripts/check-i18n.py",
+    "check:seo": "python3 scripts/check-seo.py",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.4.3",
+    "@astrojs/mdx": "^8.1.2",
+    "@astrojs/rss": "^4.0.19",
+    "@chenglou/pretext": "^1.0.0",
+    "astro": "^7.4.4",
+    "marked": "^18.1.2",
+    "preact": "^11.1.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@astrojs/preact": "^6.1.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.156.0"
+  }
+}

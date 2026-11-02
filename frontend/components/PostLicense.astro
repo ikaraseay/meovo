@@ -1,0 +1,77 @@
+---
+/**
+ * 文本协议卡片的内容 —— 版权声明 + 许可协议。
+ * 外层玻璃壳（可拖拽部件）由 Article.astro 给，这里只管内容。
+ */
+import { t, type Locale } from '../i18n'
+import { LICENSES } from '../lib/licenses'
+import type { Post } from '../lib/posts'
+
+interface Props {
+  post: Post
+  locale: Locale
+}
+
+const { post, locale } = Astro.props
+
+const license = LICENSES[post.data.license]
+
+/** 版权年份取发布年 —— 文章的版权从发布那年算 */
+const year = post.data.pubDate.getFullYear()
+---
+
+<div class="post-license">
+  <p class="post-license-title">{t(locale, 'post.license.title')}</p>
+  <p class="post-license-meta">
+    <span>{t(locale, 'footer.copyright', { year, name: t(locale, 'site.author') })}</span>
+    {
+      license.url ? (
+        <a
+          class="post-license-name"
+          href={license.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t(locale, license.nameKey)}
+        </a>
+      ) : (
+        <span class="post-license-name">{t(locale, license.nameKey)}</span>
+      )
+    }
+  </p>
+  <p class="post-license-note">{t(locale, license.noteKey)}</p>
+</div>
+
+<style>
+  .post-license {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    font-size: 0.875rem;
+  }
+
+  .post-license-title {
+    color: var(--ui-text-secondary);
+    font-weight: 600;
+  }
+
+  .post-license-meta {
+    display: flex;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+    color: var(--ui-text-muted);
+  }
+
+  .post-license-name {
+    color: var(--ui-text-accent);
+    text-decoration: none;
+  }
+
+  a.post-license-name:hover {
+    text-decoration: underline;
+  }
+
+  .post-license-note {
+    color: var(--ui-text-muted);
+  }
+</style>

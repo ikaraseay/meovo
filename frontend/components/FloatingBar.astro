@@ -1,0 +1,1270 @@
+---
+/**
+ * 悬浮状态栏 —— 移植自 Wofuf-edge 的 AppNavbar.vue
+ *
+ * 桌面端：可拖拽的悬浮菜单（拖站名移动，悬停出现「重置位置」）
+ * 移动端：贴底的可拖拽抽屉（上下拖改变高度，默认展开）
+ * 两端共用：可拖拽的设置按钮（FAB），语言与明暗模式收在它的弹窗里
+ */
+import { getRelativeLocaleUrl } from 'astro:i18n'
+import { t, locales, localeLabel, stripLocalePrefix, type Locale } from '../i18n'
+import { ATTR } from '../lib/dom-contract'
+
+interface Props {
+  locale: Locale
+}
+
+const { locale } = Astro.props
+
+const homeHref = getRelativeLocaleUrl(locale)
+/** 切语言时保留当前页面 */
+const currentPath = stripLocalePrefix(Astro.url.pathname)
+const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/'
+
+/** 下拉子项（桌面端悬浮菜单） */
+interface NavChild {
+  label: string
+  href: string
+}
+
+interface NavItem {
+  label: string
+  /** 顶层地址 —— 移动端抽屉直接链过去 */
+  href: string
+  icon: string
+  /** 路径相等时高亮；可以列多个 */
+  matches?: string[]
+  /** 桌面端下拉的子项 */
+  children?: NavChild[]
+}
+
+/**
+ * 三栏：首页 / 归档 / 关于。
+ * 标签、分类、系列收在「归档」下面，友链收在「关于」下面。
+ * 移动端抽屉不做子菜单 —— 子项从归档页与关于页里点进去。
+ */
+const navItems: NavItem[] = [
+  { label: t(locale, 'nav.home'), href: homeHref, icon: 'home', matches: [`/${locale}`] },
+  {
+    label: t(locale, 'nav.archive'),
+    href: `/${locale}/archive/`,
+    icon: 'archive',
+    matches: [`/${locale}/archive`],
+    children: [
+      { label: t(locale, 'nav.allPosts'), href: `/${locale}/archive/` },
+      { label: t(locale, 'nav.tags'), href: `/${locale}/archive/#tags` },
+      { label: t(locale, 'nav.categories'), href: `/${locale}/archive/#categories` },
+      { label: t(locale, 'nav.series'), href: `/${locale}/archive/#series` },
+    ],
+  },
+  {
+    label: t(locale, 'nav.about'),
+    href: `/${locale}/about/`,
+    icon: 'about',
+    matches: [`/${locale}/about`, `/${locale}/links`],
+    children: [
+      { label: t(locale, 'about.title'), href: `/${locale}/about/` },
+      { label: t(locale, 'links.title'), href: `/${locale}/links/` },
+    ],
+  },
+]
+
+---
+
+<!-- 桌面端：可拖拽的悬浮菜单 -->
+<div class="floating-menu ui-nav-surface" data-float-menu>
+  <span class="drag-handle" data-float-drag>
+    <img
+      class="logo"
+      src="/avatar.png"
+      width="24"
+      height="24"
+      alt={t(locale, 'site.author')}
+      decoding="async"
+    />
+  </span>
+
+  <button
+    type="button"
+    class="reset-btn ui-nav-surface"
+    data-reset-menu
+    aria-label={t(locale, 'nav.reset')}
+    title={t(locale, 'nav.reset')}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <path
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"></path>
+    </svg>
+  </button>
+
+  <nav class="menu-links" aria-label={t(locale, 'a11y.mainNav')}>
+    {
+      navItems.map((item, index) =>
+        item.children ? (
+          <div class="nav-group" data-nav-group={index}>
+            <a
+              class="menu-link nav-trigger"
+              href={item.children[0].href}
+              data-nav-trigger
+              aria-haspopup="true"
+              aria-expanded="false"
+              draggable="false"
+              aria-current={item.matches?.includes(pathname) ? 'page' : undefined}
+            >
+              <span>{item.label}</span>
+            </a>
+          </div>
+        ) : (
+          <a
+            class="menu-link"
+            href={item.href}
+            aria-current={item.matches?.includes(pathname) ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        )
+      )
+    }
+  </nav>
+</div>
+
+<!--
+  液态玻璃的折射滤镜 —— 观感参考 liquid-glass.iyinchao.cn：
+  玻璃边缘把背后的内容「掰弯」，并带一点色散（RGB 三通道位移量不同，边缘泛彩光）。
+
+  浏览器支持 backdrop-filter: url(#...)（Chromium 实测可用），
+  但只写标准属性 —— 同时写 -webkit- 会被 CSS 压缩流程合并掉。
+-->
+<svg class="glass-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <filter
+    id="glass-refract"
+    x="-12%"
+    y="-12%"
+    width="124%"
+    height="124%"
+    color-interpolation-filters="sRGB"
+  >
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="11" result="noise" />
+    <feGaussianBlur in="noise" stdDeviation="2" result="soft" />
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="30" xChannelSelector="R" yChannelSelector="G" result="d0" />
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="24" xChannelSelector="R" yChannelSelector="G" result="d1" />
+    <feDisplacementMap in="SourceGraphic" in2="soft" scale="36" xChannelSelector="R" yChannelSelector="G" result="d2" />
+    <feColorMatrix in="d2" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr" />
+    <feColorMatrix in="d1" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg" />
+    <feColorMatrix in="d0" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb" />
+    <feBlend in="cr" in2="cg" mode="screen" result="crg" />
+    <feBlend in="crg" in2="cb" mode="screen" />
+  </filter>
+</svg>
+
+<!--
+  二级菜单面板 —— 必须是 .floating-menu 的**同级**元素。
+  嵌在它里面的话，父级的 backdrop-filter 会创建 backdrop root，
+  子面板的毛玻璃就模糊不到页面内容，只剩一层半透明底，文字跟后面的内容糊在一起。
+
+  面板本身**不能**带 backdrop-filter（那会创建 backdrop root），
+  毛玻璃交给里面的底板 .nav-panel-plate。
+  三层的顺序是「底板 → 镜片 → 文字」：
+  镜片要是压在文字上面，它的 backdrop-filter 会把文字一起糊掉。
+-->
+<div class="nav-panel" data-nav-panel>
+  <!-- 底板：跟一级菜单同一套 --ui-nav-* token，所以两层毛玻璃长得一模一样 -->
+  <div class="nav-panel-plate ui-nav-surface ui-nav-surface--panel"></div>
+
+  <!-- 玻璃镜片：夹在底板和文字之间，罩住哪个子项就糊哪个子项的「底」 -->
+  <div class="glass-lens ui-glass-lens" data-glass-lens aria-hidden="true"></div>
+
+  {
+    navItems.map((item, index) =>
+      item.children && (
+        <ul class="nav-panel-items" data-panel-items={index}>
+          {item.children.map((child, i) => (
+            <li style={`--i:${i}`}>
+              <a class="nav-panel-item" href={child.href} data-panel-link>
+                {child.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    )
+  }
+</div>
+
+<!-- 移动端：贴底可拖拽抽屉 -->
+<nav class="drawer-nav" data-drawer aria-label={t(locale, 'a11y.mainNav')}>
+  <div class="drawer-blur ui-nav-surface ui-nav-surface--top"></div>
+  <div class="drawer-content">
+    <div class="drawer-handle-wrapper" data-drawer-drag>
+      <div class="drawer-handle"></div>
+    </div>
+
+    <div class="drawer-items" data-drawer-items>
+      {
+        navItems.map((item) => (
+          <a
+            class="drawer-item"
+            href={item.href}
+            aria-current={item.matches?.includes(pathname) ? 'page' : undefined}
+          >
+            <span class="drawer-label">{item.label}</span>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</nav>
+
+<!-- 设置悬浮按钮（所有设备） -->
+<button
+  type="button"
+  class="settings-fab ui-nav-surface ui-fab"
+  data-fab
+  aria-label={t(locale, 'settings.open')}
+  title={t(locale, 'settings.open')}
+>
+    <span class="fab-text">{t(locale, 'settings.title')}</span>
+</button>
+
+<!-- 设置弹窗：语言 + 明暗模式 -->
+<div class="settings-popup ui-nav-surface" data-settings hidden>
+  <div class="popup-header" data-popup-drag>
+    <div class="popup-drag-handle"></div>
+  </div>
+
+  <p class="popup-title">{t(locale, 'settings.title')}</p>
+
+  <div class="settings-section">
+    <p class="section-label">{t(locale, 'lang.label')}</p>
+    <div class="options-grid">
+      {
+        locales.map((code) => (
+          <a
+            class:list={['ui-choice', 'option-lang', { 'is-active': code === locale }]}
+            href={getRelativeLocaleUrl(code, currentPath)}
+            hreflang={code}
+            lang={code}
+            aria-current={code === locale ? 'true' : undefined}
+          >
+            <span class="option-flag" aria-hidden="true">
+              {code === 'zh' ? '🇨🇳' : '🇺🇸'}
+            </span>
+            <span class="option-text">{localeLabel(code, locale)}</span>
+          </a>
+        ))}
+      <!-- 跟随系统 = 回根路径，由 Worker 按 Accept-Language 挑语言 -->
+      <a class="ui-choice option-lang" href="/" data-lang-system>
+        <span class="option-flag" aria-hidden="true">🌐</span>
+        <span class="option-text">{t(locale, 'lang.system')}</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <p class="section-label">{t(locale, 'theme.label')}</p>
+    <div class="options-grid">
+      <button type="button" class="ui-choice option-theme" data-theme-mode="light">
+        <span>{t(locale, 'theme.light')}</span>
+      </button>
+      <button type="button" class="ui-choice option-theme" data-theme-mode="dark">
+        <span>{t(locale, 'theme.dark')}</span>
+      </button>
+      <button type="button" class="ui-choice option-theme" data-theme-mode="system">
+        <span>{t(locale, 'theme.system')}</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <p class="section-label">{t(locale, 'settings.fontSize')}</p>
+    <div class="options-grid options-grid--tight">
+      <button type="button" class="ui-choice option-step" data-prose-scale="0.9">
+        {t(locale, 'settings.sizeSmall')}
+      </button>
+      <button type="button" class="ui-choice option-step" data-prose-scale="1">
+        {t(locale, 'settings.sizeMedium')}
+      </button>
+      <button type="button" class="ui-choice option-step" data-prose-scale="1.12">
+        {t(locale, 'settings.sizeLarge')}
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <p class="section-label">{t(locale, 'settings.lineHeight')}</p>
+    <div class="options-grid options-grid--tight">
+      <button type="button" class="ui-choice option-step" data-prose-lh="1.65">
+        {t(locale, 'settings.heightCompact')}
+      </button>
+      <button type="button" class="ui-choice option-step" data-prose-lh="1.85">
+        {t(locale, 'settings.heightStandard')}
+      </button>
+      <button type="button" class="ui-choice option-step" data-prose-lh="2.05">
+        {t(locale, 'settings.heightRelaxed')}
+      </button>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <button
+      type="button"
+      class="ui-btn ui-btn--secondary reset-layout-btn"
+      {...{ [ATTR.layoutReset]: '' }}
+    >
+      {t(locale, 'layout.reset')}
+    </button>
+  </div>
+
+  <button type="button" class="ui-btn ui-btn--secondary close-btn" data-settings-close>
+    {t(locale, 'settings.close')}
+  </button>
+</div>
+
+<script>
+  import { initNavPanel, type NavPanelController } from '../lib/nav-panel'
+  import {
+    clearFloatingBarState,
+    readFloatingBarState,
+    saveFloatingBarState,
+  } from '../lib/floating-bar-state'
+  import { ATTR, CLASS } from '../lib/dom-contract'
+  import { beginDrag } from '../lib/drag'
+  import { isDesktop } from '../lib/breakpoint'
+  import {
+    applyPreferences,
+    clearMode,
+    readModeChoice,
+    readPreferences,
+    setMode,
+    setProseLh,
+    setProseScale,
+    type ThemeMode,
+  } from '../lib/preferences'
+  import {
+    avoidBar,
+    clampFab,
+    clampPoint,
+    defaultMenuX as menuDefaultX,
+  } from '../lib/floating-bar-layout'
+
+  // 用户摆出来的位置属于用户 —— 跨页面、跨刷新都得还在
+  const saved = readFloatingBarState()
+
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
+
+  /* ---------- 桌面端悬浮菜单 ---------- */
+
+  const menu = document.querySelector<HTMLElement>('[data-float-menu]')
+  const menuHandle = document.querySelector<HTMLElement>('[data-float-drag]')
+  const resetBtn = document.querySelector<HTMLButtonElement>('[data-reset-menu]')
+
+  const MARGIN = 10
+
+  let menuX = 0
+  let menuY = 0
+  let hideTimer = 0
+
+  /** 菜单默认停在视口顶部正中 —— 用实测宽度算，菜单长短变了也不会跑偏 */
+  function defaultMenuX() {
+    const w = menu?.offsetWidth || 320
+    return menuDefaultX(w, { width: window.innerWidth, height: window.innerHeight }, MARGIN)
+  }
+
+  function placeMenu() {
+    if (!menu) return
+    const p = clampPoint(
+      { x: menuX, y: menuY },
+      { width: menu.offsetWidth || 320, height: menu.offsetHeight || 200 },
+      { width: window.innerWidth, height: window.innerHeight },
+      MARGIN,
+    )
+    menuX = p.x
+    menuY = p.y
+    menu.style.left = `${menuX}px`
+    menu.style.top = `${menuY}px`
+  }
+
+  function resetMenu() {
+    menuX = defaultMenuX()
+    menuY = window.innerHeight / 100
+    placeMenu()
+    hideReset()
+    saveFloatingBarState({ menu: { x: menuX, y: menuY } })
+  }
+
+  function showReset() {
+    resetBtn?.classList.add(CLASS.visible)
+    window.clearTimeout(hideTimer)
+  }
+
+  function hideReset() {
+    window.clearTimeout(hideTimer)
+    hideTimer = window.setTimeout(() => resetBtn?.classList.remove(CLASS.visible), 3000)
+  }
+
+  if (menu) {
+    // 存过就用存的，没存过才落默认位
+    menuX = saved.menu?.x ?? defaultMenuX()
+    menuY = saved.menu?.y ?? window.innerHeight / 100
+    // 视口尺寸还没出来时（innerWidth 为 0）先别摆 —— 那会儿夹取会把位置夹到角落
+    if (window.innerWidth > 0) placeMenu()
+    menu.addEventListener('mouseenter', showReset)
+    menu.addEventListener('mouseleave', hideReset)
+  }
+
+  resetBtn?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    resetMenu()
+  })
+
+  // 刚切到这一页时窗口尺寸可能还是 0 —— 那会儿摆出来的位置会歪到角落，
+  // 等 load 之后再摆一次。只夹取，不重置：用户的位置得留住。
+  window.addEventListener('load', placeMenu)
+
+  if (menuHandle) {
+    let startMenuX = 0
+    let startMenuY = 0
+    beginDrag(menuHandle, {
+      onStart: () => {
+        startMenuX = menuX
+        startMenuY = menuY
+      },
+      onMove: (s) => {
+        menuX = startMenuX + s.dx
+        menuY = startMenuY + s.dy
+        placeMenu()
+      },
+      onEnd: () => {
+        showReset()
+        saveFloatingBarState({ menu: { x: menuX, y: menuY } })
+      },
+    })
+  }
+
+  /* ---------- 移动端底部抽屉 ---------- */
+
+  const drawer = document.querySelector<HTMLElement>('[data-drawer]')
+  const drawerItems = document.querySelector<HTMLElement>('[data-drawer-items]')
+  const drawerHandle = document.querySelector<HTMLElement>('[data-drawer-drag]')
+
+  const DRAWER_MIN = 40
+  const DRAWER_MAX = 130
+
+  let drawerHeight = saved.drawer?.height ?? DRAWER_MAX
+  let drawerExpanded = saved.drawer?.expanded ?? true
+
+  function placeDrawer() {
+    if (!drawer) return
+    drawer.style.height = `${drawerHeight}px`
+    if (drawerItems) drawerItems.hidden = !drawerExpanded
+  }
+
+  if (drawerHandle) {
+    let startHeight = 0
+    let height = 0
+    beginDrag(drawerHandle, {
+      onStart: () => {
+        startHeight = drawerHeight
+        height = startHeight
+      },
+      onMove: (s) => {
+        // 往上拖 = 变高：dy 向下为正，所以取负
+        height = clamp(startHeight - s.dy, DRAWER_MIN, DRAWER_MAX)
+        drawerHeight = height
+        if (drawer) drawer.style.height = `${height}px`
+        // 拖的过程中始终展开，松开才决定收还是留
+        if (drawerItems) drawerItems.hidden = false
+      },
+      onEnd: () => {
+        drawerExpanded = height >= (DRAWER_MAX + DRAWER_MIN) / 2
+        drawerHeight = drawerExpanded ? DRAWER_MAX : DRAWER_MIN
+        placeDrawer()
+        saveFloatingBarState({ drawer: { height: drawerHeight, expanded: drawerExpanded } })
+      },
+    })
+  }
+
+  placeDrawer()
+
+  /* ---------- 设置按钮（FAB）与设置弹窗 ---------- */
+
+  const fab = document.querySelector<HTMLElement>('[data-fab]')
+  const popup = document.querySelector<HTMLElement>('[data-settings]')
+  const popupHandle = document.querySelector<HTMLElement>('[data-popup-drag]')
+
+  let fabRight = saved.fab?.right ?? 20
+  let fabBottom = saved.fab?.bottom ?? 0
+  let popupX = saved.popup?.x ?? 0
+  let popupY = saved.popup?.y ?? 0
+  /** 弹窗是不是「自动落点」—— 用户拖过就别再自动挪 */
+  let popupAuto = !saved.popup
+
+  const isMobile = () => !isDesktop()
+
+  function placeFab() {
+    if (!fab) return
+    const minBottom = isMobile() ? drawerHeight + 20 : 20
+    const p = clampFab(
+      { right: fabRight, bottom: fabBottom },
+      { width: fab.offsetWidth || 72, height: fab.offsetHeight || 44 },
+      { width: window.innerWidth, height: window.innerHeight },
+      { margin: MARGIN, minBottom },
+    )
+    fabRight = p.right
+    fabBottom = p.bottom
+    fab.style.right = `${fabRight}px`
+    fab.style.bottom = `${fabBottom}px`
+  }
+
+  function placePopup() {
+    if (!popup) return
+    const p = clampPoint(
+      { x: popupX, y: popupY },
+      { width: popup.offsetWidth || 280, height: popup.offsetHeight || 240 },
+      { width: window.innerWidth, height: window.innerHeight },
+      MARGIN,
+    )
+    popupX = p.x
+    popupY = p.y
+    popup.style.left = `${popupX}px`
+    popup.style.top = `${popupY}px`
+  }
+
+  /**
+   * 自动落点时避开栏体 —— 两块玻璃叠在一起会糊成一片。
+   * 只管自动落点：用户自己拖过的位置不动。
+   */
+  function avoidNavBar() {
+    if (!menu || !popup) return
+    const rect = menu.getBoundingClientRect()
+    const p = avoidBar(
+      { x: popupX, y: popupY },
+      { width: popup.offsetWidth || 280, height: popup.offsetHeight || 240 },
+      { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+      { width: window.innerWidth, height: window.innerHeight },
+      { margin: MARGIN, gap: 8 },
+    )
+    popupX = p.x
+    popupY = p.y
+  }
+
+  let navPanel: NavPanelController | null = null
+
+  function openPopup() {
+    if (!popup) return
+    // 同一时刻只有一个覆盖层 —— 弹窗和二级面板互斥
+    navPanel?.close()
+    popup.hidden = false
+    if (popupAuto) {
+      // 自动落点：视口中间，避开栏体 —— 两块玻璃叠在一起会糊成一片
+      popupX = window.innerWidth / 2 - 140
+      popupY = window.innerHeight / 2 - 150
+      avoidNavBar()
+    }
+    placePopup()
+  }
+
+  function closePopup() {
+    if (!popup) return
+    popup.hidden = true
+  }
+
+  if (fab) {
+    fabBottom = saved.fab?.bottom ?? Math.floor(window.innerHeight * 0.2)
+    placeFab()
+  }
+
+  if (fab) {
+    let startRight = 0
+    let startBottom = 0
+    beginDrag(fab, {
+      // 超过 5px 才算拖动，否则松手时不该当成点击
+      threshold: 5,
+      onStart: () => {
+        startRight = fabRight
+        startBottom = fabBottom
+      },
+      onMove: (s) => {
+        fabRight = startRight - s.dx
+        fabBottom = startBottom - s.dy
+        placeFab()
+      },
+      onEnd: (s) => {
+        if (s.moved) {
+          saveFloatingBarState({ fab: { right: fabRight, bottom: fabBottom } })
+          return
+        }
+        // 没拖动 = 点击：开 / 关设置弹窗
+        if (s.cancelled) return
+        if (popup?.hidden) openPopup()
+        else closePopup()
+      },
+    })
+  }
+
+  if (popupHandle) {
+    let startX = 0
+    let startY = 0
+    beginDrag(popupHandle, {
+      // 超过 5px 才算拖动 —— 碰一下把手不等于用户摆过位置
+      threshold: 5,
+      onStart: () => {
+        startX = popupX
+        startY = popupY
+      },
+      onMove: (s) => {
+        popupX = startX + s.dx
+        popupY = startY + s.dy
+        placePopup()
+      },
+      onEnd: (s) => {
+        // 没拖动就别改状态 —— 碰一下把手不该让自动落点永远回不来
+        if (!s.moved) return
+        popupAuto = false
+        saveFloatingBarState({ popup: { x: popupX, y: popupY } })
+      },
+    })
+  }
+
+  /**
+   * 「重置布局」—— 用户摆出来的东西全部回到默认。
+   * 悬浮栏这头复位自己的四个面；玻璃卡片由 BaseLayout 那边的接线复位
+   * （同一个按钮，两个 module 各管各的 —— 谁的状态谁负责清）。
+   */
+  document.querySelector<HTMLElement>(`[${ATTR.layoutReset}]`)?.addEventListener('click', () => {
+    clearFloatingBarState()
+    popupAuto = true
+    // 抽屉回默认高度
+    drawerHeight = DRAWER_MAX
+    drawerExpanded = true
+    placeDrawer()
+    // 栏体回视口顶部正中
+    menuX = defaultMenuX()
+    menuY = window.innerHeight / 100
+    placeMenu()
+    // 设置按钮回右下角
+    fabRight = 20
+    fabBottom = Math.floor(window.innerHeight * 0.2)
+    placeFab()
+    // 设置弹窗回自动落点
+    popupX = window.innerWidth / 2 - 140
+    popupY = window.innerHeight / 2 - 150
+    avoidNavBar()
+    placePopup()
+  })
+
+  popup?.querySelector('[data-settings-close]')?.addEventListener('click', closePopup)
+
+  // 点弹窗外面关闭
+  const closeOnOutside = (e: Event) => {
+    if (!popup || popup.hidden) return
+    const target = e.target as Node
+    if (!popup.contains(target) && !fab?.contains(target)) closePopup()
+  }
+  document.addEventListener('mouseup', closeOnOutside)
+  document.addEventListener('touchend', closeOnOutside)
+
+  /* ---------- 语言：当前语言若正是系统要的那种，「跟随系统」才是选中项 ---------- */
+
+  /** 浏览器要的语言 —— 跟 Worker 那边的协商一个口径 */
+  function systemLocale(): 'zh' | 'en' {
+    const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
+    for (const tag of languages) {
+      const lower = tag.toLowerCase()
+      if (lower.startsWith('zh')) return 'zh'
+      if (lower.startsWith('en')) return 'en'
+    }
+    return 'zh'
+  }
+
+  const langSystem = document.querySelector<HTMLAnchorElement>('[data-lang-system]')
+  if (langSystem) {
+    const current = document.documentElement.lang === 'en' ? 'en' : 'zh'
+    const onSystem = systemLocale() === current
+    langSystem.classList.toggle(CLASS.active, onSystem)
+    if (onSystem) {
+      // 显式的语言选项就都取消选中 —— 现在跟着系统
+      for (const option of document.querySelectorAll<HTMLElement>('.option-lang[hreflang]')) {
+        option.classList.remove(CLASS.active)
+        option.removeAttribute('aria-current')
+      }
+    }
+  }
+
+  /* ---------- 明暗模式 ---------- */
+
+  const themeButtons = document.querySelectorAll<HTMLButtonElement>('[data-theme-mode]')
+
+  function syncThemeButtons() {
+    const choice = readModeChoice()
+    themeButtons.forEach((btn) => {
+      btn.classList.toggle(CLASS.active, btn.dataset.themeMode === choice)
+    })
+  }
+
+  themeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = btn.dataset.themeMode
+      if (choice === 'system') {
+        // 删掉存的值 —— 首屏脚本与这里都按「没存 = 跟随系统」处理
+        clearMode()
+        applyPreferences(document.documentElement, readPreferences())
+      } else {
+        const mode: ThemeMode = choice === 'dark' ? 'dark' : 'light'
+        applyPreferences(document.documentElement, { ...readPreferences(), mode })
+        setMode(mode)
+      }
+      syncThemeButtons()
+    })
+  })
+
+  syncThemeButtons()
+
+  /* 跟随系统时，系统换主题要立刻跟上（用户没手动选过才跟） */
+  const colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
+  colorScheme.addEventListener('change', () => {
+    if (readModeChoice() !== 'system') return
+    applyPreferences(document.documentElement, readPreferences())
+    syncThemeButtons()
+  })
+
+  /* ---------- 正文字号 / 行距 ---------- */
+
+  /**
+   * 当前值从**计算样式**里读 —— 默认值由 styles/prose.css 的 :root 提供，
+   * 这里不用再写一遍。首屏脚本已经按 localStorage 覆盖过了。
+   */
+  function currentProse(prop: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(prop).trim()
+  }
+
+  function syncProseButtons() {
+    const scale = currentProse('--ui-prose-scale')
+    const lineHeight = currentProse('--ui-prose-lh')
+    document.querySelectorAll<HTMLButtonElement>('[data-prose-scale]').forEach((btn) => {
+      btn.classList.toggle(CLASS.active, btn.dataset.proseScale === scale)
+    })
+    document.querySelectorAll<HTMLButtonElement>('[data-prose-lh]').forEach((btn) => {
+      btn.classList.toggle(CLASS.active, btn.dataset.proseLh === lineHeight)
+    })
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-prose-scale]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.proseScale ?? ''
+      applyPreferences(document.documentElement, { ...readPreferences(), proseScale: value })
+      setProseScale(value)
+      syncProseButtons()
+    })
+  })
+
+  document.querySelectorAll<HTMLButtonElement>('[data-prose-lh]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.proseLh ?? ''
+      applyPreferences(document.documentElement, { ...readPreferences(), proseLh: value })
+      setProseLh(value)
+      syncProseButtons()
+    })
+  })
+
+  syncProseButtons()
+
+  /* ---------- 二级菜单：长按展开 + 拖拽选择（实现在 lib/nav-panel.ts） ---------- */
+
+  navPanel = initNavPanel({
+    panel: document.querySelector<HTMLElement>('[data-nav-panel]'),
+    lens: document.querySelector<HTMLElement>('[data-glass-lens]'),
+    triggers: [...document.querySelectorAll<HTMLAnchorElement>('[data-nav-trigger]')],
+    // 同一时刻只有一个覆盖层 —— 打开面板前先关掉设置弹窗
+    onBeforeOpen: closePopup,
+  })
+
+  /* ---------- 视口变化 ---------- */
+
+  window.addEventListener('resize', () => {
+    placeMenu()
+    placeFab()
+    if (popup && !popup.hidden) placePopup()
+    navPanel?.close()
+  })
+
+</script>
+
+<style>
+  /* 滤镜定义用的空 svg —— 不能占位 */
+  .glass-defs {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+
+  /* ==================== 桌面端悬浮菜单 ==================== */
+  .floating-menu {
+    position: fixed;
+    z-index: var(--ui-z-nav);
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-xs);
+    /* 椭圆端头吃横向空间，内边距跟着放宽 */
+    padding: var(--ui-space-sm) var(--ui-space-lg);
+    /* 苹果的胶囊形：圆角 = 高度一半，9999px 由浏览器夹到 50% */
+    border-radius: var(--ui-nav-radius-full);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .drag-handle {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--ui-space-xs) var(--ui-space-sm);
+    cursor: move;
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+
+  /* 标题栏的图标 —— 就是作者头像（像素画，别插值） */
+  .logo {
+    width: 24px;
+    height: 24px;
+    display: block;
+    border-radius: var(--ui-radius-sm);
+    image-rendering: pixelated;
+  }
+
+  .reset-btn {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--ui-nav-radius-full);
+    color: var(--ui-text-muted);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.8);
+    transition:
+      opacity var(--ui-transition-fast),
+      transform var(--ui-transition-fast),
+      visibility 0s linear var(--ui-transition-fast);
+  }
+
+  .reset-btn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    transition-delay: 0s;
+  }
+
+  .reset-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .reset-btn:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .menu-links {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-xs);
+  }
+
+  .menu-link {
+    padding: var(--ui-space-xs) var(--ui-space-sm);
+    border-radius: var(--ui-nav-radius-sm);
+    /* 玻璃底下是什么颜色不固定（封面是深色的）—— 文字得用最深的那档才撑得住 */
+    color: var(--ui-text);
+    font-size: 0.9375rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .menu-link:hover {
+    color: var(--ui-text-accent);
+    background: var(--ui-surface-hover);
+  }
+
+  .menu-link[aria-current='page'] {
+    color: var(--ui-text-accent);
+  }
+
+  /* ==================== 二级菜单 ==================== */
+  .nav-group {
+    position: relative;
+  }
+
+  .nav-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    /* 长按是手势 —— 别让系统菜单/滚动抢走 pointermove */
+    touch-action: none;
+    -webkit-touch-callout: none;
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast),
+      transform var(--ui-duration-fast) var(--ui-ease-out);
+  }
+
+  /* 没有小箭头了，改用底色表示「这一栏已经展开」 */
+  .nav-trigger[aria-expanded='true'] {
+    color: var(--ui-text);
+    background: var(--ui-surface-hover);
+  }
+
+  /* 按住时的回弹反馈 */
+  .nav-trigger.is-pressing {
+    transform: scale(0.94);
+  }
+
+  /* 面板：position: fixed，由脚本摆到触发器正下方。
+     面板自己不带 backdrop-filter —— 那会创建 backdrop root，
+     毛玻璃交给里面的 .nav-panel-plate。 */
+  .nav-panel {
+    position: fixed;
+    z-index: var(--ui-z-panel);
+    min-width: 9.5rem;
+    padding: var(--ui-space-xs);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-50%) translateY(-10px) scale(0.88);
+    transform-origin: top center;
+    transition:
+      opacity var(--ui-duration-fast) var(--ui-ease-out),
+      transform var(--ui-duration-base) var(--ui-ease-spring),
+      visibility 0s linear var(--ui-duration-base);
+  }
+
+  .nav-panel.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0) scale(1);
+    transition:
+      opacity var(--ui-duration-fast) var(--ui-ease-out),
+      transform var(--ui-duration-base) var(--ui-ease-spring),
+      visibility 0s;
+  }
+
+  /* 底板：铺满面板，撑出毛玻璃与描边 */
+  .nav-panel-plate {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* 文字层压在最上面 —— 镜片在它下面，文字永远清晰 */
+  .nav-panel-items {
+    position: relative;
+    display: none;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-panel-items.is-active {
+    display: block;
+  }
+
+  /* 逐条落位。
+     刻意不动 opacity —— 文字的可读性不该依赖「动画正好在跑」，
+     万一时间线卡住，最坏也只是位置偏一点，不会糊成看不清。 */
+  .nav-panel.is-open .nav-panel-item {
+    animation: nav-item-in var(--ui-duration-base) var(--ui-ease-spring) backwards;
+    animation-delay: calc(var(--i, 0) * 28ms);
+  }
+
+  @keyframes nav-item-in {
+    from {
+      translate: 0 -8px;
+      scale: 0.94;
+    }
+    to {
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+
+  .nav-panel-item {
+    display: block;
+    padding: var(--ui-space-xs) var(--ui-space-sm);
+    border-radius: var(--ui-nav-radius-sm);
+    /* 同上：面板浮在页面上，底色不可控 */
+    color: var(--ui-text);
+    font-size: 0.9375rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      color var(--ui-transition-fast),
+      transform var(--ui-duration-fast) var(--ui-ease-spring);
+  }
+
+  /* 选中项：微微抬起一点，像被玻璃托着 */
+  .nav-panel-item.is-active {
+    color: var(--ui-text);
+    transform: translateY(-1px) scale(1.03);
+  }
+
+  /* 跟着指针走的玻璃镜片 —— 夹在底板和文字之间 */
+  .glass-lens {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: var(--ui-nav-radius-sm);
+    opacity: 0;
+    pointer-events: none;
+    transform-origin: center;
+    /* ⚠️ 尺寸（width / height）**不做过渡**，也不在 CSS 里写死 ——
+       尺寸的主人只有 JS（nav-panel.ts 量了子项就写进来）一个。
+       折射的位移图必须和滤镜区域 1:1 对齐：尺寸一旦逐帧变化，
+       每帧都要重建一张位移图，缓存一帧一条 —— 过渡期间生成的
+       全是元素从未有过的尺寸。位置（transform）和透明度照常过渡。 */
+    transition:
+      transform var(--ui-duration-fast) var(--ui-ease-spring),
+      opacity var(--ui-duration-fast) var(--ui-ease-out);
+  }
+
+  .glass-lens.is-visible {
+    opacity: 1;
+  }
+
+  /* ==================== 移动端底部抽屉 ==================== */
+  .drawer-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: var(--ui-z-nav);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .drawer-blur {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--ui-nav-radius-xl) var(--ui-nav-radius-xl) 0 0;
+    /* 裁掉圆角外的阴影 */
+    clip-path: inset(0 0 0 0 round var(--ui-nav-radius-xl) var(--ui-nav-radius-xl) 0 0);
+  }
+
+  .drawer-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .drawer-handle-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 8px;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .drawer-handle-wrapper:active {
+    cursor: grabbing;
+  }
+
+  .drawer-handle {
+    width: 36px;
+    height: 5px;
+    border-radius: 2.5px;
+    background: var(--ui-text-faint);
+  }
+
+  .drawer-items {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex: 1;
+    padding: 0 var(--ui-space-sm) var(--ui-space-sm);
+  }
+
+  .drawer-item {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--ui-space-sm) 2px;
+    border-radius: var(--ui-nav-radius-md);
+    color: var(--ui-text);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .drawer-item:active {
+    transform: scale(0.94);
+  }
+
+  .drawer-item[aria-current='page'] {
+    color: var(--ui-text-accent);
+    background: var(--ui-accent-gradient-subtle);
+  }
+
+  .drawer-label {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ==================== 设置悬浮按钮 ==================== */
+  .settings-fab {
+    position: fixed;
+    z-index: var(--ui-z-fab);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    padding: 0 var(--ui-space-md);
+    color: var(--ui-text);
+    cursor: pointer;
+    touch-action: none;
+    transition: transform var(--ui-transition-fast);
+  }
+
+  .settings-fab:hover {
+    transform: scale(1.05);
+  }
+
+  .settings-fab:active {
+    transform: scale(0.96);
+  }
+
+  .fab-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  /* ==================== 设置弹窗 ==================== */
+  .settings-popup {
+    position: fixed;
+    z-index: var(--ui-z-popup);
+    width: 280px;
+    max-height: min(560px, 85dvh);
+    overflow-y: auto;
+    padding-bottom: var(--ui-space-md);
+    border-radius: var(--ui-nav-radius-lg);
+    color: var(--ui-text);
+    animation: ui-pop-in var(--ui-duration-base) var(--ui-ease-out);
+  }
+
+  @keyframes ui-pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+  }
+
+  .popup-header {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 6px;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .popup-header:active {
+    cursor: grabbing;
+  }
+
+  .popup-drag-handle {
+    width: 36px;
+    height: 5px;
+    border-radius: 2.5px;
+    background: var(--ui-text-faint);
+  }
+
+  .popup-title {
+    margin: 0 var(--ui-space-md);
+    padding-bottom: var(--ui-space-sm);
+    border-bottom: 1px solid var(--ui-border);
+    font-family: var(--ui-font-heading);
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .settings-section {
+    padding: var(--ui-space-sm) var(--ui-space-md);
+  }
+
+  .section-label {
+    margin: 0 0 var(--ui-space-sm);
+    padding-left: 4px;
+    color: var(--ui-text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .options-grid {
+    display: flex;
+    gap: var(--ui-space-sm);
+  }
+
+  /* 字号 / 行距这种三选一 —— 按钮压扁一点，弹窗才放得下 */
+  .options-grid--tight .ui-choice {
+    padding: var(--ui-space-xs) var(--ui-space-xs);
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  .option-lang,
+  .option-theme {
+    flex: 1;
+    position: relative;
+  }
+
+  .option-flag {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .option-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .close-btn {
+    width: calc(100% - 2 * var(--ui-space-md));
+    margin: var(--ui-space-sm) var(--ui-space-md) 0;
+    padding: var(--ui-space-md);
+    font-size: 1rem;
+  }
+
+  /* ==================== 桌面 / 移动 切换 ==================== */
+  @media not (min-width: 1024px) {
+    .floating-menu {
+      display: none;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .drawer-nav {
+      display: none;
+    }
+  }
+</style>

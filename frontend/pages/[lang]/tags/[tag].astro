@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import PostRow from '../../../components/PostRow.astro'
+import GlassWidget from '../../../components/GlassWidget.astro'
+import { t, locales, type Locale } from '../../../i18n'
+import { getVisiblePosts, resolveItems, getTagLabel } from '../../../lib/posts'
+
+export async function getStaticPaths() {
+  const posts = await getVisiblePosts()
+  const paths: Array<{ params: { lang: string; tag: string }; props: { locale: Locale; tag: string } }> = []
+
+  for (const locale of locales) {
+    const items = resolveItems(posts, locale)
+    const tags = new Set(items.flatMap((item) => item.post.data.tags))
+    for (const tag of tags) {
+      paths.push({ params: { lang: locale, tag }, props: { locale, tag } })
+    }
+  }
+
+  return paths
+}
+
+const { locale, tag } = Astro.props
+
+const posts = await getVisiblePosts()
+const items = resolveItems(posts, locale).filter((item) => item.post.data.tags.includes(tag))
+---
+
+<BaseLayout locale={locale} title={`${getTagLabel(locale, tag)} · ${t(locale, 'tags.title')}`} wide>
+  <div class="desk" data-desk>
+    <GlassWidget id="tax-head" width="lg" locale={locale}>
+      <div class="tax-head">
+        <p class="page-kicker">
+          <a href={`/${locale}/archive/#tags`}>{t(locale, 'tags.title')}</a>
+        </p>
+        <h1 class="page-title">{getTagLabel(locale, tag)}</h1>
+        <p class="page-count">{t(locale, 'list.postCount', { count: items.length })}</p>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="tax-posts" width="lg" locale={locale}>
+      {
+        items.length === 0 ? (
+          <p class="ui-text--muted">{t(locale, 'archive.empty')}</p>
+        ) : (
+          <div class="post-list">
+            {items.map((item) => (
+              <PostRow
+                post={item.post}
+                locale={locale}
+                href={item.href}
+                isFallback={item.isFallback}
+              />
+            ))}
+          </div>
+        )
+      }
+    </GlassWidget>
+  </div>
+</BaseLayout>
+
+<style>
+  .tax-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+  }
+
+  .page-kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .page-kicker a {
+    color: var(--ui-text-muted);
+    text-decoration: none;
+  }
+
+  .page-kicker a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-count {
+    font-size: 0.875rem;
+    color: var(--ui-text-muted);
+  }
+</style>

@@ -1,0 +1,2 @@
+# 根路径不再用静态 301 —— 由 Worker 按 Accept-Language 协商（frontend/pages/index.ts）。
+# 静态规则会先于 Worker 生效，留着这条就永远只到 /zh/。

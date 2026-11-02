@@ -1,0 +1,342 @@
+---
+/**
+ * 文章页的外壳 —— 标题卡、正文、目录、结构图、上下篇、页脚。
+ * ---------------------------------------------------------
+ * 页面只管路由与数据（哪篇文章、哪些语言版本）；chrome 全在这一份：
+ * 卡片摆在哪（zone）、目录怎么折叠、复制按钮怎么注入，都归这里。
+ *
+ * 正文走插槽：渲染好的 markdown 由页面传进来 —— 这一块不属于 chrome。
+ */
+import GlassWidget from './GlassWidget.astro'
+import OutlineMap from './OutlineMap.astro'
+import PostLicense from './PostLicense.astro'
+import PostMeta from './PostMeta.astro'
+import TranslationNotice from './TranslationNotice.astro'
+import { t, localeLabel, defaultLocale, type Locale } from '../i18n'
+import {
+  getPostLocale,
+  getPostSlug,
+  readingTime,
+  type Post,
+} from '../lib/posts'
+import { tocHeadings, type Heading } from '../lib/content-queries'
+import { postPath } from '../lib/urls'
+
+interface Props {
+  /** 这篇文章（内容语言可能与 URL 语言不同） */
+  post: Post
+  /** markdown 目录 */
+  headings: Heading[]
+  /** URL 上的语言 */
+  locale: Locale
+  /** 显示的是原文（当前语言还没有这个版本） */
+  isFallback: boolean
+  /** 同一个翻译组里的各语言版本 */
+  variants: Post[]
+  prev?: { title: string; href: string }
+  next?: { title: string; href: string }
+}
+
+const { post, headings, locale, isFallback, variants, prev, next } = Astro.props
+
+/** 目录只收 h2 / h3 —— 再深的层级在侧栏里没有意义 */
+const tocItems = tocHeadings(headings)
+
+/** 阅读时间按**内容语言**算，不是按 URL 上的语言 */
+const minutes = readingTime(post.body ?? '', getPostLocale(post))
+
+/**
+ * 协议按**翻译组**取 —— 同一篇文章的中英文版本得挂同一个协议。
+ * （每份 frontmatter 各写各的，中文版改了英文版没改，就会出现一篇文章两个协议）
+ */
+const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? post
+---
+
+<div class="desk" data-desk data-desk-flow>
+  <!-- 标题卡：顶部通栏 -->
+  <GlassWidget id="article-head" zone="top" width="xl" locale={locale}>
+    <div class="post-head">
+      <h1 class="post-title">{post.data.title}</h1>
+      <PostMeta post={post} locale={locale} readingMinutes={minutes} />
+    </div>
+  </GlassWidget>
+
+  <!-- 正文：正常文档流，位置永远不变；卡片绝对定位在四周，不占它的空间 -->
+  <article class="post-content" data-desk-content>
+    {isFallback && <TranslationNotice locale={locale} post={post} />}
+
+    <div
+      class="prose"
+      data-copy-label={t(locale, 'post.copyCode')}
+      data-copied-label={t(locale, 'post.copied')}
+    >
+      <slot />
+    </div>
+  </article>
+
+  {
+    tocItems.length > 0 && (
+      <GlassWidget id="article-toc" zone="side" width="sm" defaultPin locale={locale}>
+        <nav class="toc" aria-label={t(locale, 'post.toc')} data-toc>
+          <button type="button" class="toc-toggle" data-toc-toggle aria-expanded="false">
+            <span>{t(locale, 'post.toc')}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          <ul class="toc-list">
+            {tocItems.map((item) => (
+              <li class:list={['toc-item', `toc-item--depth-${item.depth}`]}>
+                <a class="toc-link" href={`#${item.slug}`} data-toc-link={item.slug}>
+                  {item.text}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </GlassWidget>
+    )
+  }
+
+  {
+    tocItems.length > 0 && (
+      <GlassWidget id="article-outline" zone="side" width="sm" defaultPin locale={locale}>
+        <OutlineMap headings={headings} title={post.data.title} locale={locale} />
+      </GlassWidget>
+    )
+  }
+
+  <!-- 协议卡：正文后面 —— 跟上下篇一样是可拖走的玻璃部件，只是位置固定在文末这一段 -->
+  <GlassWidget id="article-license" zone="tail" width="lg" locale={locale}>
+    <PostLicense post={licensePost} locale={locale} />
+  </GlassWidget>
+
+  {
+    (prev || next) && (
+      <GlassWidget id="article-nav" zone="tail" width="lg" locale={locale}>
+        <nav class="post-nav" aria-label={t(locale, 'post.navigation')}>
+          {prev && (
+            <a class="ui-card ui-card--sm ui-card--interactive post-nav-item" href={prev.href}>
+              <span class="post-nav-label">{t(locale, 'post.prev')}</span>
+              <span class="post-nav-title">{prev.title}</span>
+            </a>
+          )}
+          {next && (
+            <a
+              class="ui-card ui-card--sm ui-card--interactive post-nav-item post-nav-item--next"
+              href={next.href}
+            >
+              <span class="post-nav-label">{t(locale, 'post.next')}</span>
+              <span class="post-nav-title">{next.title}</span>
+            </a>
+          )}
+        </nav>
+      </GlassWidget>
+    )
+  }
+
+  <GlassWidget id="article-footer" zone="tail" width="lg" locale={locale}>
+    <div class="post-footer">
+      <a class="ui-btn ui-btn--secondary" href={`/${locale}/`}>
+        {t(locale, 'nav.home')}
+      </a>
+
+      {
+        variants.length > 1 && (
+          <div class="post-translations">
+            <span class="ui-text--muted">{t(locale, 'post.translations')}</span>
+            {variants.map((variant) => (
+              <a
+                class="ui-chip"
+                href={postPath(getPostLocale(variant), getPostSlug(variant))}
+                hreflang={getPostLocale(variant)}
+              >
+                {localeLabel(getPostLocale(variant), locale)}
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </GlassWidget>
+</div>
+
+<!-- 评论功能已停用：组件在 frontend/components/Comments.astro，
+     恢复只要把 <Comments slug={getPostSlug(post)} locale={locale} /> 放回这里 -->
+
+<script>
+  /* ---------- 目录：折叠 + 滚动高亮 ---------- */
+
+  const toc = document.querySelector<HTMLElement>('[data-toc]')
+  const tocToggle = document.querySelector<HTMLButtonElement>('[data-toc-toggle]')
+
+  tocToggle?.addEventListener('click', () => {
+    if (!toc) return
+    const open = toc.hasAttribute('data-open')
+    toc.toggleAttribute('data-open', !open)
+    tocToggle.setAttribute('aria-expanded', String(!open))
+  })
+
+  const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')]
+  const tocHeadings = tocLinks
+    .map((link) => document.getElementById(link.dataset.tocLink ?? ''))
+    .filter((el): el is HTMLElement => el !== null)
+
+  /** 悬浮状态栏会盖住标题，判定「到达」时留出这段距离 */
+  const HEADING_OFFSET = 120
+
+  function syncActiveHeading() {
+    let active: string | undefined
+    for (const heading of tocHeadings) {
+      if (heading.getBoundingClientRect().top <= HEADING_OFFSET) active = heading.id
+      else break
+    }
+    for (const link of tocLinks) {
+      link.classList.toggle('is-active', link.dataset.tocLink === active)
+    }
+  }
+
+  if (tocHeadings.length > 0) {
+    let ticking = false
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (ticking) return
+        ticking = true
+        requestAnimationFrame(() => {
+          syncActiveHeading()
+          ticking = false
+        })
+      },
+      { passive: true },
+    )
+    syncActiveHeading()
+  }
+
+  /* ---------- 代码块：语言标签 + 复制按钮 ---------- */
+
+  const prose = document.querySelector<HTMLElement>('.prose')
+  const copyLabel = prose?.dataset.copyLabel ?? ''
+  const copiedLabel = prose?.dataset.copiedLabel ?? ''
+
+  document.querySelectorAll<HTMLElement>('.prose pre.astro-code').forEach((pre) => {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'code-block'
+    pre.parentNode?.insertBefore(wrapper, pre)
+    wrapper.appendChild(pre)
+
+    const language = pre.dataset.language
+    if (language) {
+      const tag = document.createElement('span')
+      tag.className = 'code-lang'
+      tag.textContent = language
+      wrapper.appendChild(tag)
+    }
+
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'code-copy'
+    button.textContent = copyLabel
+    button.setAttribute('aria-label', copyLabel)
+    wrapper.appendChild(button)
+
+    button.addEventListener('click', async () => {
+      const code = pre.querySelector('code')?.textContent ?? ''
+      try {
+        await navigator.clipboard.writeText(code)
+      } catch {
+        // 剪贴板不可用（非安全上下文 / 权限拒绝）—— 选中代码，用户自己复制
+        const range = document.createRange()
+        range.selectNodeContents(pre)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+        return
+      }
+      button.textContent = copiedLabel
+      button.classList.add('is-copied')
+      window.setTimeout(() => {
+        button.textContent = copyLabel
+        button.classList.remove('is-copied')
+      }, 2000)
+    })
+  })
+</script>
+
+<style>
+  /* 正文：正常文档流，固定一个适合阅读的宽度，居中显示；卡片绝对定位在四周，互不占位 */
+  .post-content {
+    width: min(760px, 100%);
+    margin-inline: auto;
+  }
+
+  .post-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-block-end: var(--ui-space-md);
+  }
+
+  /* ==================== 上一篇 / 下一篇 ==================== */
+  .post-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--ui-space-md);
+  }
+
+  .post-nav-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    min-width: 0;
+    text-decoration: none;
+  }
+
+  .post-nav-item--next {
+    text-align: end;
+  }
+
+  .post-nav-label {
+    color: var(--ui-text-muted);
+    font-size: 0.75rem;
+  }
+
+  .post-nav-title {
+    color: var(--ui-text-secondary);
+    font-weight: 500;
+  }
+
+  .post-nav-item:hover .post-nav-title {
+    color: var(--ui-text-accent);
+  }
+
+  /* ==================== 页脚 ==================== */
+  .post-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+  }
+
+  .post-translations {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-sm);
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+  }
+
+  .post-translations a.ui-chip {
+    text-decoration: none;
+    color: var(--ui-text-secondary);
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .post-translations a.ui-chip:hover {
+    color: var(--ui-text-accent);
+    background: var(--ui-surface-hover);
+  }
+</style>

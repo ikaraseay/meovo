@@ -1,0 +1,282 @@
+---
+/**
+ * 页面骨架：html / head / body
+ *
+ * 明暗模式的类（.dark）在 <head> 里由内联脚本提前写上，
+ * 首屏渲染前就定好深浅 —— 否则会闪一下默认浅色。
+ */
+import '../styles/global.css'
+import { getAbsoluteLocaleUrl } from 'astro:i18n'
+import { t, locales, defaultLocale, stripLocalePrefix, type Locale } from '../i18n'
+import FloatingBar from '../components/FloatingBar.astro'
+import Footer from '../components/Footer.astro'
+import { PREFS_KEYS } from '../lib/preferences'
+import { ogImageUrl } from '../lib/urls'
+
+interface Props {
+  /** URL 上的语言 */
+  locale: Locale
+  title?: string
+  description?: string
+  /**
+   * 内容实际使用的语言。
+   * 回退页（英文地址显示中文原文）传 'zh'，`<html lang>` 跟内容走。
+   */
+  contentLocale?: Locale
+  /**
+   * 各语言的等价链接。不传就按当前路径生成全部语言。
+   * 只有真实存在的语言版本才该传进来 —— 给不存在的版本挂 hreflang 是错的。
+   */
+  alternates?: Array<{ code: Locale; href: string }>
+  /** canonical 指向。不传就取当前语言的 URL */
+  canonical?: string
+  /** 回退页等不该被收录的页面传 true */
+  noindex?: boolean
+  /** og:type —— 文章页传 'article' */
+  ogType?: 'website' | 'article'
+  /** 桌面用更宽的容器（卡片散开需要空间） */
+  wide?: boolean
+  /**
+   * 站点外壳（悬浮导航 + 页脚）。后台传 false ——
+   * 后台是另一个应用，_public_ 的导航跟页脚在这儿只是噪音，还会压住页头。
+   */
+  chrome?: boolean
+}
+
+const {
+  locale,
+  title,
+  description,
+  contentLocale,
+  noindex = false,
+  ogType = 'website',
+  wide = false,
+  chrome = true,
+} = Astro.props
+
+const siteName = t(locale, 'site.name')
+/** 笔名 —— 标题后缀与署名用作者名，不是品牌名 */
+const authorName = t(locale, 'site.author')
+// 标题用笔名（site.author），导航栏用品牌名（site.name）
+const pageTitle = title ? `${title} · ${authorName}` : authorName
+const pageDescription = description ?? t(locale, 'site.tagline')
+
+/** `<html lang>` 跟内容走，不是跟 URL 走 */
+const lang = contentLocale ?? locale
+
+/** 当前页去掉语言前缀的部分 —— 用来生成各语言的等价链接 */
+const currentPath = stripLocalePrefix(Astro.url.pathname)
+
+const alternates =
+  Astro.props.alternates ?? locales.map((code) => ({ code, href: getAbsoluteLocaleUrl(code, currentPath) }))
+
+const canonical = Astro.props.canonical ?? getAbsoluteLocaleUrl(locale, currentPath)
+
+/** x-default 指向默认语言版本 */
+const xDefault = alternates.find((alt) => alt.code === defaultLocale)?.href ?? canonical
+
+/** OG 图 —— 全站共用一张静态品牌图 */
+const ogImage = ogImageUrl(Astro.site ?? Astro.url)
+
+/** 本语言的 RSS */
+const rssHref = new URL(`/${locale}/rss.xml`, Astro.site ?? Astro.url).href
+
+const ogLocale = locale === 'zh' ? 'zh_CN' : 'en_US'
+
+/** 站点级结构化数据；文章页在 head 插槽里补自己的 BlogPosting */
+const webSiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: siteName,
+  url: new URL(`/${locale}/`, Astro.site ?? Astro.url).href,
+  description: t(locale, 'site.tagline'),
+  inLanguage: locales,
+  author: { '@type': 'Person', name: authorName },
+}
+---
+
+<!doctype html>
+<html lang={lang} data-theme="liquid-glass">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDescription} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex,follow" />}
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    {
+      alternates.map((alt) => (
+        <link rel="alternate" hreflang={alt.code} href={alt.href} />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={xDefault} />
+    <link rel="alternate" type="application/rss+xml" title={siteName} href={rssHref} />
+
+    <!-- Open Graph / Twitter Card -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content={ogLocale} />
+    {
+      alternates
+        .filter((alt) => alt.code !== locale)
+        .map((alt) => (
+          <meta property="og:locale:alternate" content={alt.code === 'zh' ? 'zh_CN' : 'en_US'} />
+        ))
+    }
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={pageDescription} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(webSiteLd)} />
+
+    <!-- 页面自己往 head 里塞 meta / 结构化数据 -->
+    <slot name="head" />
+
+    <!--
+      明暗模式与正文字号 / 行距：必须在首屏渲染前定好，否则会闪一下默认排版。
+      define:vars（隐含 is:inline）—— 这段脚本不进打包产物，原样输出，保证同步执行。
+
+      key 由 preferences 模块注入：内联脚本不能 import 模块，
+      但 key 名只能有一个主人 —— 这里再写死一份的话，
+      改了模块那份首屏会静默回退到默认值（深色闪一下又变回来）。
+    -->
+    <script define:vars={{ prefKeys: PREFS_KEYS }}>
+      ;(() => {
+        // 有 JS 就挂 .js：桌面卡片在布局完成前先藏起，布局好再淡入（见 global.css）
+        const root = document.documentElement
+        root.classList.add('js')
+
+        const get = (key) => {
+          try {
+            return localStorage.getItem(key)
+          } catch {
+            return null
+          }
+        }
+
+        const stored = get(prefKeys.mode)
+        const mode =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+        root.classList.toggle('dark', mode === 'dark')
+
+        // 正文字号 / 行距：写在内联样式上，CSS 里只用 var() 读。
+        // 默认值在 styles/prose.css 的 :root 里，这里只在有偏好时覆盖。
+        const scale = get(prefKeys.scale)
+        const lineHeight = get(prefKeys.lh)
+        if (scale) root.style.setProperty('--ui-prose-scale', scale)
+        if (lineHeight) root.style.setProperty('--ui-prose-lh', lineHeight)
+      })()
+    </script>
+
+    <!--
+      折射能力：也得在首屏渲染前定好 —— 导航玻璃的折射挂在 <html> 的 class 上，
+      晚一步就会闪一下没有折射的玻璃。
+
+      只有 Chromium 系真渲染 backdrop-filter: url()。Safari / Firefox 解析 url() 没问题、
+      CSS.supports 也返回 true，但渲染时整条 backdrop-filter 会被丢掉（连 blur 一起）——
+      WebKit bug 245510，PR 68614 至今未合并。挂错了整个液态玻璃会消失。
+
+      「是不是 Chromium」看 navigator.userAgentData —— Chromium 专有，Safari / Firefox 没有。
+      注意它**只在安全上下文里暴露**：http 的局域网 IP 上没有，Android WebView 要 119+ 才有。
+      这类环境会落到 .glass-fallback（毛玻璃 + 拟态色散）—— 宁可漏判（少一层折射），
+      不可误判（Safari 里整个玻璃消失）。
+
+      引擎判据只有这一份 —— 内联脚本不能 import 模块，所以判完把结果写进 <html> 的 class；
+      frontend/lib/liquid-glass.ts 的 canRefract() 只读这个 class。
+    -->
+    <script is:inline>
+      ;(() => {
+        const refract =
+          typeof CSS !== 'undefined' &&
+          CSS.supports('backdrop-filter', 'url(#a)') &&
+          'userAgentData' in navigator
+        document.documentElement.classList.add(refract ? 'glass-refract' : 'glass-fallback')
+      })()
+    </script>
+  </head>
+
+  <body>
+    <div class="ui-aurora" aria-hidden="true">
+      <span class="ui-aurora__blob"></span>
+      <span class="ui-aurora__blob"></span>
+      <span class="ui-aurora__blob"></span>
+      <span class="ui-aurora__blob"></span>
+    </div>
+    <a class="skip-link" href="#main">{t(locale, 'a11y.skipToContent')}</a>
+    {chrome && <FloatingBar locale={locale} />}
+
+    <!-- 加载遮罩：桌面布局完成前盖住，摆好再撤掉 -->
+    <div class="page-loader" aria-hidden="true">
+      <span class="page-loader__ring"></span>
+    </div>
+    <main id="main" class="site-main">
+      <div class:list={['container', { 'container--wide': wide }]}>
+        <slot />
+      </div>
+    </main>
+
+    <!-- 页脚：也是一张可拖拽的玻璃卡片，默认待在页面底部（流动模式，拖一下才抬起来） -->
+    {chrome && (
+    <div class="footer-desk">
+      <div class:list={['container', { 'container--wide': wide }]}>
+        <div class="desk" data-desk data-desk-flow>
+          <Footer locale={locale} />
+        </div>
+      </div>
+    </div>
+    )}
+
+    <!-- 玻璃桌面：页面里凡是 [data-desk] 容器，里面的部件都变成可拖拽布局 -->
+    <script>
+      import { initDesk } from '../lib/draggable'
+      import { ATTR } from '../lib/dom-contract'
+      const desks = [...document.querySelectorAll<HTMLElement>(`[${ATTR.desk}]`)].map(initDesk)
+      // 「重置布局」—— 卡片回到默认落位（悬浮栏那边复位它自己的四个面）
+      document
+        .querySelector<HTMLElement>(`[${ATTR.layoutReset}]`)
+        ?.addEventListener('click', () => {
+          for (const desk of desks) desk?.reset()
+        })
+      // 布局摆好后再撤掉加载遮罩（等两帧，让淡入跟遮罩淡出衔接上）
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.classList.add('page-ready')
+        })
+      })
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip-link {
+    position: absolute;
+    inset-inline-start: var(--ui-space-md);
+    inset-block-start: -100px;
+    z-index: var(--ui-z-skip);
+    padding: var(--ui-space-sm) var(--ui-space-md);
+    background: var(--ui-surface-raised);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-md);
+    transition: inset-block-start var(--ui-transition-fast);
+  }
+
+  .skip-link:focus-visible {
+    inset-block-start: var(--ui-space-md);
+  }
+
+  .footer-desk {
+    padding-block-end: var(--ui-space-2xl);
+  }
+</style>

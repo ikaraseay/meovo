@@ -1,0 +1,457 @@
+---
+/**
+ * 评论 —— 表单 + 评论列表。
+ * ---------------------------------------------------------
+ * 评论存在 D1（后台审核后才对读者可见），文章页是静态的，
+ * 所以列表与提交都在浏览器端走 /api/comments。
+ *
+ * 邮箱只用来取头像（Gravatar）；公开接口不返回邮箱。
+ */
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  /** 文章 slug —— 评论按 slug 归线程（各语言版本共用一条） */
+  slug: string
+  locale: Locale
+}
+
+const { slug, locale } = Astro.props
+---
+
+<section class="comments ui-card ui-card--lg" data-comments data-slug={slug}>
+  <h2 class="comments__title">
+    {t(locale, 'comments.title')}
+    <span class="comments__count" data-comments-count></span>
+  </h2>
+
+  <div class="comments__list" data-comments-list></div>
+
+  <form class="comments__form" data-comments-form novalidate>
+    <p class="comments__form-title">{t(locale, 'comments.form.title')}</p>
+
+    <div class="comments__grid">
+      <label class="comments__field">
+        <span class="comments__label">{t(locale, 'comments.field.name')}</span>
+        <input
+          class="ui-input"
+          type="text"
+          name="name"
+          maxlength="50"
+          autocomplete="name"
+          required
+          data-comments-field="name"
+        />
+        <span class="comments__error" data-comments-error="name"></span>
+      </label>
+
+      <label class="comments__field">
+        <span class="comments__label">{t(locale, 'comments.field.email')}</span>
+        <input
+          class="ui-input"
+          type="email"
+          name="email"
+          maxlength="120"
+          autocomplete="email"
+          required
+          data-comments-field="email"
+        />
+        <span class="comments__error" data-comments-error="email"></span>
+      </label>
+
+      <label class="comments__field comments__field--wide">
+        <span class="comments__label">
+          {t(locale, 'comments.field.website')}
+          <span class="comments__optional">{t(locale, 'comments.field.optional')}</span>
+        </span>
+        <input
+          class="ui-input"
+          type="text"
+          name="website"
+          maxlength="200"
+          autocomplete="url"
+          data-comments-field="website"
+        />
+        <span class="comments__error" data-comments-error="website"></span>
+      </label>
+
+      <label class="comments__field comments__field--wide">
+        <span class="comments__label">{t(locale, 'comments.field.content')}</span>
+        <textarea
+          class="ui-input comments__textarea"
+          name="content"
+          rows="4"
+          maxlength="2000"
+          required
+          data-comments-field="content"></textarea>
+        <span class="comments__error" data-comments-error="content"></span>
+      </label>
+    </div>
+
+    <!-- 蜜罐：机器人填了这个字段 —— 提交会成功但不会落库 -->
+    <input
+      class="comments__hp"
+      type="text"
+      name="url"
+      tabindex="-1"
+      autocomplete="off"
+      aria-hidden="true"
+    />
+
+    <p class="comments__hint">{t(locale, 'comments.form.hint')}</p>
+    <p class="comments__status" data-comments-status role="status" aria-live="polite"></p>
+
+    <button class="ui-btn ui-btn--primary" type="submit" data-comments-submit>
+      {t(locale, 'comments.form.submit')}
+    </button>
+  </form>
+</section>
+
+<script>
+  import { t } from '../i18n'
+
+  interface Comment {
+    id: string
+    name: string
+    website: string
+    content: string
+    created_at: string
+    avatar: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const root = document.querySelector<HTMLElement>('[data-comments]')
+  const list = document.querySelector<HTMLElement>('[data-comments-list]')
+  const countLabel = document.querySelector<HTMLElement>('[data-comments-count]')
+  const form = document.querySelector<HTMLFormElement>('[data-comments-form]')
+  const status = document.querySelector<HTMLElement>('[data-comments-status]')
+  const submit = document.querySelector<HTMLButtonElement>('[data-comments-submit]')
+  const slug = root?.dataset.slug ?? ''
+
+  function say(message: string, isError = false) {
+    if (!status) return
+    status.textContent = message
+    status.classList.toggle('comments__status--error', isError)
+  }
+
+  function clearErrors() {
+    for (const node of document.querySelectorAll<HTMLElement>('[data-comments-error]')) {
+      node.textContent = ''
+    }
+  }
+
+  function showErrors(fields: Record<string, string>) {
+    for (const [field, code] of Object.entries(fields)) {
+      const node = document.querySelector<HTMLElement>('[data-comments-error="' + field + '"]')
+      if (node) node.textContent = t(locale, 'comments.error.' + code)
+    }
+  }
+
+  function formatDate(value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  }
+
+  /** 头像：Gravatar 有就用，没有就留姓名首字母 */
+  function avatar(comment: Comment): HTMLElement {
+    const box = document.createElement('span')
+    box.className = 'comment__avatar'
+    box.textContent = (comment.name || '?').trim().charAt(0).toUpperCase()
+
+    const image = document.createElement('img')
+    image.className = 'comment__avatar-img'
+    image.alt = ''
+    image.loading = 'lazy'
+    image.addEventListener('load', () => {
+      box.textContent = ''
+      box.appendChild(image)
+    })
+    image.src = comment.avatar
+    return box
+  }
+
+  function item(comment: Comment): HTMLElement {
+    const article = document.createElement('article')
+    article.className = 'comment'
+
+    const body = document.createElement('div')
+    body.className = 'comment__body'
+
+    const meta = document.createElement('p')
+    meta.className = 'comment__meta'
+
+    if (comment.website) {
+      const link = document.createElement('a')
+      link.className = 'comment__name'
+      link.href = comment.website
+      link.target = '_blank'
+      link.rel = 'nofollow noopener noreferrer'
+      link.textContent = comment.name
+      meta.appendChild(link)
+    } else {
+      const name = document.createElement('span')
+      name.className = 'comment__name'
+      name.textContent = comment.name
+      meta.appendChild(name)
+    }
+
+    const time = document.createElement('time')
+    time.className = 'comment__time'
+    time.dateTime = comment.created_at
+    time.textContent = formatDate(comment.created_at)
+    meta.appendChild(time)
+
+    body.appendChild(meta)
+
+    const content = document.createElement('p')
+    content.className = 'comment__content'
+    content.textContent = comment.content
+    body.appendChild(content)
+
+    article.appendChild(avatar(comment))
+    article.appendChild(body)
+    return article
+  }
+
+  async function load() {
+    if (!list) return
+    try {
+      const response = await fetch('/api/comments?slug=' + encodeURIComponent(slug))
+      const payload = (await response.json()) as { comments?: Comment[] }
+      const comments = payload.comments ?? []
+      list.textContent = ''
+      if (comments.length === 0) {
+        const empty = document.createElement('p')
+        empty.className = 'comments__empty'
+        empty.textContent = t(locale, 'comments.empty')
+        list.appendChild(empty)
+      } else {
+        for (const comment of comments) list.appendChild(item(comment))
+      }
+      if (countLabel) {
+        countLabel.textContent = t(locale, 'comments.count', { count: comments.length })
+      }
+    } catch {
+      say(t(locale, 'comments.error.failed'), true)
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    clearErrors()
+    say('')
+
+    const data = new FormData(form)
+    const payload = {
+      slug,
+      name: String(data.get('name') ?? ''),
+      email: String(data.get('email') ?? ''),
+      website: String(data.get('website') ?? ''),
+      content: String(data.get('content') ?? ''),
+      url: String(data.get('url') ?? ''),
+    }
+
+    if (submit) submit.disabled = true
+    try {
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string
+        fields?: Record<string, string>
+      }
+
+      if (!response.ok) {
+        if (result.fields) showErrors(result.fields)
+        else say(t(locale, 'comments.error.' + (result.error ?? 'failed')), true)
+        return
+      }
+
+      say(t(locale, 'comments.submitted'))
+      form.reset()
+    } catch {
+      say(t(locale, 'comments.error.failed'), true)
+    } finally {
+      if (submit) submit.disabled = false
+    }
+  })
+
+  void load()
+</script>
+
+<style>
+  .comments {
+    width: min(760px, 100%);
+    margin-inline: auto;
+    margin-block-start: var(--ui-space-2xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-lg);
+  }
+
+  .comments__title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--ui-space-sm);
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .comments__count {
+    color: var(--ui-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+
+  .comments__empty {
+    color: var(--ui-text-muted);
+    font-size: 0.9375rem;
+  }
+
+  /* ---- 单条评论 ---- */
+  .comment {
+    display: flex;
+    gap: var(--ui-space-md);
+    padding-block: var(--ui-space-md);
+    border-block-start: 1px solid var(--ui-border-subtle);
+  }
+
+  .comment__avatar {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-surface-sunken);
+    color: var(--ui-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    overflow: hidden;
+  }
+
+  .comment__avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .comment__body {
+    min-width: 0;
+  }
+
+  .comment__meta {
+    display: flex;
+    align-items: baseline;
+    gap: var(--ui-space-sm);
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    color: var(--ui-text-muted);
+  }
+
+  .comment__name {
+    color: var(--ui-text-accent);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .comment__name:hover {
+    text-decoration: underline;
+  }
+
+  .comment__content {
+    margin-block-start: var(--ui-space-xs);
+    white-space: pre-wrap;
+  }
+
+  /* ---- 表单 ---- */
+  .comments__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-md);
+    border-block-start: 1px solid var(--ui-border-subtle);
+    padding-block-start: var(--ui-space-lg);
+  }
+
+  .comments__form-title {
+    font-weight: 600;
+  }
+
+  .comments__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--ui-space-md);
+  }
+
+  .comments__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    min-width: 0;
+  }
+
+  .comments__field--wide {
+    grid-column: 1 / -1;
+  }
+
+  .comments__label {
+    font-size: 0.8125rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .comments__optional {
+    color: var(--ui-text-faint);
+  }
+
+  .comments__textarea {
+    resize: vertical;
+    min-height: 96px;
+  }
+
+  .comments__error {
+    color: var(--ui-danger);
+    font-size: 0.8125rem;
+  }
+
+  .comments__error:empty {
+    display: none;
+  }
+
+  /* 提交按钮不撑满整行 */
+  .comments__form .ui-btn {
+    align-self: start;
+  }
+
+  .comments__hint {
+    color: var(--ui-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .comments__status {
+    color: var(--ui-success);
+    font-size: 0.875rem;
+  }
+
+  .comments__status:empty {
+    display: none;
+  }
+
+  .comments__status--error {
+    color: var(--ui-danger);
+  }
+
+  /* 蜜罐：挪出视口，但别用 display:none（有些机器人不填隐藏域） */
+  .comments__hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+</style>

@@ -1,0 +1,487 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import PostRow from '../../components/PostRow.astro'
+import GlassWidget from '../../components/GlassWidget.astro'
+import { t, locales } from '../../i18n'
+import {
+  getVisiblePosts,
+  resolveItems,
+  getTagLabel,
+  getCategoryLabel,
+  getSeriesEntries,
+  tagPath,
+  categoryPath,
+  seriesPath,
+  type PostItem,
+} from '../../lib/posts'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { lang: locale }, props: { locale } }))
+}
+
+const { locale } = Astro.props
+
+const posts = await getVisiblePosts()
+const items = resolveItems(posts, locale)
+
+/** 按年份分组 */
+const years = new Map<number, PostItem[]>()
+for (const item of items) {
+  const year = item.post.data.pubDate.getFullYear()
+  const list = years.get(year)
+  if (list) list.push(item)
+  else years.set(year, [item])
+}
+const yearGroups = [...years.entries()].sort(([a], [b]) => b - a)
+
+/** 标签与分类，附带文章数 */
+const tagCounts = new Map<string, number>()
+const categoryCounts = new Map<string, number>()
+for (const item of items) {
+  for (const tag of item.post.data.tags) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)
+  const category = item.post.data.category
+  if (category) categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1)
+}
+const tagEntries = [...tagCounts.entries()].sort(([a], [b]) => a.localeCompare(b))
+const categoryEntries = [...categoryCounts.entries()].sort(([a], [b]) => a.localeCompare(b))
+
+/** 系列 —— 标题来自 frontmatter，篇数按当前语言算 */
+const seriesEntries = getSeriesEntries(items, locale)
+
+/**
+ * 搜索索引 —— 构建期生成，随页面内联，浏览器端匹配。
+ *
+ * 静态页不查数据库：正文（markdown 原文）连同标题、摘要一起发给浏览器，
+ * 命中规则走 frontend/lib/search.ts（切分只有一处，索引与查询共用）。
+ * `<` 转义后再内联，免得正文里的标签把 script 标签提前关掉。
+ */
+const searchBodies = items.map((item) => item.post.body ?? '')
+const searchIndexJson = JSON.stringify(searchBodies).replace(/</g, '\\u003c')
+---
+
+<BaseLayout locale={locale} title={t(locale, 'archive.title')} wide>
+  <script
+    is:inline
+    type="application/json"
+    data-archive-index
+    set:html={searchIndexJson}
+  ></script>
+
+  <div class="desk" data-desk data-archive-desk>
+    <!-- 独占一行：标题 + 搜索框，别被旁边的卡压住 -->
+    <GlassWidget id="archive-head" width="xl" full locale={locale}>
+      <div class="archive-head">
+        <h1 class="page-title">{t(locale, 'archive.title')}</h1>
+        <p class="page-count">{t(locale, 'list.postCount', { count: items.length })}</p>
+      </div>
+
+      <!--
+        搜索就住在归档卡里，不另开一张卡。
+        搜索时别的卡片收起（.is-searching）—— 散开布局是绝对定位的，
+        这张卡长高会跟旁边的卡叠在一起。
+      -->
+      <div class="archive-search" id="search" data-archive-search data-locale={locale}>
+        <label class="sr-only" for="archive-search-input">{t(locale, 'search.title')}</label>
+        <input
+          class="ui-input"
+          id="archive-search-input"
+          type="search"
+          name="q"
+          placeholder={t(locale, 'search.placeholder')}
+          autocomplete="off"
+          spellcheck="false"
+        />
+
+        <p
+          class="archive-search-status ui-text--muted"
+          data-archive-status
+          role="status"
+          aria-live="polite"
+          hidden
+        >
+        </p>
+
+        <ul class="archive-search-results" data-archive-results hidden>
+          {
+            items.map((item) => (
+              <li class="archive-search-hit" hidden>
+                <a class="archive-search-hit-link" href={item.href}>
+                  <time
+                    class="archive-search-hit-date"
+                    datetime={item.post.data.pubDate.toISOString()}
+                  >
+                    {item.post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')}
+                  </time>
+                  <span class="archive-search-hit-body">
+                    <span class="archive-search-hit-title" data-archive-title>
+                      {item.post.data.title}
+                    </span>
+                    <span class="archive-search-hit-summary" data-archive-summary>
+                      {item.post.data.description}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </GlassWidget>
+
+    {
+      items.length === 0 ? (
+        <GlassWidget id="empty" width="md" locale={locale}>
+          <p class="ui-text--muted">{t(locale, 'archive.empty')}</p>
+        </GlassWidget>
+      ) : (
+        yearGroups.map(([year, yearItems]) => (
+          <GlassWidget id={`year-${year}`} width="lg" locale={locale}>
+            <div class="year-group">
+              <h2 class="year-title">{year}</h2>
+              <div class="post-list">
+                {yearItems.map((item) => (
+                  <PostRow
+                    post={item.post}
+                    locale={locale}
+                    href={item.href}
+                    isFallback={item.isFallback}
+                  />
+                ))}
+              </div>
+            </div>
+          </GlassWidget>
+        ))
+      )
+    }
+
+    {
+      tagEntries.length > 0 && (
+        <GlassWidget id="tax-tags" width="md" locale={locale}>
+          <div class="taxonomy">
+            <h2 class="taxonomy-title">{t(locale, 'tags.title')}</h2>
+            <ul class="taxonomy-list">
+              {tagEntries.map(([tag, count]) => (
+                <li>
+                  <a href={tagPath(locale, tag)}>{getTagLabel(locale, tag)}</a>
+                  <span class="taxonomy-count">{count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </GlassWidget>
+      )
+    }
+
+    {
+      categoryEntries.length > 0 && (
+        <GlassWidget id="tax-categories" width="md" locale={locale}>
+          <div class="taxonomy">
+            <h2 class="taxonomy-title">{t(locale, 'categories.title')}</h2>
+            <ul class="taxonomy-list">
+              {categoryEntries.map(([category, count]) => (
+                <li>
+                  <a href={categoryPath(locale, category)}>{getCategoryLabel(locale, category)}</a>
+                  <span class="taxonomy-count">{count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </GlassWidget>
+      )
+    }
+
+    {
+      seriesEntries.length > 0 && (
+        <GlassWidget id="tax-series" width="md" locale={locale}>
+          <div class="taxonomy">
+            <h2 class="taxonomy-title">{t(locale, 'series.title')}</h2>
+            <ul class="taxonomy-list">
+              {seriesEntries.map((entry) => (
+                <li>
+                  <a href={seriesPath(locale, entry.id)}>{entry.title}</a>
+                  <span class="taxonomy-count">{entry.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </GlassWidget>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  import { t, type Locale } from '../../i18n'
+  import { parseQuery, matchText, highlightParts, type SearchTerm } from '../../lib/search'
+  import { ATTR } from '../../lib/dom-contract'
+
+  const section = document.querySelector<HTMLElement>(`[${ATTR.archiveSearch}]`)
+  const desk = document.querySelector<HTMLElement>(`[${ATTR.archiveDesk}]`)
+  const indexEl = document.querySelector<HTMLScriptElement>(`[${ATTR.archiveIndex}]`)
+  const input = section?.querySelector<HTMLInputElement>('input[type="search"]')
+  const status = section?.querySelector<HTMLElement>(`[${ATTR.archiveStatus}]`)
+  const list = section?.querySelector<HTMLElement>(`[${ATTR.archiveResults}]`)
+
+  if (section && desk && indexEl && input && status && list) {
+    const locale = (section.dataset.locale ?? 'zh') as Locale
+    const bodies: string[] = JSON.parse(indexEl.textContent || '[]')
+    const rows = [...list.children] as HTMLElement[]
+
+    /** 归档卡 —— 搜索时桌面只留它 */
+    const host = desk.querySelector<HTMLElement>('[data-widget="archive-head"]')
+    const cards = [...desk.querySelectorAll<HTMLElement>('[data-widget]')]
+
+    /**
+     * 只留归档卡：散开布局是绝对定位的，卡片长高会跟旁边的卡叠在一起。
+     * 收起期间这些卡量不到尺寸（draggable.ts 的 measure 会跳过）——
+     * 恢复时位置照旧，不会被量成 0。
+     */
+    const showOnlyHost = (only: boolean) => {
+      for (const card of cards) card.hidden = only && card !== host
+    }
+
+    /** 卡片长高了，桌面也得跟着长 —— 否则下面留一地空白，页脚还会压上来 */
+    let savedMinHeight = ''
+    let searching = false
+    const syncDeskHeight = () => {
+      if (!host) return
+      const deskRect = desk.getBoundingClientRect()
+      const cardRect = host.getBoundingClientRect()
+      desk.style.minHeight = `${Math.ceil(cardRect.bottom - deskRect.top)}px`
+    }
+
+    /** 关键词写进 URL —— 结果能分享、能收藏 */
+    const syncUrl = (q: string) => {
+      const url = new URL(location.href)
+      if (q) url.searchParams.set('q', q)
+      else url.searchParams.delete('q')
+      history.replaceState(null, '', url)
+    }
+
+    /** 命中处包 <mark>，其余原样写回 */
+    const paint = (el: Element | null, text: string, terms: SearchTerm[]) => {
+      if (!el) return
+      el.replaceChildren(
+        ...highlightParts(text, terms).map((part) => {
+          if (!part.hit) return document.createTextNode(part.text)
+          const mark = document.createElement('mark')
+          mark.className = 'ui-mark'
+          mark.textContent = part.text
+          return mark
+        }),
+      )
+    }
+
+    const search = (raw: string) => {
+      const terms = parseQuery(raw)
+      const q = raw.trim()
+
+      if (terms.length === 0) {
+        for (const row of rows) row.hidden = true
+        list.hidden = true
+        status.hidden = true
+        showOnlyHost(false)
+        desk.style.minHeight = savedMinHeight
+        searching = false
+        syncUrl('')
+        return
+      }
+
+      let count = 0
+      rows.forEach((row, i) => {
+        const titleEl = row.querySelector(`[${ATTR.archiveTitle}]`)
+        const summaryEl = row.querySelector(`[${ATTR.archiveSummary}]`)
+        const title = titleEl?.textContent?.trim() ?? ''
+        const summary = summaryEl?.textContent?.trim() ?? ''
+        const body = bodies[i] ?? ''
+        // 一个词组要完整落在某一个字段里（标题 / 摘要 / 正文），字段之间不串
+        const hit = terms.every(
+          (term) =>
+            matchText(title, [term]) || matchText(summary, [term]) || matchText(body, [term]),
+        )
+        row.hidden = !hit
+        if (!hit) return
+        count++
+        paint(titleEl, title, terms)
+        paint(summaryEl, summary, terms)
+      })
+
+      list.hidden = false
+      status.hidden = false
+      status.textContent =
+        count > 0 ? t(locale, 'search.resultCount', { count }) : t(locale, 'search.empty')
+
+      if (!searching) {
+        searching = true
+        savedMinHeight = desk.style.minHeight
+        showOnlyHost(true)
+      }
+      syncDeskHeight()
+      // 桌面收起后页面变短 —— 结果要自己进视野
+      list.scrollIntoView({ block: 'nearest' })
+      syncUrl(q)
+    }
+
+    input.addEventListener('input', () => search(input.value))
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      input.value = ''
+      search('')
+    })
+
+    // 分享 / 收藏的链接带了 q=，直接搜；页脚「搜索」入口跳来时聚焦输入框
+    const initial = new URLSearchParams(location.search).get('q') ?? ''
+    if (initial) {
+      input.value = initial
+      search(initial)
+    }
+    const focusSearch = () => {
+      if (location.hash === '#search') input.focus()
+    }
+    focusSearch()
+    // 同页跳锚点不会重新加载页面 —— 得单独听一下
+    window.addEventListener('hashchange', focusSearch)
+  }
+</script>
+
+<style>
+  .archive-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-count {
+    font-size: 0.875rem;
+    color: var(--ui-text-muted);
+  }
+
+  .year-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .year-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .taxonomy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .taxonomy-title {
+    font-size: 1rem;
+  }
+
+  .taxonomy-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .taxonomy-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--ui-space-md);
+    align-items: baseline;
+    padding-block: var(--ui-space-sm);
+    border-block-start: 1px solid var(--ui-border);
+  }
+
+  .taxonomy-list a {
+    color: var(--ui-text);
+    text-decoration: none;
+  }
+
+  .taxonomy-list a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .taxonomy-count {
+    font-family: var(--ui-font-mono);
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 搜索区 ---------- */
+
+  /* 没有 JS 就别摆搜索框 —— 搜不了的东西不如不出现 */
+  .archive-search {
+    display: none;
+    margin-block-start: var(--ui-space-lg);
+  }
+
+  :global(html.js) .archive-search {
+    display: block;
+  }
+
+  .archive-search-status {
+    margin-block: var(--ui-space-md) var(--ui-space-sm);
+    font-size: 0.875rem;
+  }
+
+  .archive-search-results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .archive-search-hit {
+    border-block-start: 1px solid var(--ui-border);
+  }
+
+  .archive-search-hit-link {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    column-gap: var(--ui-space-lg);
+    align-items: start;
+    padding-block: var(--ui-space-md);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .archive-search-hit-date {
+    font-family: var(--ui-font-mono);
+    font-size: 0.75rem;
+    line-height: 1.9;
+    color: var(--ui-text-muted);
+  }
+
+  .archive-search-hit-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    min-width: 0;
+  }
+
+  .archive-search-hit-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--ui-text);
+  }
+
+  .archive-search-hit-summary {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .archive-search-hit-link:hover .archive-search-hit-title {
+    color: var(--ui-text-accent);
+  }
+</style>

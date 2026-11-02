@@ -1,0 +1,203 @@
+---
+/**
+ * 后台评论 —— 审核 / 标记垃圾 / 删除。
+ * ---------------------------------------------------------
+ * 数据在 D1，页面是 on-demand 的：内容由脚本去接口取。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+---
+
+<AdminLayout
+  locale={locale}
+  section="comments"
+  title={t(locale, 'admin.comments.title')}
+  intro={t(locale, 'admin.comments.intro')}
+>
+  <div class="admin-list" data-admin-comments></div>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { defaultLocale, t } from '../../../i18n'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  interface CommentRow {
+    id: string
+    slug: string
+    name: string
+    email: string
+    website: string
+    content: string
+    status: 'pending' | 'approved' | 'spam'
+    created_at: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const list = document.querySelector<HTMLElement>('[' + ATTR.adminComments + ']')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function button(label: string, action: () => void, className = 'ui-btn'): HTMLButtonElement {
+    const element = document.createElement('button')
+    element.className = className
+    element.type = 'button'
+    element.textContent = label
+    element.addEventListener('click', action)
+    return element
+  }
+
+  function formatDate(value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  }
+
+  const STATUS_TEXT: Record<CommentRow['status'], string> = {
+    pending: 'admin.comments.pending',
+    approved: 'admin.comments.approved',
+    spam: 'admin.comments.spam',
+  }
+
+  function row(item: CommentRow): HTMLElement {
+    const line = document.createElement('div')
+    line.className = 'admin-doc'
+
+    const main = document.createElement('div')
+    main.className = 'admin-doc__main'
+
+    const title = document.createElement('span')
+    title.className = 'admin-doc__title'
+    title.textContent = item.name
+    main.appendChild(title)
+
+    const path = document.createElement('span')
+    path.className = 'admin-doc__path'
+    path.textContent = item.email + ' · ' + formatDate(item.created_at)
+    main.appendChild(path)
+
+    const content = document.createElement('span')
+    content.className = 'admin-doc__path'
+    content.textContent = item.content
+    main.appendChild(content)
+
+    const post = document.createElement('a')
+    post.className = 'admin-doc__path'
+    post.href = '/' + defaultLocale + '/posts/' + item.slug + '/'
+    post.target = '_blank'
+    post.rel = 'noopener'
+    post.textContent = t(locale, 'admin.comments.post') + ': ' + item.slug
+    main.appendChild(post)
+
+    line.appendChild(main)
+
+    const status = document.createElement('span')
+    status.className = 'admin-pill' + (item.status === 'approved' ? ' admin-pill--published' : '')
+    status.textContent = t(locale, STATUS_TEXT[item.status])
+    line.appendChild(status)
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-doc__actions'
+
+    if (item.status !== 'approved') {
+      actions.appendChild(
+        button(
+          t(locale, 'admin.comments.approve'),
+          async () => {
+            try {
+              await api('/api/admin/comments/' + item.id, {
+                method: 'POST',
+                body: JSON.stringify({ status: 'approved' }),
+              })
+              await render()
+            } catch (error) {
+              say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+            }
+          },
+          'ui-btn ui-btn--primary',
+        ),
+      )
+    }
+
+    if (item.status !== 'spam') {
+      actions.appendChild(
+        button(
+          t(locale, 'admin.comments.spamAction'),
+          async () => {
+            try {
+              await api('/api/admin/comments/' + item.id, {
+                method: 'POST',
+                body: JSON.stringify({ status: 'spam' }),
+              })
+              await render()
+            } catch (error) {
+              say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+            }
+          },
+        ),
+      )
+    }
+
+    actions.appendChild(
+      button(
+        t(locale, 'admin.action.delete'),
+        async () => {
+          if (!confirm(t(locale, 'admin.confirm.delete'))) return
+          try {
+            await api('/api/admin/comments/' + item.id, { method: 'DELETE' })
+            await render()
+          } catch (error) {
+            say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+          }
+        },
+        'ui-btn admin-btn--danger',
+      ),
+    )
+
+    line.appendChild(actions)
+    return line
+  }
+
+  async function render() {
+    if (!list) return
+    try {
+      const data = await api<{ comments: CommentRow[] }>('/api/admin/comments')
+      list.textContent = ''
+      if (data.comments.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const mark = document.createElement('span')
+        mark.className = 'admin-empty__mark'
+        mark.setAttribute('aria-hidden', 'true')
+        mark.textContent = '✎'
+        empty.appendChild(mark)
+        const text = document.createElement('p')
+        text.className = 'admin-empty__text'
+        text.textContent = t(locale, 'admin.comments.empty')
+        empty.appendChild(text)
+        list.appendChild(empty)
+        return
+      }
+      for (const item of data.comments) list.appendChild(row(item))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  void render()
+</script>

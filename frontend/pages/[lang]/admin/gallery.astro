@@ -1,0 +1,167 @@
+---
+/**
+ * 图库 —— 上传 / 改 alt / 复制链接 / 删除。
+ * 图片二进制在 R2，元数据在 D1，公开地址是 /media/<key>。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+---
+
+<AdminLayout
+  locale={locale}
+  section="gallery"
+  title={t(locale, 'admin.gallery.title')}
+  intro={t(locale, 'admin.gallery.intro')}
+>
+  <label slot="actions" class="ui-btn ui-btn--primary">
+    {t(locale, 'admin.action.upload')}
+    <input type="file" accept="image/*" hidden data-admin-upload />
+  </label>
+
+  <div class="admin-gallery" data-admin-gallery></div>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { t } from '../../../i18n'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  interface MediaRow {
+    id: string
+    key: string
+    filename: string
+    mime: string
+    size: number
+    alt: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const gallery = document.querySelector<HTMLElement>('[' + ATTR.adminGallery + ']')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function item(record: MediaRow): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'admin-item'
+
+    const image = document.createElement('img')
+    image.className = 'admin-item__thumb'
+    image.src = '/media/' + record.key
+    image.alt = record.alt
+    image.loading = 'lazy'
+    box.appendChild(image)
+
+    const meta = document.createElement('p')
+    meta.className = 'admin-item__meta'
+    meta.textContent = record.filename + ' · ' + Math.round(record.size / 1024) + ' KB'
+    box.appendChild(meta)
+
+    const alt = document.createElement('input')
+    alt.className = 'ui-input'
+    alt.type = 'text'
+    alt.value = record.alt
+    alt.placeholder = t(locale, 'admin.field.alt')
+    alt.addEventListener('change', async () => {
+      try {
+        await api('/api/admin/media/' + record.id, {
+          method: 'PATCH',
+          body: JSON.stringify({ alt: alt.value }),
+        })
+        image.alt = alt.value
+        say(t(locale, 'admin.hint.saved'))
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    box.appendChild(alt)
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-item__actions'
+
+    const copy = document.createElement('button')
+    copy.className = 'ui-btn'
+    copy.type = 'button'
+    copy.textContent = t(locale, 'admin.action.copy')
+    copy.addEventListener('click', async () => {
+      await navigator.clipboard.writeText('/media/' + record.key)
+      say(t(locale, 'admin.hint.copied'))
+    })
+    actions.appendChild(copy)
+
+    const remove = document.createElement('button')
+    remove.className = 'ui-btn admin-btn--danger'
+    remove.type = 'button'
+    remove.textContent = t(locale, 'admin.action.delete')
+    remove.addEventListener('click', async () => {
+      if (!confirm(t(locale, 'admin.confirm.deleteMedia'))) return
+      try {
+        await api('/api/admin/media/' + record.id, { method: 'DELETE' })
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    actions.appendChild(remove)
+
+    box.appendChild(actions)
+    return box
+  }
+
+  async function render() {
+    if (!gallery) return
+    gallery.textContent = ''
+    try {
+      const data = await api<{ media: MediaRow[] }>('/api/admin/media')
+      if (data.media.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const mark = document.createElement('span')
+        mark.className = 'admin-empty__mark'
+        mark.setAttribute('aria-hidden', 'true')
+        mark.textContent = '▦'
+        empty.appendChild(mark)
+        const label = document.createElement('p')
+        label.className = 'admin-empty__text'
+        label.textContent = t(locale, 'admin.gallery.empty')
+        empty.appendChild(label)
+        gallery.appendChild(empty)
+        return
+      }
+      for (const record of data.media) gallery.appendChild(item(record))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  document
+    .querySelector<HTMLInputElement>('[data-admin-upload]')
+    ?.addEventListener('change', async (event) => {
+      const input = event.target as HTMLInputElement
+      const file = input.files?.[0]
+      if (!file) return
+      const form = new FormData()
+      form.append('file', file)
+      try {
+        await api('/api/admin/media', { method: 'POST', body: form })
+        say(t(locale, 'admin.hint.uploaded'))
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      } finally {
+        input.value = ''
+      }
+    })
+
+  void render()
+</script>

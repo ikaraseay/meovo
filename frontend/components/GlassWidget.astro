@@ -1,0 +1,114 @@
+---
+/**
+ * 玻璃部件 —— 可拖拽的毛玻璃卡片。
+ * ---------------------------------------------------------
+ * 抓手是一条白色小横条（拖拽移动）+ 一个小圆钮（旋转切换固定）。
+ * 每张卡片带一个随机的 tint（由 id 哈希到一个悦目色相，稳定可复现），
+ * 浅到「感觉得出来一点就好」；组件只内联色相，浅/深两套配方在 tokens.css。
+ */
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  /** 部件 id —— 跨页面唯一，位置按它存 localStorage，也决定 tint 色相 */
+  id: string
+  /** 宽度档位：sm / md / lg / xl；缺省 auto（由内容决定） */
+  width?: 'sm' | 'md' | 'lg' | 'xl' | 'auto'
+  /** 独占整行（默认瀑布流里它自己占一行，如页脚、Hero） */
+  full?: boolean
+  /** 文章页的默认落位：top=顶部通栏 / side=正文右侧 / tail=正文下方 */
+  zone?: 'top' | 'side' | 'tail'
+  /** 默认就固定（首次进入没有存档时自动 pin，如思维导图、目录） */
+  defaultPin?: boolean
+  locale: Locale
+}
+
+const { id, width = 'auto', full = false, zone, defaultPin = false, locale } = Astro.props
+
+/** 悦目的色相集合 —— 避开病态的黄绿，只取看着舒服的暖/冷色 */
+const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
+
+/** 字符串哈希 → 0..N-1，同一 id 永远同一个色相 */
+function hashHue(key: string): number {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return TINT_HUES[h % TINT_HUES.length]
+}
+
+const hue = hashHue(id)
+
+/** 只把色相交给样式层 —— 浅色/深色各自的配方在 tokens.css 里（颜色归主题层，组件不写死色值） */
+---
+
+<section
+  class:list={['ui-widget', 'ui-card', `ui-widget--${width}`]}
+  data-widget={id}
+  data-widget-full={full ? '' : undefined}
+  data-zone={zone || undefined}
+  data-default-pin={defaultPin ? '' : undefined}
+  style={`--ui-widget-hue: ${hue}`}
+>
+  <header class="ui-widget__grip">
+    <span
+      class="ui-widget__handle"
+      data-widget-drag
+      aria-label={t(locale, 'widget.drag')}
+      title={t(locale, 'widget.drag')}
+    ></span>
+    <button
+      type="button"
+      class="ui-widget__restore"
+      data-widget-restore
+      aria-label={t(locale, 'desk.restore')}
+      title={t(locale, 'desk.restore')}
+    >
+      ↺
+    </button>
+    <button
+      type="button"
+      class="ui-widget__pin"
+      data-widget-pin
+      aria-label={t(locale, 'desk.pin')}
+      title={t(locale, 'desk.pin')}
+      aria-pressed="false"
+    >
+      📌
+    </button>
+  </header>
+  <div class="ui-widget__body">
+    <slot />
+  </div>
+</section>
+
+<style>
+  .ui-widget--sm {
+    width: 300px;
+  }
+  .ui-widget--md {
+    width: 420px;
+  }
+  .ui-widget--lg {
+    width: 560px;
+  }
+  .ui-widget--xl {
+    width: 720px;
+  }
+
+  /* 窄桌面 / 移动端：别让固定宽度撑破视口 */
+  @media (max-width: 1279px) {
+    .ui-widget--lg {
+      width: min(560px, 100%);
+    }
+    .ui-widget--xl {
+      width: min(720px, 100%);
+    }
+  }
+
+  @media not (min-width: 1024px) {
+    .ui-widget--sm,
+    .ui-widget--md,
+    .ui-widget--lg,
+    .ui-widget--xl {
+      width: 100%;
+    }
+  }
+</style>

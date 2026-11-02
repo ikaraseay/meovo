@@ -1,0 +1,142 @@
+/* =========================================================
+   终端面板 —— 首页欢迎卡与 404 页共用
+   ---------------------------------------------------------
+   颜色是独立一套 token（--ui-term-*，浅色纸色 / 深色墨色两套），
+   不跟玻璃卡那套（--ui-card-*）混。
+   ========================================================= */
+.term {
+  background: var(--ui-term-bg);
+  border: 1px solid var(--ui-term-grid);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+  font-family: var(--ui-font-mono);
+  color: var(--ui-term-fg);
+}
+
+/* 标题栏：三个点 + 路径 */
+.term__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-md);
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  background: var(--ui-term-bar-bg);
+  border-block-end: 1px solid var(--ui-term-grid);
+  font-size: 0.75rem;
+  color: var(--ui-term-dim);
+}
+
+.term__dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.term__dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--ui-radius-full);
+  display: block;
+}
+
+.term__dots i:nth-child(1) {
+  background: var(--ui-danger);
+}
+
+.term__dots i:nth-child(2) {
+  background: var(--ui-warning);
+}
+
+.term__dots i:nth-child(3) {
+  background: var(--ui-success);
+}
+
+.term__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-sm);
+  padding: var(--ui-space-lg);
+}
+
+.term__console {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-sm);
+}
+
+.term__line {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* 大标题：> 笔名 ▌ */
+.term__title {
+  font-family: var(--ui-font-mono);
+  font-size: clamp(1.5rem, 3.4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ui-term-fg);
+  display: flex;
+  align-items: center;
+  gap: 0.4ch;
+  white-space: nowrap;
+}
+
+.term__prompt {
+  color: var(--ui-term-dim);
+}
+
+.term__user {
+  color: var(--ui-term-accent);
+}
+
+.term__dim {
+  color: var(--ui-term-dim);
+}
+
+.term__accent {
+  color: var(--ui-term-green);
+}
+
+.term__violet {
+  color: var(--ui-term-violet);
+}
+
+/* 字符画 */
+.term__art {
+  margin: 0;
+  font-family: var(--ui-font-mono);
+  font-size: clamp(0.36rem, 0.5vw, 0.5rem);
+  line-height: 1.02;
+  color: var(--ui-term-fg);
+  white-space: pre;
+  overflow: hidden;
+}
+
+/* 块状光标 */
+.term__cursor {
+  display: inline-block;
+  width: 0.55ch;
+  height: 0.9em;
+  background: var(--ui-term-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .term__cursor {
+    animation: term-cursor 1.2s steps(1) infinite;
+  }
+}
+
+@keyframes term-cursor {
+  50% {
+    opacity: 0;
+  }
+}
+
+.term__actions {
+  display: flex;
+  gap: var(--ui-space-sm);
+  flex-wrap: wrap;
+  margin-block-start: var(--ui-space-sm);
+}

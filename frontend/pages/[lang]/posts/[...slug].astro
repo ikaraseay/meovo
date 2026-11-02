@@ -1,0 +1,144 @@
+---
+import { render } from 'astro:content'
+import { getAbsoluteLocaleUrl } from 'astro:i18n'
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import Article from '../../../components/Article.astro'
+import { t, locales, type Locale } from '../../../i18n'
+import {
+  getVisiblePosts,
+  groupByTranslation,
+  getPostLocale,
+  getPostSlug,
+  getCategoryLabel,
+  getTagLabel,
+  resolveForLocale,
+  resolveItems,
+  getAdjacentPosts,
+  type Post,
+  type PostItem,
+} from '../../../lib/posts'
+import { ogImageUrl, postRoute } from '../../../lib/urls'
+
+export async function getStaticPaths() {
+  const posts = await getVisiblePosts()
+  const groups = groupByTranslation(posts)
+  /** 每个语言下的文章序列 —— 一个翻译组算一篇 */
+  const itemsByLocale = new Map<Locale, PostItem[]>(
+    locales.map((locale) => [locale, resolveItems(posts, locale)]),
+  )
+
+  const paths: Array<{
+    params: { lang: string; slug: string }
+    props: {
+      post: Post
+      isFallback: boolean
+      variants: Post[]
+      prev?: { title: string; href: string }
+      next?: { title: string; href: string }
+    }
+  }> = []
+
+  for (const variants of groups.values()) {
+    for (const locale of locales) {
+      // 没有该语言版本就顶上原文（默认语言优先，再退到任意现有版本）
+      const post = resolveForLocale(variants, locale)
+      if (!post) continue
+
+      const { prev, next } = getAdjacentPosts(itemsByLocale.get(locale)!, getPostSlug(post))
+
+      paths.push({
+        params: { lang: locale, slug: getPostSlug(post) },
+        props: { post, isFallback: getPostLocale(post) !== locale, variants, prev, next },
+      })
+    }
+  }
+
+  return paths
+}
+
+const { post, isFallback, variants, prev, next } = Astro.props
+
+const { Content, headings } = await render(post)
+
+const locale = Astro.params.lang as Locale
+
+/** `<html lang>` 跟内容走 —— 回退页显示的是中文原文 */
+const contentLocale = getPostLocale(post)
+
+/** hreflang 只列真实存在的语言版本，给不存在的版本挂 hreflang 是错的 */
+const alternates = variants.map((variant) => ({
+  code: getPostLocale(variant),
+  href: getAbsoluteLocaleUrl(getPostLocale(variant), postRoute(getPostSlug(variant))),
+}))
+
+/**
+ * canonical 指向真实版本；回退页指向原文地址。
+ *
+ * 这两条不是 BaseLayout 的 pass-through —— 页面知道哪些语言版本真的存在，
+ * 回退页的 canonical 还得指向原文，布局那边算不出来。
+ */
+const canonicalPost = resolveForLocale(variants, locale) ?? post
+const canonical = getAbsoluteLocaleUrl(
+  getPostLocale(canonicalPost),
+  postRoute(getPostSlug(canonicalPost)),
+)
+
+/** OG 图 —— 全站共用一张静态品牌图 */
+const ogImage = ogImageUrl(Astro.site ?? Astro.url)
+
+/**
+ * 文章级结构化数据。
+ * author 是笔名（site.author）—— 站点名（site.name）是博客的名字，不是人。
+ */
+const blogPostingLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.pubDate.toISOString(),
+  dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
+  inLanguage: contentLocale,
+  mainEntityOfPage: canonical,
+  url: canonical,
+  image: ogImage,
+  author: { '@type': 'Person', name: t(locale, 'site.author') },
+  keywords: post.data.tags.map((tag) => getTagLabel(locale, tag)),
+  articleSection: post.data.category
+    ? getCategoryLabel(locale, post.data.category)
+    : undefined,
+}
+---
+
+<BaseLayout
+  locale={locale}
+  contentLocale={contentLocale}
+  alternates={alternates}
+  canonical={canonical}
+  noindex={isFallback}
+  ogType="article"
+  title={post.data.title}
+  description={post.data.description}
+  wide
+>
+  <Fragment slot="head">
+    <meta property="article:published_time" content={post.data.pubDate.toISOString()} />
+    {
+      post.data.updatedDate && (
+        <meta property="article:modified_time" content={post.data.updatedDate.toISOString()} />
+      )
+    }
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(blogPostingLd)} />
+  </Fragment>
+
+  <Article
+    post={post}
+    headings={headings}
+    locale={locale}
+    isFallback={isFallback}
+    variants={variants}
+    prev={prev}
+    next={next}
+  >
+    <Content />
+  </Article>
+</BaseLayout>

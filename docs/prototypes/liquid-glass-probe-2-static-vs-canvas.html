@@ -1,0 +1,206 @@
+<!doctype html>
+<!-- 存档原型：调研阶段的方案实现，未采用。结论见 docs/prototypes/README.md -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>liquid glass probe v2</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #1a1a1a;
+    display: grid;
+    place-items: center;
+    gap: 60px;
+    grid-auto-flow: row;
+    padding: 60px 20px;
+    font: 13px system-ui;
+    color: #ddd;
+  }
+  .case { display: grid; place-items: center; gap: 10px; }
+  .stage { position: relative; width: 320px; height: 150px; }
+  .stripes {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, #ff3b30 0 10px, #34c759 10px 20px, #0a84ff 20px 30px);
+  }
+  .panel {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px; height: 90px;
+    border-radius: 24px;
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 13px;
+    background: rgba(255,255,255,.25);
+    border: 1px solid rgba(255,255,255,.45);
+  }
+  .a { backdrop-filter: url(#turb) blur(3px) saturate(180%); }
+  .b { backdrop-filter: url(#lensStatic) blur(1px) saturate(180%); }
+</style>
+</head>
+<body>
+  <p style="position:fixed;inset-block-end:0;inset-inline:0;margin:0;padding:8px 14px;background:#000;color:#7fd;font:12px/1.5 ui-monospace,monospace;text-align:center">存档原型 · <b>未采用</b> · 结论见 <a style="color:#7fd" href="README.md">docs/prototypes/README.md</a></p>
+
+<div class="case">
+  <div class="stage">
+    <div class="stripes"></div>
+    <div class="panel a">A noise (current)</div>
+  </div>
+</div>
+
+<div class="case">
+  <div class="stage">
+    <div class="stripes"></div>
+    <div class="panel b">B static stretched map</div>
+  </div>
+</div>
+
+<div class="case">
+  <div class="stage">
+    <div class="stripes"></div>
+    <div class="panel" id="c">C runtime canvas map</div>
+  </div>
+</div>
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <filter id="turb" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="11" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="2" result="soft"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="30" xChannelSelector="R" yChannelSelector="G" result="d0"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="24" xChannelSelector="R" yChannelSelector="G" result="d1"/>
+      <feDisplacementMap in="SourceGraphic" in2="soft" scale="36" xChannelSelector="R" yChannelSelector="G" result="d2"/>
+      <feColorMatrix in="d2" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>
+      <feColorMatrix in="d1" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>
+      <feColorMatrix in="d0" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>
+      <feBlend in="cr" in2="cg" mode="screen" result="crg"/>
+      <feBlend in="crg" in2="cb" mode="screen"/>
+    </filter>
+
+    <!-- 静态位移图：viewBox 300x300 中央 50..250 是元素本体，外圈是采样余量 -->
+    <svg id="mapStatic" width="300" height="300" viewBox="0 0 300 300">
+      <defs>
+        <linearGradient id="gx" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ff0000"/>
+          <stop offset="50%" stop-color="#808080"/>
+          <stop offset="100%" stop-color="#000000"/>
+        </linearGradient>
+        <linearGradient id="gy" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#000000"/>
+          <stop offset="50%" stop-color="#808080"/>
+          <stop offset="100%" stop-color="#0000ff"/>
+        </linearGradient>
+        <filter id="soften" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="11"/>
+        </filter>
+      </defs>
+      <rect width="300" height="300" fill="#808080"/>
+      <rect x="50" y="50" width="200" height="200" rx="30" fill="url(#gx)"/>
+      <rect x="50" y="50" width="200" height="200" rx="30" fill="url(#gy)" style="mix-blend-mode:difference"/>
+      <rect x="64" y="64" width="172" height="172" rx="23" fill="rgb(128,128,128)" fill-opacity="0.93" filter="url(#soften)"/>
+    </svg>
+
+    <filter id="lensStatic" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feImage href="#mapStatic" x="0%" y="0%" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+      <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="-46" result="d0"/>
+      <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="-36" result="d1"/>
+      <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="-56" result="d2"/>
+      <feColorMatrix in="d0" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>
+      <feColorMatrix in="d1" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>
+      <feColorMatrix in="d2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>
+      <feBlend in="cr" in2="cg" mode="screen" result="crg"/>
+      <feBlend in="crg" in2="cb" mode="screen"/>
+    </filter>
+  </defs>
+</svg>
+
+<script>
+  // C：逐元素 canvas 生成位移图（rizzytoday/liquid-glass 的做法）
+  const NS = 'http://www.w3.org/2000/svg'
+  let counter = 0
+
+  function buildMap(el, radius, scale) {
+    const rect = el.getBoundingClientRect()
+    const w = Math.round(rect.width)
+    const h = Math.round(rect.height)
+    const maxD = Math.max(Math.abs(scale) * 0.5, 20)
+    const pad = Math.ceil(maxD)
+    const totalW = w + pad * 2
+    const totalH = h + pad * 2
+
+    const canvas = document.createElement('canvas')
+    canvas.width = totalW
+    canvas.height = totalH
+    const ctx = canvas.getContext('2d')
+
+    ctx.fillStyle = 'rgb(128, 128, 128)'
+    ctx.fillRect(0, 0, totalW, totalH)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(pad, pad, w, h, radius)
+    ctx.clip()
+
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(pad, pad, w, h)
+
+    const redGrad = ctx.createLinearGradient(pad + w, pad, pad, pad)
+    redGrad.addColorStop(0, '#000000')
+    redGrad.addColorStop(1, '#ff0000')
+    ctx.fillStyle = redGrad
+    ctx.fillRect(pad, pad, w, h)
+
+    ctx.globalCompositeOperation = 'difference'
+    const blueGrad = ctx.createLinearGradient(pad, pad, pad, pad + h)
+    blueGrad.addColorStop(0, '#000000')
+    blueGrad.addColorStop(1, '#0000ff')
+    ctx.fillStyle = blueGrad
+    ctx.fillRect(pad, pad, w, h)
+
+    ctx.globalCompositeOperation = 'source-over'
+    const borderPx = Math.min(w, h) * 0.035
+    ctx.filter = 'blur(11px)'
+    ctx.fillStyle = 'hsla(0, 0%, 50%, 0.93)'
+    ctx.beginPath()
+    ctx.roundRect(pad + borderPx, pad + borderPx, w - borderPx * 2, h - borderPx * 2, radius)
+    ctx.fill()
+    ctx.restore()
+
+    return { uri: canvas.toDataURL(), w, h, pad }
+  }
+
+  function applyRuntime(el, radius, scale) {
+    const { uri, w, h, pad } = buildMap(el, radius, scale)
+    const id = 'lg-runtime-' + ++counter
+
+    const svg = document.createElementNS(NS, 'svg')
+    svg.setAttribute('width', '0')
+    svg.setAttribute('height', '0')
+    svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none'
+    svg.innerHTML = `
+      <defs>
+        <filter id="${id}" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+          <feImage result="map" preserveAspectRatio="none" x="${pad}" y="${pad}" width="${w}" height="${h}"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale}" result="d0"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale + 10}" result="d1"/>
+          <feDisplacementMap in="SourceGraphic" in2="map" xChannelSelector="R" yChannelSelector="B" scale="${scale + 20}" result="d2"/>
+          <feColorMatrix in="d0" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>
+          <feColorMatrix in="d1" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>
+          <feColorMatrix in="d2" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>
+          <feBlend in="cr" in2="cg" mode="screen" result="crg"/>
+          <feBlend in="crg" in2="cb" mode="screen"/>
+        </filter>
+      </defs>`
+    document.body.appendChild(svg)
+
+    const feImage = svg.querySelector('feImage')
+    feImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', uri)
+    feImage.setAttribute('href', uri)
+
+    el.style.backdropFilter = `url(#${id}) blur(1px) saturate(180%)`
+  }
+
+  applyRuntime(document.getElementById('c'), 24, -46)
+</script>
+
+</body>
+</html>

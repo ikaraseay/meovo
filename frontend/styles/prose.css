@@ -1,0 +1,270 @@
+/* =========================================================
+   文章页样式 —— 正文 / 代码块 / 目录
+   ---------------------------------------------------------
+   由 global.css 引入。
+   颜色一律走 token；代码高亮的明暗两套由 Shiki 写在元素上的
+   CSS 变量（--shiki-light / --shiki-dark）切换。
+   ========================================================= */
+
+/* ==================== 正文 ==================== */
+/* 正文偏好。首屏脚本会按 localStorage 覆盖这两个值 */
+:root {
+  --ui-prose-scale: 1;
+  --ui-prose-lh: 1.85;
+}
+
+.prose {
+  font-size: calc(1.0625rem * var(--ui-prose-scale));
+  line-height: var(--ui-prose-lh);
+  color: var(--ui-text);
+}
+
+.prose > * + * {
+  margin-block-start: var(--ui-space-md);
+}
+
+/* 标题：悬浮状态栏会盖住标题，锚点跳转要留出这段距离 */
+.prose > h2,
+.prose > h3,
+.prose > h4 {
+  margin-block-start: var(--ui-space-xl);
+  scroll-margin-top: 120px;
+}
+
+.prose > h2 {
+  font-size: 1.5em;
+}
+
+.prose > h3 {
+  font-size: 1.25em;
+}
+
+.prose > h4 {
+  font-size: 1.05em;
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.5em;
+}
+
+.prose li + li {
+  margin-block-start: var(--ui-space-xs);
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin-block-start: var(--ui-space-xs);
+}
+
+.prose a {
+  text-decoration: underline;
+  text-decoration-color: var(--ui-border-accent);
+  text-underline-offset: 0.2em;
+}
+
+.prose a:hover {
+  text-decoration-color: currentColor;
+}
+
+.prose img {
+  margin-block: var(--ui-space-lg);
+  border-radius: var(--ui-radius-md);
+}
+
+.prose hr {
+  height: 1px;
+  margin-block: var(--ui-space-2xl);
+  border: none;
+  background: var(--ui-border);
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding-inline-start: var(--ui-space-md);
+  border-inline-start: 2px solid var(--ui-text);
+  color: var(--ui-text-secondary);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.prose th,
+.prose td {
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border-block-end: 1px solid var(--ui-border);
+  text-align: start;
+}
+
+.prose th {
+  font-weight: 600;
+  color: var(--ui-text-secondary);
+}
+
+/* 行内代码 —— 代码块里的 <code> 由 .astro-code 接手 */
+.prose :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-sunken);
+  color: var(--ui-text);
+  font-family: var(--ui-font-mono);
+  font-size: 0.875em;
+}
+
+/* ==================== 代码块 ==================== */
+.code-block {
+  position: relative;
+  margin-block: var(--ui-space-lg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  /* 裁掉代码背景溢出圆角的部分 */
+  overflow: hidden;
+}
+
+.code-block pre.astro-code {
+  margin: 0;
+  padding: var(--ui-space-md);
+  border-radius: 0;
+  overflow-x: auto;
+  background-color: var(--shiki-light-bg);
+  color: var(--shiki-light);
+  font-family: var(--ui-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* Shiki 给每个 span 也写了变量，得一起切 */
+.code-block pre.astro-code span {
+  color: var(--shiki-light);
+}
+
+/* 深色模式 —— 浅色那组选择器特异性更低，这里压得住 */
+html.dark .code-block pre.astro-code {
+  background-color: var(--shiki-dark-bg);
+  color: var(--shiki-dark);
+}
+
+html.dark .code-block pre.astro-code span {
+  color: var(--shiki-dark);
+}
+
+.code-lang {
+  position: absolute;
+  inset-block-start: var(--ui-space-sm);
+  inset-inline-start: var(--ui-space-md);
+  color: var(--ui-text-faint);
+  font-family: var(--ui-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+}
+
+.code-copy {
+  position: absolute;
+  inset-block-start: var(--ui-space-xs);
+  inset-inline-end: var(--ui-space-xs);
+  padding: 4px 10px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-active);
+  color: var(--ui-text-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    color var(--ui-transition-fast),
+    background var(--ui-transition-fast);
+}
+
+.code-copy:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-hover);
+}
+
+.code-copy.is-copied {
+  color: var(--ui-text-accent);
+}
+
+/* ==================== 目录 ==================== */
+.toc {
+  font-size: 0.8125rem;
+}
+
+.toc-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-sm);
+  width: 100%;
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-active);
+  color: var(--ui-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toc-toggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--ui-transition-fast);
+}
+
+.toc-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+/* 移动端默认收起 */
+.toc-list {
+  display: none;
+  margin: var(--ui-space-sm) 0 0;
+  padding: 0;
+  border-inline-start: 1px solid var(--ui-border);
+  list-style: none;
+}
+
+.toc[data-open] .toc-list {
+  display: block;
+}
+
+.toc-item--depth-3 {
+  padding-inline-start: var(--ui-space-md);
+}
+
+.toc-link {
+  display: block;
+  margin-inline-start: -1px;
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+  border-inline-start: 2px solid transparent;
+  color: var(--ui-text-muted);
+  text-decoration: none;
+  transition:
+    color var(--ui-transition-fast),
+    border-color var(--ui-transition-fast);
+}
+
+.toc-link:hover {
+  color: var(--ui-text);
+}
+
+.toc-link.is-active {
+  border-inline-start-color: var(--ui-text-accent);
+  color: var(--ui-text-accent);
+}
+
+/* 桌面端目录常驻右侧 —— 选择器比上面的 .toc-list 更具体，压得住 */
+@media (min-width: 1024px) {
+  .toc .toc-list {
+    display: block;
+  }
+
+  .toc-toggle {
+    display: none;
+  }
+}

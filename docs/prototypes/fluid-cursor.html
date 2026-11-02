@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="zh" data-theme="liquid-glass">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>流体光标原型 · Fluid Cursor</title>
+
+    <!-- 直接复用博客真实的样式层：字体栈、token、主题都跟线上完全一致 -->
+    <link rel="stylesheet" href="../../src/styles/global.css" />
+
+    <style>
+      body {
+        padding-block: 6vh 12vh;
+      }
+
+      /* ---------- 原型工具条 ---------- */
+      .proto-bar {
+        position: fixed;
+        inset-block-end: 0;
+        inset-inline: 0;
+        z-index: 50;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--ui-space-md);
+        align-items: center;
+        padding: var(--ui-space-sm) var(--ui-space-lg);
+        background: var(--ui-surface-glass);
+        backdrop-filter: blur(12px);
+        border-block-start: 1px solid var(--ui-border);
+        font-size: 0.75rem;
+        color: var(--ui-text-secondary);
+      }
+
+      .proto-bar label {
+        display: inline-flex;
+        gap: var(--ui-space-xs);
+        align-items: center;
+      }
+
+      .proto-bar input[type='range'] {
+        width: 120px;
+      }
+
+      .proto-bar .stat {
+        margin-inline-start: auto;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      /* ---------- Hero（照抄 src/pages/zh/index.astro 的样式） ---------- */
+      .hero {
+        position: relative;
+        padding-block: var(--ui-space-3xl) var(--ui-space-2xl);
+        background: radial-gradient(
+          ellipse 60% 50% at 50% 0%,
+          var(--ui-hero-glow) 0%,
+          transparent 70%
+        );
+        text-align: center;
+      }
+
+      .hero-title {
+        font-size: clamp(2.25rem, 6vw, 3.5rem);
+        margin-block-end: var(--ui-space-md);
+      }
+
+      .hero-subtitle {
+        font-size: 1.125rem;
+        max-width: 36rem;
+        margin-inline: auto;
+      }
+
+      .hero-actions {
+        display: flex;
+        justify-content: center;
+        gap: var(--ui-space-sm);
+        margin-block-start: var(--ui-space-lg);
+        flex-wrap: wrap;
+      }
+
+      /* ---------- 画布 ---------- */
+      #fx {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 200ms ease;
+      }
+
+      /*
+       * 流体模式生效时：DOM 原文整体透明（用 opacity 而不是 color:transparent ——
+       * color 会把 getComputedStyle().color 也变成 transparent，canvas 就没颜色可画；
+       * opacity 不动 color，文字还能被框选复制，也仍然在无障碍树里）。
+       */
+      .is-fluid #fx {
+        opacity: 1;
+      }
+
+      .is-fluid .hero-title,
+      .is-fluid .hero-subtitle {
+        opacity: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <section class="hero" id="hero">
+      <canvas id="fx" aria-hidden="true"></canvas>
+
+      <div class="hero-text" id="hero-text">
+        <h1 class="hero-title" id="t-title">你好，世界</h1>
+        <p class="hero-subtitle ui-text--secondary" id="t-sub">一个用 Astro 搭的个人博客，中英双语。</p>
+      </div>
+
+      <div class="hero-actions" id="actions">
+        <a class="ui-btn ui-btn--primary" href="#latest">最新文章</a>
+        <a class="ui-btn ui-btn--secondary" href="#">归档</a>
+      </div>
+    </section>
+
+    <div class="proto-bar">
+      <label>
+        语言
+        <button type="button" class="ui-btn ui-btn--ghost" id="btn-lang">中文 / EN</button>
+      </label>
+
+      <label>
+        主题
+        <button type="button" class="ui-btn ui-btn--ghost" id="btn-theme">明 / 暗</button>
+      </label>
+
+      <label>
+        模式
+        <button type="button" class="ui-btn ui-btn--ghost" id="btn-mode">走廊重排</button>
+      </label>
+
+      <label>
+        障碍物半径
+        <input type="range" id="rng-radius" min="0" max="70" step="1" value="20" />
+        <span id="lbl-radius">20</span>
+      </label>
+
+      <label>
+        <input type="checkbox" id="chk-debug" />
+        调试（画出槽位）
+      </label>
+
+      <span class="stat" id="stat"></span>
+    </div>
+
+    <script type="module">
+      import { prepareWithSegments, layoutNextLine, setLocale } from 'https://esm.sh/@chenglou/pretext@1.0.0'
+
+      /* =========================================================
+         手感参数 —— 全部集中在这里，原型阶段直接调
+         ========================================================= */
+      const CFG = {
+        mode: 'corridor', // 'corridor' 走廊重排（Pretext 官方那套）| 'split' 劈开不重排
+        radius: 20, // 障碍物基础半径
+        radiusMagnet: 34, // 靠近按钮时的放大半径
+        pad: 10, // 障碍物与文字之间的额外留白
+        minSlot: 30, // 窄于此宽度的槽位直接丢弃
+        springK: 170, // 弹簧刚度
+        springD: 22, // 阻尼
+        magnetRange: 130, // 指针进入按钮这个距离内触发磁吸
+      }
+
+      const COPY = {
+        zh: { title: '你好，世界', sub: '一个用 Astro 搭的个人博客，中英双语。', lang: 'zh' },
+        en: {
+          title: 'Hello, world',
+          sub: 'A personal blog built with Astro, in Chinese and English.',
+          lang: 'en',
+        },
+      }
+
+      const hero = document.getElementById('hero')
+      const heroText = document.getElementById('hero-text')
+      const canvas = document.getElementById('fx')
+      const ctx = canvas.getContext('2d')
+      const titleEl = document.getElementById('t-title')
+      const subEl = document.getElementById('t-sub')
+      const actionsEl = document.getElementById('actions')
+      const statEl = document.getElementById('stat')
+
+      let lang = 'zh'
+      let debug = false
+      let fields = []
+      let buttons = []
+      let enabled = false
+      let reservedHeight = 0
+      let reservedWorst = null
+
+      /* ---------- 指针 + 弹簧状态 ---------- */
+      const pointer = { x: -9999, y: -9999, active: false }
+      const spring = { x: -9999, y: -9999, vx: 0, vy: 0 }
+      let needsDraw = true
+      let lastLayoutMs = 0
+
+      /* =========================================================
+         几何工具 —— 移植自 pretext 官方 demo
+         pages/demos/editorial-engine.ts + pages/demos/wrap-geometry.ts
+         ========================================================= */
+
+      /** 圆与一条水平带（band）的相交区间；不相交返回 null */
+      function circleIntervalForBand(cx, cy, r, bandTop, bandBottom) {
+        if (bandBottom <= cy - r || bandTop >= cy + r) return null
+        const minDy = cy >= bandTop && cy <= bandBottom ? 0 : cy < bandTop ? bandTop - cy : cy - bandBottom
+        if (minDy >= r) return null
+        const maxDx = Math.sqrt(r * r - minDy * minDy)
+        return { left: cx - maxDx - CFG.pad, right: cx + maxDx + CFG.pad }
+      }
+
+      /** 从可用区间里挖掉被遮挡的区间，剩下的就是「槽位」 */
+      function carveSlots(region, blocked, minWidth) {
+        let slots = [region]
+        for (const b of blocked) {
+          const next = []
+          for (const s of slots) {
+            if (b.right <= s.left || b.left >= s.right) {
+              next.push(s)
+              continue
+            }
+            if (b.left > s.left) next.push({ left: s.left, right: b.left })
+            if (b.right < s.right) next.push({ left: b.right, right: s.right })
+          }
+          slots = next
+        }
+        return slots.filter((s) => s.right - s.left >= minWidth)
+      }
+
+      /* =========================================================
+         布局 —— 一个字段（标题或副标题）的逐行排版
+         每行：算出被光标挡住的区间 → 挖出若干槽位 → 逐槽位灌文字
+         ========================================================= */
+      function layoutField(field, region, obstacle, top, maxBands) {
+        const lines = []
+        let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+        let y = top
+        let bands = 0
+        let exhausted = false
+
+        while (bands < maxBands) {
+          const blocked = []
+          if (obstacle) {
+            const iv = circleIntervalForBand(obstacle.x, obstacle.y, obstacle.r, y, y + field.lineHeight)
+            if (iv) blocked.push(iv)
+          }
+
+          const slots = carveSlots(region, blocked, CFG.minSlot)
+          let placed = false
+
+          for (const slot of slots) {
+            const line = layoutNextLine(field.prepared, slot.right - slot.left, cursor)
+            if (line === null) {
+              exhausted = true
+              break
+            }
+            lines.push({
+              field,
+              text: line.text,
+              width: line.width,
+              x: slot.left,
+              slotWidth: slot.right - slot.left,
+              y,
+            })
+            cursor = line.end
+            placed = true
+          }
+
+          if (placed) bands++
+          if (exhausted) break
+
+          y += field.lineHeight
+        }
+
+        return { lines, bands }
+      }
+
+      /** 两个字段顺序排布：标题排完，副标题接着往下 */
+      function layoutAll(obstacle, maxBands = Infinity) {
+        const out = []
+        const bands = []
+        let y = fields[0].top
+
+        for (let i = 0; i < fields.length; i++) {
+          const field = fields[i]
+          const res =
+            CFG.mode === 'split'
+              ? layoutFieldSplit(field, field.region, obstacle, y)
+              : layoutField(field, field.region, obstacle, y, maxBands)
+          out.push(...res.lines)
+          bands.push(res.bands)
+          y += res.bands * field.lineHeight
+          if (i < fields.length - 1) y += field.gapAfter
+        }
+
+        return { lines: out, bands, height: y - fields[0].top }
+      }
+
+      /* =========================================================
+         劈开模式 —— 行数不变，只把被光标切到的那一行从中间劈开，
+         左右两半分别贴住光标的左右边缘（文字因此「分开」，但整体高度不变）
+         ========================================================= */
+      function layoutFieldSplit(field, region, obstacle, top) {
+        const lines = []
+        // 用元素盒宽排版 —— 行断点跟自然排版完全一致，劈开模式不改变行数
+        const width = field.width
+        let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+        let y = top
+
+        for (let band = 0; band < field.natural.bands; band++) {
+          const line = layoutNextLine(field.prepared, width, cursor)
+          if (line === null) break
+          cursor = line.end
+
+          const x = field.left + (width - line.width) / 2
+          const iv = obstacle
+            ? circleIntervalForBand(obstacle.x, obstacle.y, obstacle.r, y, y + field.lineHeight)
+            : null
+
+          let split = null
+          let discLeft = 0
+          let discRight = 0
+          if (iv) {
+            discLeft = Math.max(iv.left, x)
+            discRight = Math.min(iv.right, x + line.width)
+            if (discRight > discLeft) {
+              const k = splitIndex(line.text, field.font, discLeft - x)
+              if (k > 0 && k < line.text.length) split = k
+            }
+          }
+
+          if (split !== null) {
+            const leftText = line.text.slice(0, split)
+            const rightText = line.text.slice(split)
+            ctx.font = field.font
+            const lw = ctx.measureText(leftText).width
+            const rw = ctx.measureText(rightText).width
+            lines.push({ field, text: leftText, width: lw, x: discLeft - lw, slotWidth: lw, y })
+            lines.push({ field, text: rightText, width: rw, x: discRight, slotWidth: rw, y })
+          } else {
+            // slotWidth = line.width，draw() 不会再二次居中
+            lines.push({ field, text: line.text, width: line.width, x, slotWidth: line.width, y })
+          }
+
+          y += field.lineHeight
+        }
+
+        return { lines, bands: field.natural.bands }
+      }
+
+      /** 找出被光标切到的字符位置：拉丁文按词边界切，中文逐字切 */
+      function splitIndex(text, font, target) {
+        ctx.font = font
+        const total = ctx.measureText(text).width
+        if (target <= 0) return 0
+        if (target >= total) return text.length
+
+        let lo = 0
+        let hi = text.length
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1
+          if (ctx.measureText(text.slice(0, mid)).width <= target) lo = mid
+          else hi = mid - 1
+        }
+
+        const sp = text.lastIndexOf(' ', lo)
+        return sp > 0 ? sp + 1 : lo
+      }
+
+      /* =========================================================
+         读样式 —— 把 CSS 的排版参数翻译成 Pretext / canvas 认的东西
+         ========================================================= */
+      function readStyle(el) {
+        const cs = getComputedStyle(el)
+        const size = parseFloat(cs.fontSize)
+        const weight = cs.fontWeight === 'normal' ? '400' : cs.fontWeight
+        const style = cs.fontStyle === 'italic' ? 'italic' : 'normal'
+        const ls = parseFloat(cs.letterSpacing)
+        const lh = parseFloat(cs.lineHeight)
+
+        const font = `${style} ${weight} ${size}px ${cs.fontFamily}`
+        // canvas 的 font 简写解析失败时会静默保留旧值 —— 兜一层
+        ctx.font = font
+        if (!ctx.font.includes(`${size}px`)) ctx.font = `${style} ${weight} ${size}px sans-serif`
+
+        return {
+          font: ctx.font,
+          letterSpacing: Number.isFinite(ls) ? ls : 0,
+          lineHeight: Number.isFinite(lh) ? lh : size * 1.2,
+          color: cs.color,
+        }
+      }
+
+      /* =========================================================
+         初始化字段 —— 测自然排版，拿到文字的真实外框
+         ========================================================= */
+      function buildFields() {
+        const heroRect = hero.getBoundingClientRect()
+        const specs = [
+          { el: titleEl, rect: titleEl.getBoundingClientRect() },
+          { el: subEl, rect: subEl.getBoundingClientRect() },
+        ]
+
+        fields = specs.map(({ el, rect }) => {
+          const st = readStyle(el)
+          return {
+            ...st,
+            el,
+            prepared: prepareWithSegments(el.textContent.trim(), st.font, { letterSpacing: st.letterSpacing }),
+            left: rect.left - heroRect.left,
+            top: rect.top - heroRect.top,
+            width: rect.width,
+            gapAfter: 0,
+            region: { left: 0, right: 0 },
+            natural: null,
+          }
+        })
+
+        // 字段之间的自然间隙（标题的下外边距）
+        fields[0].gapAfter = fields[1].top - (fields[0].top + specs[0].rect.height)
+
+        // 第一遍：没有障碍物的自然排版 —— 顺便算出文字的真实外框。
+        // 障碍物只跟「看得见的字」交互，不跟标题元素那一大片空白盒交互。
+        for (const field of fields) {
+          const natural = layoutField(field, { left: field.left, right: field.left + field.width }, null, field.top, Infinity)
+          field.natural = natural
+
+          let left = Infinity
+          let right = -Infinity
+          for (const line of natural.lines) {
+            const x = line.x + (line.slotWidth - line.width) / 2
+            left = Math.min(left, x)
+            right = Math.max(right, x + line.width)
+          }
+          if (!Number.isFinite(left)) {
+            left = field.left
+            right = field.left + field.width
+          }
+          field.region = { left, right }
+        }
+      }
+
+      /** 障碍物落在不同位置时，整个文本区最多会占多高 —— 拿它预留固定高度，页面就不跳 */
+      function computeReserved() {
+        // 劈开模式不改变行数，高度天然固定
+        if (CFG.mode === 'split') {
+          reservedWorst = null
+          return layoutAll(null).height
+        }
+
+        const radii = [CFG.radius, CFG.radiusMagnet]
+        const left = Math.min(...fields.map((f) => f.region.left))
+        const right = Math.max(...fields.map((f) => f.region.right))
+        const top = fields[0].top
+        const last = fields[fields.length - 1]
+        const bottom = last.top + last.natural.bands * last.lineHeight
+
+        const step = Math.min(...fields.map((f) => f.lineHeight)) / 2
+        const xs = [
+          left + CFG.radius,
+          left + (right - left) * 0.25,
+          (left + right) / 2,
+          right - (right - left) * 0.25,
+          right - CFG.radius,
+        ]
+        const ys = []
+        for (let y = top - step; y <= bottom + step; y += step) ys.push(y)
+
+        let worst = layoutAll(null)
+        let worstObstacle = null
+
+        for (const r of radii) {
+          for (const x of xs) {
+            for (const y of ys) {
+              const obstacle = { x, y, r }
+              const res = layoutAll(obstacle)
+              if (res.height > worst.height) {
+                worst = res
+                worstObstacle = obstacle
+              }
+            }
+          }
+        }
+
+        reservedWorst = worstObstacle
+        return worst.height
+      }
+
+      /* =========================================================
+         绘制
+         ========================================================= */
+      function draw(lines) {
+        const dpr = window.devicePixelRatio || 1
+        const w = canvas.clientWidth
+        const h = canvas.clientHeight
+        const pw = Math.round(w * dpr)
+        const ph = Math.round(h * dpr)
+
+        if (canvas.width !== pw || canvas.height !== ph) {
+          canvas.width = pw
+          canvas.height = ph
+        }
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+
+        const heroRect = hero.getBoundingClientRect()
+
+        // 先画光晕（压在文字下面）
+        if (pointer.active) {
+          const cx = spring.x - heroRect.left
+          const cy = spring.y - heroRect.top
+          const accent = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim()
+          const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, CFG.radiusMagnet * 2.4)
+          glow.addColorStop(0, hexToRgba(accent, 0.22))
+          glow.addColorStop(0.45, hexToRgba(accent, 0.07))
+          glow.addColorStop(1, hexToRgba(accent, 0))
+          ctx.fillStyle = glow
+          ctx.beginPath()
+          ctx.arc(cx, cy, CFG.radiusMagnet * 2.4, 0, Math.PI * 2)
+          ctx.fill()
+        }
+
+        // 再画文字
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'left'
+        let currentFont = ''
+
+        for (const line of lines) {
+          const field = line.field
+          if (field.font !== currentFont) {
+            ctx.font = field.font
+            currentFont = field.font
+          }
+          ctx.fillStyle = field.color
+
+          // 居中于槽位
+          const x = line.x + (line.slotWidth - line.width) / 2
+          ctx.fillText(line.text, x, line.y + field.lineHeight / 2)
+
+          if (debug) {
+            ctx.strokeStyle = 'rgba(255, 107, 53, 0.55)'
+            ctx.lineWidth = 1
+            ctx.strokeRect(line.x + 0.5, line.y + 0.5, line.slotWidth - 1, field.lineHeight - 1)
+          }
+        }
+      }
+
+      function hexToRgba(hex, alpha) {
+        const m = hex.replace('#', '')
+        const full = m.length === 3 ? m.split('').map((c) => c + c).join('') : m
+        const n = parseInt(full, 16)
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+      }
+
+      /* =========================================================
+         主循环 —— 弹簧积分 + 重排 + 绘制
+         ========================================================= */
+      let last = performance.now()
+      let acc = 0
+      const STEP = 1 / 120
+
+      function frame(now) {
+        requestAnimationFrame(frame)
+        if (!enabled) return
+
+        const dt = Math.min((now - last) / 1000, 0.1)
+        last = now
+
+        // 弹簧：半隐式欧拉 + 固定子步长，保证不同帧率下手感一致
+        acc += dt
+        while (acc >= STEP) {
+          const ax = (pointer.x - spring.x) * CFG.springK - spring.vx * CFG.springD
+          const ay = (pointer.y - spring.y) * CFG.springK - spring.vy * CFG.springD
+          spring.vx += ax * STEP
+          spring.vy += ay * STEP
+          spring.x += spring.vx * STEP
+          spring.y += spring.vy * STEP
+          acc -= STEP
+        }
+
+        const moving =
+          Math.abs(pointer.x - spring.x) > 0.05 ||
+          Math.abs(pointer.y - spring.y) > 0.05 ||
+          Math.abs(spring.vx) > 0.05 ||
+          Math.abs(spring.vy) > 0.05
+
+        if (!moving && !needsDraw) return
+        needsDraw = false
+
+        const t0 = performance.now()
+        const res = layoutAll(obstacleFor(spring.x, spring.y))
+        lastLayoutMs = performance.now() - t0
+
+        draw(res.lines)
+        const w = reservedWorst
+        statEl.textContent =
+          `布局 ${lastLayoutMs.toFixed(2)} ms · ${res.lines.length} 段 · 行 ${res.bands.join('/')}` +
+          ` · 预留 ${Math.round(reservedHeight)}px` +
+          (w ? ` · 最坏 r=${w.r} @(${Math.round(w.x)},${Math.round(w.y)})` : '') +
+          (debug
+            ? ' || ' +
+              fields
+                .map(
+                  (f, i) =>
+                    `#${i} L=${Math.round(f.left)} W=${Math.round(f.width)} 自然行=${f.natural.bands} ` +
+                    `区域=[${Math.round(f.region.left)},${Math.round(f.region.right)}]`,
+                )
+                .join(' | ') +
+              ' || ' +
+              res.lines
+                .map((l) => `"${l.text}" x=${Math.round(l.x)} w=${Math.round(l.width)}`)
+                .join(' ; ')
+            : '')
+      }
+
+      /**
+       * 当前的障碍物：靠近按钮时半径变大。
+       * 注意坐标系 —— 布局与画布都用「相对 hero」的坐标，
+       * 指针是视口坐标，转换必须在这里做一次（否则会差一个 hero 的偏移）。
+       */
+      function obstacleFor(vx, vy) {
+        if (!pointer.active) return null
+        let r = CFG.radius
+        for (const b of buttons) {
+          // buttons 存的是视口坐标 —— 磁吸判定在视口空间做
+          const dx = vx - b.x
+          const dy = vy - b.y
+          if (Math.hypot(dx, dy) < CFG.magnetRange) {
+            r = CFG.radiusMagnet
+            break
+          }
+        }
+        const heroRect = hero.getBoundingClientRect()
+        return { x: vx - heroRect.left, y: vy - heroRect.top, r }
+      }
+
+      /* =========================================================
+         装配
+         ========================================================= */
+      function refreshButtons() {
+        buttons = [...actionsEl.querySelectorAll('a, button')].map((el) => {
+          const r = el.getBoundingClientRect()
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        })
+      }
+
+      function resize() {
+        buildFields()
+        reservedHeight = computeReserved()
+        heroText.style.minHeight = `${Math.ceil(reservedHeight)}px`
+        refreshButtons()
+        needsDraw = true
+      }
+
+      function applyCopy(next) {
+        lang = next
+        const c = COPY[lang]
+        document.documentElement.lang = c.lang
+        titleEl.textContent = c.title
+        subEl.textContent = c.sub
+        setLocale(c.lang)
+        resize()
+      }
+
+      /* ---------- 降级判断 ---------- */
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
+      const hasFinePointer = matchMedia('(any-pointer: fine)')
+      // ?static=1 用来手动验证降级路径（原型调试用）
+      const forceStatic = new URLSearchParams(location.search).has('static')
+
+      function shouldEnable() {
+        if (forceStatic) return false
+        return hasFinePointer.matches && !reducedMotion.matches
+      }
+
+      function syncEnabled() {
+        enabled = shouldEnable()
+        hero.classList.toggle('is-fluid', enabled)
+        if (enabled) resize()
+      }
+
+      /* ---------- 事件 ---------- */
+      window.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return
+        pointer.x = e.clientX
+        pointer.y = e.clientY
+        if (!pointer.active) {
+          pointer.active = true
+          spring.x = e.clientX
+          spring.y = e.clientY
+        }
+        needsDraw = true
+      })
+
+      document.documentElement.addEventListener('pointerleave', () => {
+        pointer.active = false
+        needsDraw = true
+      })
+
+      window.addEventListener('resize', resize)
+
+      reducedMotion.addEventListener('change', syncEnabled)
+      hasFinePointer.addEventListener('change', syncEnabled)
+
+      document.getElementById('btn-lang').addEventListener('click', () => {
+        applyCopy(lang === 'zh' ? 'en' : 'zh')
+      })
+
+      document.getElementById('btn-theme').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark')
+        setTimeout(resize, 0)
+      })
+
+      const rng = document.getElementById('rng-radius')
+      const lbl = document.getElementById('lbl-radius')
+      rng.addEventListener('input', () => {
+        CFG.radius = Number(rng.value)
+        CFG.radiusMagnet = Math.round(CFG.radius * 1.7)
+        lbl.textContent = rng.value
+        resize()
+      })
+
+      const btnMode = document.getElementById('btn-mode')
+      btnMode.addEventListener('click', () => {
+        CFG.mode = CFG.mode === 'corridor' ? 'split' : 'corridor'
+        btnMode.textContent = CFG.mode === 'corridor' ? '走廊重排' : '劈开不重排'
+        resize()
+      })
+
+      document.getElementById('chk-debug').addEventListener('change', (e) => {
+        debug = e.target.checked
+        needsDraw = true
+      })
+
+      syncEnabled()
+      requestAnimationFrame(frame)
+    </script>
+  </body>
+</html>

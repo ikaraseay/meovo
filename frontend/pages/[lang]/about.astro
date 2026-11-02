@@ -1,0 +1,215 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import GlassWidget from '../../components/GlassWidget.astro'
+import Avatar from '../../components/Avatar.astro'
+import { t, locales } from '../../i18n'
+import { getVisiblePosts, resolveItems, linksPath } from '../../lib/posts'
+import { projects } from '../../data/projects'
+
+export function getStaticPaths() {
+  return locales.map((locale) => ({ params: { lang: locale }, props: { locale } }))
+}
+
+const { locale } = Astro.props
+
+const posts = await getVisiblePosts()
+
+/** 一个翻译组算一篇 */
+const count = resolveItems(posts, locale).length
+---
+
+<BaseLayout locale={locale} title={t(locale, 'about.title')} wide>
+  <div class="desk" data-desk>
+    <GlassWidget id="about-head" width="lg" locale={locale}>
+      <div class="about-head">
+        <Avatar locale={locale} size={96} />
+        <div class="about-head-text">
+          <h1 class="page-title">{t(locale, 'about.title')}</h1>
+          <p class="page-intro">{t(locale, 'about.intro')}</p>
+          <p class="about-pen-name">{t(locale, 'site.author')}</p>
+          <p class="about-pen-name">
+            <a class="about-email" href={`mailto:${t(locale, 'site.email')}`}>{t(locale, 'site.email')}</a>
+          </p>
+        </div>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="about-glance" width="sm" locale={locale}>
+      <div class="about-block">
+        <h2 class="about-block-title">{t(locale, 'about.atAGlance')}</h2>
+        <dl class="about-stats">
+          <div class="about-stat">
+            <dt>{t(locale, 'about.posts')}</dt>
+            <dd>{count}</dd>
+          </div>
+          <div class="about-stat">
+            <dt>{t(locale, 'about.builtWith')}</dt>
+            <dd>Astro 7</dd>
+          </div>
+        </dl>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="about-projects" width="lg" locale={locale}>
+      <div class="about-block">
+        <h2 class="about-block-title">{t(locale, 'about.projects')}</h2>
+        <div class="about-projects">
+          {
+            projects.length === 0 ? (
+              <p class="about-projects__empty">{t(locale, 'admin.projects.empty')}</p>
+            ) : (
+              projects.map((project) => (
+                <a
+                  class="about-project"
+                  href={project.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span class="about-project__name">{project.name}</span>
+                  {project.description && (
+                    <span class="about-project__desc">{project.description}</span>
+                  )}
+                </a>
+              ))
+            )
+          }
+        </div>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="about-links" width="sm" locale={locale}>
+      <div class="about-block">
+        <h2 class="about-block-title">{t(locale, 'about.links')}</h2>
+        <p class="about-block-text">{t(locale, 'about.linksIntro')}</p>
+        <a class="ui-btn ui-btn--secondary" href={linksPath(locale)}>{t(locale, 'links.title')}</a>
+      </div>
+    </GlassWidget>
+  </div>
+</BaseLayout>
+
+<style>
+  .about-head {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-lg);
+  }
+
+  .about-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .about-pen-name {
+    display: flex;
+    align-items: baseline;
+    gap: var(--ui-space-sm);
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .about-email {
+    color: var(--ui-text-accent);
+    text-decoration: none;
+  }
+
+  .about-email:hover {
+    text-decoration: underline;
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-intro {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+    max-width: 40ch;
+  }
+
+  .about-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-md);
+  }
+
+  .about-block-title {
+    font-size: 1rem;
+  }
+
+  .about-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--ui-space-lg);
+    margin: 0;
+  }
+
+  .about-stat {
+    border-block-start: 1px solid var(--ui-border);
+    padding-block-start: var(--ui-space-sm);
+  }
+
+  .about-stat dt {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ui-text-muted);
+    margin-block-end: var(--ui-space-xs);
+  }
+
+  .about-stat dd {
+    margin: 0;
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 项目（构建期渲染好的静态数据） */
+.about-projects {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .about-project {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    padding: var(--ui-space-sm) var(--ui-space-md);
+    border: 1px solid var(--ui-border-subtle);
+    border-radius: var(--ui-radius-md);
+    text-decoration: none;
+    transition:
+      border-color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .about-project:hover {
+    border-color: var(--ui-border-accent);
+    background: var(--ui-surface-hover);
+  }
+
+  .about-project__name {
+    color: var(--ui-text);
+    font-weight: 600;
+  }
+
+  .about-project__desc {
+    color: var(--ui-text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .about-projects__empty {
+    color: var(--ui-text-muted);
+    font-size: 0.875rem;
+  }
+
+  .about-block-text {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+</style>

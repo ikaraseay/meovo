@@ -1,0 +1,114 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import PostRow from '../../../components/PostRow.astro'
+import GlassWidget from '../../../components/GlassWidget.astro'
+import { t, locales, type Locale } from '../../../i18n'
+import {
+  getVisiblePosts,
+  resolveItems,
+  getAllSeries,
+  getSeriesEntries,
+  sortSeriesItems,
+} from '../../../lib/posts'
+
+/**
+ * 系列索引页 —— /<lang>/series/<id>/
+ * 系列 id 是 frontmatter 里写的 ASCII slug，跨语言共用。
+ */
+export async function getStaticPaths() {
+  const posts = await getVisiblePosts()
+  const ids = getAllSeries(posts)
+  const paths: Array<{
+    params: { lang: string; series: string };
+    props: { locale: Locale; seriesId: string };
+  }> = []
+
+  for (const locale of locales) {
+    for (const id of ids) {
+      paths.push({ params: { lang: locale, series: id }, props: { locale, seriesId: id } })
+    }
+  }
+
+  return paths
+}
+
+const { locale, seriesId } = Astro.props
+
+const posts = await getVisiblePosts()
+const items = resolveItems(posts, locale)
+
+const entry = getSeriesEntries(items, locale).find((item) => item.id === seriesId)
+
+const seriesItems = sortSeriesItems(
+  items.filter((item) => item.post.data.series?.id === seriesId),
+)
+
+const title = entry?.title ?? seriesId
+---
+
+<BaseLayout locale={locale} title={`${title} · ${t(locale, 'series.title')}`} wide>
+  <div class="desk" data-desk>
+    <GlassWidget id="series-head" width="lg" locale={locale}>
+      <div class="tax-head">
+        <p class="page-kicker">
+          <a href={`/${locale}/archive/#series`}>{t(locale, 'series.title')}</a>
+        </p>
+        <h1 class="page-title">{title}</h1>
+        <p class="page-count">{t(locale, 'list.postCount', { count: seriesItems.length })}</p>
+      </div>
+    </GlassWidget>
+
+    <GlassWidget id="series-posts" width="lg" locale={locale}>
+      {
+        seriesItems.length === 0 ? (
+          <p class="ui-text--muted">{t(locale, 'series.empty')}</p>
+        ) : (
+          <div class="post-list">
+            {seriesItems.map((item) => (
+              <PostRow
+                post={item.post}
+                locale={locale}
+                href={item.href}
+                isFallback={item.isFallback}
+              />
+            ))}
+          </div>
+        )
+      }
+    </GlassWidget>
+  </div>
+</BaseLayout>
+
+<style>
+  .tax-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+  }
+
+  .page-kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .page-kicker a {
+    color: var(--ui-text-muted);
+    text-decoration: none;
+  }
+
+  .page-kicker a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-count {
+    font-size: 0.875rem;
+    color: var(--ui-text-muted);
+  }
+</style>

@@ -1,0 +1,5 @@
+#!/bin/sh
+# 提交前先看线上有没有更新 —— 有就先 pnpm sync，别把别人的改动盖掉
+node backend/scripts/check-remote-updates.mjs || exit 1
+# 别把部署真值（域名 / D1 id / 凭据）提交进公开仓库
+node scripts/check-deploy-info.mjs || exit 1

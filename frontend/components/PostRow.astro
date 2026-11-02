@@ -1,0 +1,127 @@
+---
+import { t, localeLabel, type Locale } from '../i18n'
+import { tagPath, categoryPath, getTagLabel, getCategoryLabel, type Post } from '../lib/posts'
+
+interface Props {
+  post: Post
+  locale: Locale
+  /** 条目链接 */
+  href: string
+  /** 真实语言与当前 URL 语言不一致（回退条目） */
+  isFallback?: boolean
+}
+
+const { post, locale, href, isFallback = false } = Astro.props
+
+/** 定宽数字日期 —— 2026.10.22 */
+const date = post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')
+---
+
+<article class="post-row">
+  <time class="post-row-date" datetime={post.data.pubDate.toISOString()}>{date}</time>
+
+  <div class="post-row-body">
+    <h3 class="post-row-title">
+      <a href={href}>{post.data.title}</a>
+    </h3>
+    <p class="post-row-summary">{post.data.description}</p>
+  </div>
+
+  <div class="post-row-meta">
+    {
+      post.data.category && (
+        <a class="ui-chip" href={categoryPath(locale, post.data.category)}>
+          {getCategoryLabel(locale, post.data.category)}
+        </a>
+      )
+    }
+    {
+      post.data.tags.map((tag) => (
+        <a class="ui-chip" href={tagPath(locale, tag)}>
+          {getTagLabel(locale, tag)}
+        </a>
+      ))
+    }
+    {
+      isFallback && (
+        <span class="ui-chip ui-chip--warn">
+          {t(locale, 'post.noTranslationShort', { locale: localeLabel(locale, locale) })}
+        </span>
+      )
+    }
+  </div>
+</article>
+
+<style>
+  .post-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) auto;
+    column-gap: var(--ui-space-lg);
+    align-items: start;
+    padding-block: var(--ui-space-lg);
+    border-block-start: 1px solid var(--ui-border);
+  }
+
+  .post-row-date {
+    font-family: var(--ui-font-mono);
+    font-size: 0.75rem;
+    line-height: 1.9;
+    color: var(--ui-text-muted);
+  }
+
+  .post-row-title {
+    font-size: 1.25rem;
+    margin-block-end: var(--ui-space-xs);
+  }
+
+  .post-row-title a {
+    color: var(--ui-text);
+    text-decoration: none;
+  }
+
+  .post-row-title a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .post-row-summary {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .post-row-meta {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ui-space-xs);
+    flex-wrap: wrap;
+    padding-block-start: 0.35rem;
+  }
+
+  .post-row-meta a.ui-chip {
+    text-decoration: none;
+    color: var(--ui-text-muted);
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .post-row-meta a.ui-chip:hover {
+    color: var(--ui-text-accent);
+    background: var(--ui-surface-hover);
+  }
+
+  .ui-chip--warn {
+    background: var(--ui-warning-bg);
+    color: var(--ui-warning);
+  }
+
+  @media (max-width: 720px) {
+    .post-row {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--ui-space-xs);
+    }
+
+    .post-row-meta {
+      padding-block-start: 0;
+    }
+  }
+</style>

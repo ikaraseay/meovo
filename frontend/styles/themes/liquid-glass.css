@@ -1,0 +1,346 @@
+/* =========================================================
+   主题 · 液态玻璃
+   ---------------------------------------------------------
+   液态玻璃 + 火焰橙 + 极光背景。
+
+   两档玻璃：
+     · 真液态玻璃（折射 + 色散）—— 只给悬浮栏 / 二级面板 / 玻璃镜片 /
+       设置 FAB·弹窗 / Hero 部件，走静态滤镜 #glass-refract，token 是 --ui-nav-*。
+     · 普通毛玻璃（blur + saturate）—— 普通卡片 / 列表部件，token 是 --ui-card-*。
+
+   ⚠️ 深色变体必须写成 `html[data-theme='xxx'].dark`（而不是 `.dark`），
+   否则优先级压不住浅色那一组。
+   ========================================================= */
+
+html[data-theme='liquid-glass'] {
+  /* ==================== 页面与背景 ==================== */
+  --ui-bg: #efe8dd;
+  --ui-surface: rgba(255, 255, 255, 0.66);
+  --ui-surface-raised: rgba(255, 255, 255, 0.82);
+  --ui-surface-sunken: rgba(120, 90, 70, 0.08);
+  --ui-surface-hover: rgba(255, 255, 255, 0.6);
+  --ui-surface-active: rgba(255, 255, 255, 0.42);
+  --ui-surface-glass: rgba(255, 255, 255, 0.5);
+
+  /* 极光色斑 —— 毛玻璃折射的就是这几团光 */
+  --ui-aurora-a: #ff9d6c;
+  --ui-aurora-b: #ff6d9a;
+  --ui-aurora-c: #b38cff;
+  --ui-aurora-d: #ffd36b;
+
+  /* ==================== 描边 ==================== */
+  --ui-border: rgba(70, 40, 20, 0.16);
+  --ui-border-subtle: rgba(70, 40, 20, 0.1);
+  --ui-border-accent: rgba(255, 92, 61, 0.45);
+
+  /* ==================== 文字 ==================== */
+  --ui-text: #241a12;
+  --ui-text-secondary: #6b5a4c;
+  --ui-text-muted: #8a7a6b;
+  --ui-text-faint: rgba(36, 26, 18, 0.55);
+  --ui-text-accent: #e8492f;
+  --ui-text-on-accent: #ffffff;
+  /* 压在色块（--ui-block-*）上的文字：高饱和亮色底 → 一律墨色 */
+  --ui-text-on-block: #2e2a33;
+
+  /* ==================== 主色 ==================== */
+  --ui-accent: #ff5c3d;
+  --ui-accent-light: #ff8463;
+  --ui-accent-dark: #d23a22;
+  --ui-accent-glow: rgba(255, 92, 61, 0.28);
+  --ui-accent-gradient: linear-gradient(135deg, #e8492f 0%, #ff5c3d 45%, #ff8a5c 100%);
+  --ui-accent-gradient-subtle: linear-gradient(
+    135deg,
+    rgba(255, 92, 61, 0.12) 0%,
+    rgba(255, 138, 92, 0.12) 100%
+  );
+
+  /* 次强调色 */
+  --ui-highlight: #ff6d9a;
+  --ui-highlight-light: #ff9bb8;
+
+  /* 搜索命中高亮 */
+  --ui-mark-bg: rgba(255, 109, 154, 0.22);
+  --ui-mark-fg: #a8325c;
+
+  /* ASCII 画 —— 猫的配色（描边 / 深橙 / 橙身 / 白毛 / 阴影） */
+  --ui-art-outline: #3b2f26;
+  --ui-art-outline-soft: #7d6650;
+  --ui-art-shade: #c96a1e;
+  --ui-art-body: #ff9d3c;
+  --ui-art-light: #e6cfa6;
+  --ui-art-light-soft: #c6a479;
+
+  /* 终端面板 —— 首页那张卡：浅色档是「纸」 */
+  --ui-term-bg: #f3ede1;
+  --ui-term-fg: #2f2820;
+  --ui-term-dim: #8a7f70;
+  --ui-term-accent: #d9480f;
+  --ui-term-green: #3f7d4e;
+  --ui-term-violet: #7c5cbf;
+  --ui-term-grid: rgba(60, 40, 20, 0.1);
+  --ui-term-bar-bg: rgba(60, 40, 20, 0.05);
+
+  /* 选中文字 —— 选中要一眼看得见，别像没选 */
+  --ui-selection-bg: rgba(255, 92, 61, 0.3);
+
+  /* ============ 色块（卡片/icon井 用的成组高饱和色） ============ */
+  --ui-block-1: #ff5c3d;
+  --ui-block-2: #ff6d9a;
+  --ui-block-3: #b38cff;
+
+  /* ==================== 状态色 ==================== */
+  --ui-success: #22c55e;
+  --ui-success-light: #4ade80;
+  --ui-success-bg: rgba(34, 197, 94, 0.12);
+  --ui-warning: #b45309;
+  --ui-warning-light: #fbbf24;
+  --ui-warning-bg: rgba(245, 158, 11, 0.12);
+  --ui-danger: #ef4444;
+  --ui-danger-light: #f87171;
+  --ui-danger-bg: rgba(239, 68, 68, 0.12);
+  --ui-info: #3b82f6;
+  --ui-info-light: #60a5fa;
+  --ui-info-bg: rgba(59, 130, 246, 0.12);
+
+  --ui-gradient-primary: linear-gradient(135deg, rgba(255, 92, 61, 0.12) 0%, rgba(255, 138, 92, 0.12) 100%);
+  --ui-gradient-success: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%);
+  --ui-gradient-highlight: linear-gradient(135deg, rgba(179, 140, 255, 0.14) 0%, rgba(255, 109, 154, 0.14) 100%);
+
+  /* ==================== 卡片（普通毛玻璃） ==================== */
+  --ui-card-bg: rgba(255, 255, 255, 0.52);
+  --ui-card-blur: blur(16px) saturate(170%);
+  --ui-card-border: rgba(255, 255, 255, 0.72);
+  --ui-card-border-width: 1px;
+  --ui-card-radius: var(--ui-radius-lg);
+  --ui-card-radius-sm: var(--ui-radius-md);
+  --ui-card-radius-lg: var(--ui-radius-xl);
+  --ui-card-shadow:
+    0 8px 32px rgba(140, 80, 40, 0.12),
+    0 1px 2px rgba(140, 80, 40, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --ui-card-shadow-hover:
+    0 20px 48px rgba(140, 80, 40, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --ui-card-lift: -4px;
+  --ui-card-pattern: none;
+  --ui-card-pattern-size: 12px 12px;
+
+  /* ==================== 按钮 ==================== */
+  --ui-btn-primary-bg: #e8492f;
+  --ui-btn-primary-hover: #d23a22;
+  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.5);
+  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.75);
+  --ui-btn-radius: var(--ui-radius-md);
+
+  /* ==================== 输入框 ==================== */
+  --ui-input-bg: rgba(255, 255, 255, 0.4);
+  --ui-input-border: rgba(70, 40, 20, 0.14);
+  --ui-input-focus: rgba(255, 92, 61, 0.3);
+  --ui-input-radius: 12px;
+
+  /* ==================== 导航栏（真液态玻璃） ==================== */
+  /* 玻璃底下是什么颜色不固定，底色要够白才撑得住文字。 */
+  --ui-nav-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.42) 50%,
+    rgba(255, 255, 255, 0.55) 100%
+  );
+  /* 折射滤镜负责「掰弯」，模糊只留一点点 —— blur 大了折射就白做了 */
+  --ui-nav-blur: blur(3px) saturate(180%);
+  --ui-nav-border: rgba(255, 255, 255, 0.62);
+  --ui-nav-shadow:
+    0 10px 30px rgba(120, 60, 30, 0.14),
+    0 2px 6px rgba(120, 60, 30, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.28);
+  --ui-nav-shadow-top:
+    0 -8px 32px rgba(120, 60, 30, 0.13),
+    0 -2px 8px rgba(120, 60, 30, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+
+  /* ==================== 拖拽时跟着指针走的玻璃镜片 ==================== */
+  --ui-lens-bg: rgba(255, 255, 255, 0.24);
+  --ui-lens-border: rgba(255, 255, 255, 0.8);
+  --ui-lens-shadow:
+    0 8px 22px rgba(120, 60, 30, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  /* 拟态镜片（渲染不出真折射时用）：顶部高光 + 左右两条色散边 */
+  --ui-lens-sheen: rgba(255, 255, 255, 0.55);
+  --ui-lens-fringe-warm: rgba(255, 96, 84, 0.5);
+  --ui-lens-fringe-cool: rgba(88, 150, 255, 0.5);
+  --ui-lens-fringe-shadow:
+    inset 3px 0 4px -1px var(--ui-lens-fringe-warm),
+    inset -3px 0 4px -1px var(--ui-lens-fringe-cool);
+
+  /* ==================== 半透明浮层 ==================== */
+  --ui-glass-border-width: 1px;
+  --ui-glass-border: var(--ui-border-subtle);
+
+  /* ==================== 阴影 ==================== */
+  --ui-shadow-sm: 0 2px 10px rgba(140, 80, 40, 0.1);
+  --ui-shadow-md: 0 8px 24px rgba(140, 80, 40, 0.12);
+  --ui-shadow-lg: 0 20px 48px rgba(140, 80, 40, 0.16);
+
+  /* ==================== 装饰形状 ==================== */
+  --ui-shape-color: transparent;
+  --ui-shape-clip: none;
+  --ui-shape-size: 28px;
+
+  /* ==================== 图标井 ==================== */
+  --ui-icon-well-radius: var(--ui-radius-lg);
+  --ui-icon-well-border: 1px solid rgba(255, 255, 255, 0.7);
+  --ui-icon-well-bg: var(--ui-surface-glass);
+  --ui-icon-well-color: var(--ui-accent);
+
+  /* ==================== 字体 ==================== */
+  /* 系统字体栈 —— 项目里没有任何 @font-face，别写不存在的 webfont 名 */
+  --ui-font-heading: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --ui-font-body: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --ui-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, 'Noto Sans Mono CJK SC', monospace;
+}
+
+/* ==================== 深色模式 ==================== */
+html[data-theme='liquid-glass'].dark {
+  --ui-bg: #0d0c12;
+  --ui-surface: rgba(255, 255, 255, 0.06);
+  --ui-surface-raised: rgba(255, 255, 255, 0.1);
+  --ui-surface-sunken: rgba(255, 255, 255, 0.06);
+  --ui-surface-hover: rgba(255, 255, 255, 0.09);
+  --ui-surface-active: rgba(255, 255, 255, 0.12);
+  --ui-surface-glass: rgba(40, 40, 52, 0.5);
+
+  --ui-aurora-a: #6b3a2e;
+  --ui-aurora-b: #6b2d4f;
+  --ui-aurora-c: #3d2e6b;
+  --ui-aurora-d: #5a4a1e;
+
+  --ui-border: rgba(255, 255, 255, 0.16);
+  --ui-border-subtle: rgba(255, 255, 255, 0.1);
+  --ui-border-accent: rgba(255, 92, 61, 0.45);
+
+  --ui-text: #f6f1ea;
+  --ui-text-secondary: #c3b8ab;
+  --ui-text-muted: #9c9186;
+  --ui-text-faint: rgba(246, 241, 234, 0.55);
+  --ui-text-accent: #ff8463;
+  --ui-text-on-accent: #ffffff;
+  --ui-text-on-block: #2e2a33;
+
+  --ui-accent: #ff5c3d;
+  --ui-accent-light: #ff8463;
+  --ui-accent-dark: #e8492f;
+  --ui-accent-glow: rgba(255, 92, 61, 0.3);
+  --ui-accent-gradient: linear-gradient(135deg, #ff5c3d 0%, #ff8463 55%, #ff8a5c 100%);
+  --ui-accent-gradient-subtle: linear-gradient(
+    135deg,
+    rgba(255, 92, 61, 0.16) 0%,
+    rgba(255, 138, 92, 0.16) 100%
+  );
+
+  --ui-highlight: #ff6d9a;
+  --ui-highlight-light: #ff9bb8;
+
+  /* 搜索命中高亮 —— 深色底上要更实一点才看得见 */
+  --ui-mark-bg: rgba(255, 109, 154, 0.32);
+  --ui-mark-fg: #ffd6e4;
+
+  /* ASCII 画 —— 深色档 */
+  --ui-art-outline: #0c0a08;
+  --ui-art-outline-soft: #6b5a48;
+  --ui-art-shade: #b85c14;
+  --ui-art-body: #ffa445;
+  --ui-art-light: #f2e4cd;
+  --ui-art-light-soft: #c6ae8c;
+
+  /* 终端面板 —— 深色档 */
+  --ui-term-bg: #101319;
+  --ui-term-fg: #d7dce5;
+  --ui-term-dim: #7b8598;
+  --ui-term-accent: #7dd3fc;
+  --ui-term-green: #86efac;
+  --ui-term-violet: #c4b5fd;
+  --ui-term-grid: rgba(255, 255, 255, 0.08);
+  --ui-term-bar-bg: rgba(255, 255, 255, 0.04);
+
+  /* 选中文字 —— 深色底上更实一点 */
+  --ui-selection-bg: rgba(255, 138, 92, 0.42);
+
+  --ui-success: #4ade80;
+  --ui-success-light: #86efac;
+  --ui-success-bg: rgba(74, 222, 128, 0.16);
+  --ui-warning: #fbbf24;
+  --ui-warning-light: #fcd34d;
+  --ui-warning-bg: rgba(251, 191, 36, 0.16);
+  --ui-danger: #f87171;
+  --ui-danger-light: #fca5a5;
+  --ui-danger-bg: rgba(248, 113, 113, 0.16);
+  --ui-info: #60a5fa;
+  --ui-info-light: #93c5fd;
+  --ui-info-bg: rgba(96, 165, 250, 0.16);
+
+  --ui-gradient-primary: linear-gradient(135deg, rgba(255, 92, 61, 0.16) 0%, rgba(255, 138, 92, 0.16) 100%);
+  --ui-gradient-success: linear-gradient(135deg, rgba(74, 222, 128, 0.16) 0%, rgba(52, 211, 153, 0.16) 100%);
+  --ui-gradient-highlight: linear-gradient(135deg, rgba(179, 140, 255, 0.18) 0%, rgba(255, 109, 154, 0.18) 100%);
+
+  --ui-card-bg: rgba(34, 34, 46, 0.55);
+  --ui-card-blur: blur(16px) saturate(160%);
+  --ui-card-border: rgba(255, 255, 255, 0.14);
+  --ui-card-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --ui-card-shadow-hover:
+    0 20px 48px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.14);
+
+  --ui-input-bg: rgba(255, 255, 255, 0.06);
+  --ui-input-border: rgba(255, 255, 255, 0.12);
+  --ui-input-focus: rgba(255, 92, 61, 0.35);
+
+  --ui-nav-bg: linear-gradient(
+    135deg,
+    rgba(30, 30, 40, 0.66) 0%,
+    rgba(20, 20, 28, 0.58) 50%,
+    rgba(30, 30, 40, 0.66) 100%
+  );
+  --ui-nav-blur: blur(3px) saturate(180%);
+  --ui-nav-border: rgba(255, 255, 255, 0.24);
+  --ui-nav-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.42),
+    0 2px 6px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  --ui-nav-shadow-top:
+    0 -8px 32px rgba(0, 0, 0, 0.35),
+    0 -2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  --ui-lens-bg: rgba(104, 104, 120, 0.26);
+  --ui-lens-border: rgba(255, 255, 255, 0.42);
+  --ui-lens-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  --ui-lens-sheen: rgba(255, 255, 255, 0.16);
+  --ui-lens-fringe-warm: rgba(255, 108, 92, 0.4);
+  --ui-lens-fringe-cool: rgba(96, 168, 255, 0.4);
+  --ui-lens-fringe-shadow:
+    inset 3px 0 4px -1px var(--ui-lens-fringe-warm),
+    inset -3px 0 4px -1px var(--ui-lens-fringe-cool);
+
+  --ui-glass-border-width: 1px;
+  --ui-glass-border: var(--ui-border-subtle);
+
+  --ui-shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
+  --ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ui-shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+
+  --ui-icon-well-border: 1px solid rgba(255, 255, 255, 0.14);
+}

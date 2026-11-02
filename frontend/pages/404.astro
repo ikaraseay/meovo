@@ -1,0 +1,74 @@
+---
+/**
+ * 404 —— 一台终端，说着「这页没了」。
+ * ---------------------------------------------------------
+ * 静态页（构建期出 404.html，Worker 找不到资源时用它）。
+ * 没有语言上下文 —— 中英文都摆出来。
+ */
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { asciiArt, colorizeArt } from '../lib/ascii-art'
+import { t } from '../i18n'
+---
+
+<BaseLayout locale="zh" title={t('zh', 'error404.title')} noindex>
+  <div class="page-404">
+    <div class="term">
+      <div class="term__bar">
+        <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="term__path">yaesaraki@astro: ~</span>
+      </div>
+
+      <div class="term__body">
+        <p class="term__line">
+          <span class="term__user">yaesaraki@astro</span>
+          <span class="term__dim">$</span> cat /404
+        </p>
+        <p class="term__line term__dim">cat: /404: No such file or directory</p>
+
+        <pre class="term__art term__art--big" aria-hidden="true" set:html={colorizeArt(asciiArt)} />
+
+        <p class="term__line">
+          <span class="term__user">yaesaraki@astro</span>
+          <span class="term__dim">$</span> ls /
+        </p>
+        <p class="term__line term__dim">about/ archive/ links/ posts/</p>
+
+        <h1 class="term__title term__title--404">
+          <span class="term__prompt" aria-hidden="true">&gt;</span>
+          404<span class="term__cursor" aria-hidden="true"></span>
+        </h1>
+
+        <p class="term__line">{t('zh', 'error404.body')}</p>
+        <p class="term__line term__dim">{t('en', 'error404.body')}</p>
+
+        <div class="term__actions">
+          <a class="ui-btn ui-btn--primary" href="/zh/">{t('zh', 'error404.home')}</a>
+          <a class="ui-btn ui-btn--secondary" href="/zh/archive/">
+            {t('zh', 'error404.archive')}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-404 {
+    display: flex;
+    justify-content: center;
+    padding-block: var(--ui-space-2xl);
+  }
+
+  .page-404 .term {
+    width: min(34rem, 100%);
+  }
+
+  .term__art--big {
+    font-size: clamp(0.5rem, 1.6vw, 0.78rem);
+    margin-block: var(--ui-space-sm);
+  }
+
+  .term__title--404 {
+    margin-block-start: var(--ui-space-sm);
+  }
+</style>

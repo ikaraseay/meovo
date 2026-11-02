@@ -1,0 +1,657 @@
+/* =========================================================
+   基础层 · 结构刻度 + 共享原语
+   ---------------------------------------------------------
+   这一层只放「所有主题都一样」的东西：
+     · 间距 / 圆角 / 动效刻度
+     · 共享原语类（卡片、徽章、按钮、标签、图标井……）
+   颜色、表面、阴影这些**语义层**由主题文件提供：
+     themes/liquid-glass.css
+   新增主题请复制 themes/liquid-glass.css。
+
+   ⚠️ 两个约定：
+   1. 主题选择方式：`html[data-theme='<id>']`，
+      明暗模式靠 `.dark` 类叠加（`html[data-theme='<id>'].dark`）。
+   2. 组件的 scoped 样式里**不要**再写 background / border-radius / box-shadow。
+      Astro 的 scoped 选择器带 data-astro-cid 属性，优先级高于这里的原语类，
+      会把主题盖掉。要调外观走 variant / size，或自己的 class 只调布局。
+   ========================================================= */
+
+:root {
+  /* ==================== 间距刻度 ==================== */
+  --ui-space-xs: 4px;
+  --ui-space-sm: 8px;
+  --ui-space-md: 16px;
+  --ui-space-lg: 24px;
+  --ui-space-xl: 32px;
+  --ui-space-2xl: 48px;
+  --ui-space-3xl: 64px;
+
+  /* ==================== 层级刻度 ====================
+     悬浮栏的四个面 —— 栏体 / 二级面板 / 设置按钮 / 设置弹窗。
+     数值只在这里定，组件里不写裸 z-index：层序是语义决定的，不是谁写的数大谁赢。
+     与 frontend/lib/dom-contract.ts 的 Z 一一对应（跨查测试盯着两边一致）。 */
+  --ui-z-bg: -1; /* 极光背景 —— 画在内容下面 */
+  --ui-z-skip: 100; /* 跳到正文 —— 聚焦时冒出来 */
+  --ui-z-nav: 9999;
+  --ui-z-panel: 10000;
+  --ui-z-fab: 10001;
+  --ui-z-popup: 10002;
+  --ui-z-loader: 10010; /* 加载遮罩 —— 盖住一切 */
+
+  /* ==================== 圆角刻度 ==================== */
+  /* 液态玻璃：圆润连续圆角。导航玻璃不吃这组，它有自己的一套（见 --ui-nav-radius-*）。 */
+  --ui-radius-sm: 10px;
+  --ui-radius-md: 16px;
+  --ui-radius-lg: 22px;
+  --ui-radius-xl: 28px;
+  --ui-radius-full: 9999px;
+
+  /* ==================== 导航栏圆角 ==================== */
+  /* 悬浮栏 / 二级面板 / 设置弹窗 / 玻璃片的圆角。
+     与页面刻度解耦 —— 页面改直角不会把玻璃的圆润一起抹平。 */
+  --ui-nav-radius-sm: 6px;
+  --ui-nav-radius-md: 10px;
+  --ui-nav-radius-lg: 16px;
+  --ui-nav-radius-xl: 24px;
+  --ui-nav-radius-full: 9999px;
+
+  /* ==================== 网格刻度 ==================== */
+  /* 12 栏 + 24px 沟槽。栏宽由容器宽度决定，沟槽固定。
+     页面骨架靠 .ui-grid，子元素用 grid-column 落位。 */
+  --ui-grid-columns: 12;
+  --ui-grid-gutter: 24px;
+
+  /* ==================== 动效刻度 ==================== */
+  /* 时长与曲线由主题覆盖 */
+  --ui-duration-fast: 150ms;
+  --ui-duration-base: 250ms;
+  --ui-duration-slow: 400ms;
+
+  --ui-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ui-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* 跳切：只给「状态切换」用，不要用在位移/淡入上 */
+  --ui-ease-step: steps(1, end);
+
+  --ui-transition-fast: var(--ui-duration-fast) var(--ui-ease-out);
+  --ui-transition-normal: var(--ui-duration-base) var(--ui-ease-out);
+  --ui-transition-slow: var(--ui-duration-slow) var(--ui-ease-out);
+  --ui-transition-step: var(--ui-duration-fast) var(--ui-ease-step);
+
+  /* 卡片位移的曲线 */
+  --ui-card-ease: var(--ui-ease-out);
+
+  /* 回弹曲线 —— 菜单展开、镜片落位这类「弹出来」的动作 */
+  --ui-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* =========================================================
+   降低动效：系统开了「减弱动态效果」就一律停掉位移
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-duration-fast: 1ms;
+    --ui-duration-base: 1ms;
+    --ui-duration-slow: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 卡片抬起是「位移」，这里直接停掉（主题里的 --ui-card-lift 优先级更高，
+     所以不能只靠改 token） */
+  .ui-card--interactive:hover {
+    transform: none !important;
+  }
+}
+
+/* =========================================================
+   卡片原语 —— 全站唯一的卡片外观来源
+   变体：
+     .ui-card              默认表面
+     .ui-card--flat        无阴影
+     .ui-card--raised      抬升表面
+     .ui-card--accent      主色氛围
+     .ui-card--quiet       无装饰，给密集信息用
+     .ui-card--interactive 可点击
+     .ui-card--pattern     叠一层主题图案（装饰位用，别压正文）
+   尺寸：--sm / --md / --lg
+   ========================================================= */
+.ui-card {
+  position: relative;
+  background: var(--ui-card-bg);
+  backdrop-filter: var(--ui-card-blur);
+  border: var(--ui-card-border-width, 1px) solid var(--ui-card-border);
+  border-radius: var(--ui-card-radius);
+  box-shadow: var(--ui-card-shadow);
+  color: var(--ui-text);
+  transition:
+    box-shadow var(--ui-transition-normal),
+    transform var(--ui-duration-base) var(--ui-card-ease),
+    border-color var(--ui-transition-normal);
+}
+
+.ui-card--flat {
+  box-shadow: none;
+}
+
+.ui-card--raised {
+  background: var(--ui-surface-raised);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.ui-card--accent {
+  background: var(--ui-accent-gradient-subtle);
+  border-color: var(--ui-border-accent);
+}
+
+.ui-card--quiet {
+  background: var(--ui-surface);
+  box-shadow: none;
+  border-color: var(--ui-border-subtle);
+}
+
+/* 图案是 background-image，永远在内容下面 —— 正文区不会被压住 */
+.ui-card--pattern {
+  background-image: var(--ui-card-pattern);
+  background-size: var(--ui-card-pattern-size, 12px 12px);
+}
+
+.ui-card--interactive {
+  cursor: pointer;
+}
+
+.ui-card--interactive:hover {
+  transform: translateY(var(--ui-card-lift, -2px));
+  box-shadow: var(--ui-card-shadow-hover);
+  border-color: var(--ui-border-accent);
+}
+
+.ui-card--sm {
+  padding: var(--ui-space-md);
+}
+.ui-card--md {
+  padding: var(--ui-space-lg);
+}
+.ui-card--lg {
+  padding: var(--ui-space-xl);
+}
+
+/* =========================================================
+   12 栏网格
+   ---------------------------------------------------------
+   页面骨架。栏数与沟槽是刻度，具体落位由页面写 grid-column。
+   只管布局 —— 外观一律走 token。
+   ========================================================= */
+.ui-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ui-grid-columns), minmax(0, 1fr));
+  column-gap: var(--ui-grid-gutter);
+  row-gap: var(--ui-grid-gutter);
+}
+
+/* =========================================================
+   桌面容器 —— 所有 .ui-widget 的定位上下文
+   ---------------------------------------------------------
+   ⚠️ 必须 position: relative：部件被「抬起」成 absolute 时，坐标是相对桌面算的；
+   缺了这一句，absolute 会相对视口定位，卡片就会「瞬移」到屏幕最上方。
+   ========================================================= */
+.desk {
+  position: relative;
+  /* flow-root 建立块级格式化上下文：防止正文的 margin-top 跟桌面外缘塌陷，
+     否则正文的顶部留白会「漏」到桌面之外，卡片坐标算错 */
+  display: flow-root;
+}
+
+/* =========================================================
+   可拖拽玻璃部件
+   ---------------------------------------------------------
+   桌面端被 draggable.ts 摆到绝对坐标上自由拖拽，移动端退回文档流。
+   部件外观来自 .ui-card（毛玻璃）+ 一层随机的浅色 tint，这里只管骨架与抓手。
+   抓手：一条白色小横条（拖拽移动）+ 一个小圆钮（旋转切换固定）。
+   ========================================================= */
+.ui-widget {
+  /* 桌面端绝对定位时由 draggable.ts 设 left/top；这里只给流式兜底 */
+  position: relative;
+  will-change: transform;
+  /* 随机浅底色：色相由部件内联 --ui-widget-hue 给出，配方在这里 ——
+     盖在 .ui-card 的毛玻璃底色之上，只做一点若有似无的着色 */
+  background-image: linear-gradient(
+    hsla(var(--ui-widget-hue), 60%, 86%, 0.45),
+    hsla(var(--ui-widget-hue), 60%, 86%, 0.45)
+  );
+}
+
+/* 深色模式换一组配方 —— 同一套色相，但压到「几乎只剩色温」。
+   深底会放大彩度：饱和度一高就是一块脏色斑，卡片之间也立刻分成绿/蓝/紫几派。
+   所以深色这套往低饱和 + 低对比走，让卡片读成同一种深玻璃。 */
+html[data-theme='liquid-glass'].dark .ui-widget {
+  background-image: linear-gradient(
+    hsla(var(--ui-widget-hue), 20%, 44%, 0.16),
+    hsla(var(--ui-widget-hue), 20%, 44%, 0.16)
+  );
+}
+
+/* 部件抓手：一条白色小横条（拖拽移动）+ 一个小圆钮（旋转切换固定） */
+.ui-widget__grip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ui-space-xs) 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 抓手小横条：默认隐藏，悬停卡片才露出来，带一点弹簧弹跳 */
+.ui-widget__handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 2.5px;
+  background: var(--ui-text-faint);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity var(--ui-transition-fast),
+    transform var(--ui-duration-base) var(--ui-ease-spring);
+}
+
+.ui-widget:hover .ui-widget__handle,
+.ui-widget__handle:focus-visible {
+  opacity: 0.85;
+  transform: scale(1);
+}
+
+.ui-widget__handle:active {
+  cursor: grabbing;
+}
+
+/* 复原按钮：图钉左边，悬停才露出来，点一下回到默认位置 */
+.ui-widget__restore {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--ui-transition-fast),
+    transform var(--ui-duration-base) var(--ui-ease-spring);
+}
+
+.ui-widget:hover .ui-widget__restore {
+  opacity: 0.8;
+  transform: translateY(-50%) scale(1);
+}
+
+.ui-widget__restore:hover {
+  color: var(--ui-text-accent);
+  opacity: 1;
+}
+
+/* 图钉：右上角，点击切换固定。未固定时悬停卡片才露出来 */
+.ui-widget__pin {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  filter: grayscale(1);
+  transition:
+    opacity var(--ui-transition-fast),
+    transform var(--ui-duration-base) var(--ui-ease-spring);
+}
+
+.ui-widget:hover .ui-widget__pin {
+  opacity: 0.5;
+  transform: translateY(-50%) scale(1);
+}
+
+.ui-widget__pin:hover {
+  opacity: 1;
+}
+
+/* 固定态：图钉常显、上色、稍倾斜 */
+.ui-widget.is-pinned .ui-widget__pin {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-50%) rotate(-20deg) scale(1);
+}
+
+/* 部件正文 */
+.ui-widget__body {
+  padding: var(--ui-space-xs) var(--ui-space-md) var(--ui-space-md);
+}
+
+/* 桌面撒开时的轻微倾斜 —— 只在默认布局里加，拖过就撤掉 */
+.ui-widget.is-tilted {
+  transform: rotate(var(--ui-widget-tilt, 0deg));
+}
+
+/* =========================================================
+   拖拽时跟着指针走的玻璃镜片
+   ---------------------------------------------------------
+   叠在二级菜单面板之上，落在哪个子项上就罩住哪个。
+
+   镜片是「玻璃片」，不是整个液态玻璃：它只有 144×33 上下，
+   静态滤镜 #glass-refract 的区域是按大元素写的，撑不住它的位移采样，
+   所以折射由 frontend/lib/liquid-glass.ts 按镜片自己的尺寸运行时挂上。
+   这里留基础毛玻璃；渲染不出真折射时由下面的 ::after 补一层拟态色散。
+   ========================================================= */
+.ui-glass-lens {
+  background: var(--ui-lens-bg);
+  backdrop-filter: var(--ui-nav-blur);
+  border: 1px solid var(--ui-lens-border);
+  box-shadow: var(--ui-lens-shadow);
+}
+
+/* 渲染不出真折射时的拟态镜片（Safari / Firefox）。
+   真折射靠像素位移把背景掰弯，这里位移不了，只能在边缘「画」出那圈色散 ——
+   形似神不似，但至少看得出来这是块透镜。
+   用 .glass-fallback 这个**正向** class（不是 :not(.glass-refract)）：
+   否则引擎判定晚一步时，Chromium 会先闪一下这层假色散再撤掉。 */
+html.glass-fallback .ui-glass-lens::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      var(--ui-lens-fringe-warm),
+      transparent 22%,
+      transparent 78%,
+      var(--ui-lens-fringe-cool)
+    ),
+    radial-gradient(130% 170% at 50% 0%, var(--ui-lens-sheen), transparent 62%);
+  box-shadow: var(--ui-lens-fringe-shadow);
+}
+
+/* =========================================================
+   图标井
+   ========================================================= */
+.ui-icon-well {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ui-icon-well-size, 64px);
+  height: var(--ui-icon-well-size, 64px);
+  flex-shrink: 0;
+  border-radius: var(--ui-icon-well-radius, var(--ui-radius-lg));
+  background: var(--ui-icon-well-bg, var(--ui-surface-raised));
+  border: var(--ui-icon-well-border, 1px solid var(--ui-border-subtle));
+  color: var(--ui-icon-well-color, var(--ui-accent));
+}
+
+.ui-icon-well--sm {
+  --ui-icon-well-size: 40px;
+}
+
+/* =========================================================
+   徽章
+   ========================================================= */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2, var(--ui-space-sm));
+  padding: var(--ui-space-xs) var(--ui-space-md);
+  border-radius: var(--ui-radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--ui-surface-glass);
+  border: 1px solid var(--ui-border-subtle);
+  color: var(--ui-text);
+}
+
+/* =========================================================
+   按钮
+   ========================================================= */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-sm);
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border-radius: var(--ui-btn-radius);
+  border: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background var(--ui-transition-fast),
+    transform var(--ui-transition-fast),
+    box-shadow var(--ui-transition-fast);
+}
+
+.ui-btn--primary {
+  background: var(--ui-btn-primary-bg);
+  color: var(--ui-text-on-accent);
+}
+
+.ui-btn--primary:hover {
+  background: var(--ui-btn-primary-hover);
+  box-shadow: 0 4px 16px var(--ui-accent-glow);
+}
+
+.ui-btn--secondary {
+  background: var(--ui-btn-secondary-bg);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+}
+
+.ui-btn--secondary:hover {
+  background: var(--ui-btn-secondary-hover);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--ui-text-secondary);
+}
+
+.ui-btn--ghost:hover {
+  color: var(--ui-text);
+  background: var(--ui-btn-secondary-bg);
+}
+
+/* =========================================================
+   小标签
+   ========================================================= */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-sunken);
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+}
+
+/* =========================================================
+   分割线
+   ========================================================= */
+.ui-divider {
+  height: 1px;
+  background: var(--ui-border);
+  margin: var(--ui-space-md) 0;
+}
+
+/* =========================================================
+   导航栏表面 —— 悬浮菜单 / 底部抽屉 / 设置按钮共用一套外观
+   背景、描边、阴影、毛玻璃来自主题的 --ui-nav-*，
+   形状（圆角、布局）留在结构层。
+
+   折射用静态滤镜 #glass-refract（定义在 FloatingBar.astro 里）：
+   折射滤镜 url() 在前、模糊在后 —— 先把背景掰弯，再把边缘抹匀。
+
+   url() 只有 Chromium 系真渲染（Safari / Firefox 整条 backdrop-filter 会作废），
+   所以用 html.glass-refract 分流：那边只留基础毛玻璃。
+   引擎判断在 BaseLayout 的首屏内联脚本，判完给 <html> 挂 class。
+   ========================================================= */
+.ui-nav-surface {
+  background: var(--ui-nav-bg);
+  backdrop-filter: var(--ui-nav-blur);
+  border: 1px solid var(--ui-nav-border);
+  box-shadow: var(--ui-nav-shadow);
+}
+
+/* 折射：只有真能渲染 url() 滤镜的引擎才挂。
+   不能用 @supports (backdrop-filter: url(#glass-refract)) —— Safari 解析得过，
+   渲染时却把整条 backdrop-filter 丢掉（连 blur 一起），玻璃会整个消失
+   （WebKit bug 245510）。引擎判断在 BaseLayout 的首屏内联脚本里 ——
+   必须首屏前定好，否则会闪一下没有折射的玻璃。 */
+html.glass-refract .ui-nav-surface {
+  /* 只写标准属性 —— 加上 -webkit- 前缀时，压缩器会认为前缀版覆盖标准版，
+     把 backdrop-filter 丢掉，Chrome / Firefox / Safari 就都不糊了。 */
+  backdrop-filter: url(#glass-refract) var(--ui-nav-blur);
+}
+
+/* 只描上边的版本（贴底的抽屉） */
+.ui-nav-surface--top {
+  border: none;
+  border-top: 1px solid var(--ui-nav-border);
+  box-shadow: var(--ui-nav-shadow-top);
+}
+
+/* 二级菜单面板
+   ---------------------------------------------------------
+   必须是 .floating-menu 的**同级**元素 ——
+   嵌在另一个 backdrop-filter 元素里面时，父级会创建 backdrop root，
+   子面板的毛玻璃就模糊不到页面内容，只剩一层半透明底。 */
+.ui-nav-surface--panel {
+  border-radius: var(--ui-radius-lg);
+}
+
+/* 圆形悬浮按钮 */
+.ui-fab {
+  border-radius: var(--ui-radius-full);
+}
+
+/* 胶囊形玻璃面（固定区等小玻璃片） */
+.ui-nav-surface--pill {
+  border-radius: var(--ui-nav-radius-full);
+}
+
+/* =========================================================
+   输入框
+   ---------------------------------------------------------
+   归档页的搜索框。外观全走 token（表面 / 描边 / 文字），
+   组件里不写死颜色。
+   ========================================================= */
+.ui-input {
+  width: 100%;
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  transition:
+    border-color var(--ui-transition-fast),
+    box-shadow var(--ui-transition-fast);
+}
+
+.ui-input::placeholder {
+  color: var(--ui-text-faint);
+}
+
+.ui-input:focus-visible {
+  outline: none;
+  border-color: var(--ui-border-accent);
+  box-shadow: 0 0 0 3px var(--ui-accent-glow);
+}
+
+/* =========================================================
+   命中高亮 —— 搜索结果里命中的片段
+   ========================================================= */
+.ui-mark {
+  padding: 0 0.15em;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-mark-bg);
+  color: var(--ui-mark-fg);
+}
+
+/* =========================================================
+   选项按钮 —— 设置弹窗里的语言 / 主题选项
+   .is-active 表示当前选中
+   ========================================================= */
+.ui-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-xs);
+  padding: var(--ui-space-sm) var(--ui-space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-active);
+  color: var(--ui-text);
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--ui-transition-step),
+    border-color var(--ui-transition-step),
+    color var(--ui-transition-step),
+    transform var(--ui-transition-fast);
+}
+
+.ui-choice:hover {
+  background: var(--ui-surface-hover);
+}
+
+.ui-choice:active {
+  transform: scale(0.96);
+}
+
+.ui-choice.is-active {
+  background: var(--ui-accent-gradient-subtle);
+  border-color: var(--ui-border-accent);
+  color: var(--ui-text-accent);
+}
+
+/* =========================================================
+   文字层级
+   ========================================================= */
+.ui-text--primary {
+  color: var(--ui-text);
+}
+.ui-text--secondary {
+  color: var(--ui-text-secondary);
+}
+.ui-text--muted {
+  color: var(--ui-text-muted);
+}
+.ui-text--faint {
+  color: var(--ui-text-faint);
+}
+.ui-text--accent {
+  color: var(--ui-text-accent);
+}

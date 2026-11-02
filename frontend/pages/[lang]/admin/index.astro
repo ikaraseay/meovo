@@ -1,0 +1,280 @@
+---
+/**
+ * 后台首页 —— 文章列表。
+ *
+ * 搜索 + 状态筛选 + 语言筛选；每行能编辑、去看线上那篇、发布 / 撤回、删除。
+ * 数据在 D1，页面是 on-demand 的：内容由脚本去接口取。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+const base = '/' + locale + '/admin'
+---
+
+<AdminLayout
+  locale={locale}
+  section="documents"
+  title={t(locale, 'admin.title')}
+  intro={t(locale, 'admin.docsIntro')}
+>
+  <a slot="actions" class="ui-btn ui-btn--primary" href={base + '/documents/new'}>
+    <span class="admin-plus" aria-hidden="true">+</span>
+    {t(locale, 'admin.action.new')}
+  </a>
+
+  <div class="admin-toolbar admin-toolbar--filters">
+    <input
+      class="ui-input admin-search"
+      type="search"
+      placeholder={t(locale, 'admin.filter.search')}
+      data-admin-search
+    />
+    <select class="ui-input admin-select" data-admin-status>
+      <option value="">{t(locale, 'admin.filter.statusAll')}</option>
+      <option value="published">{t(locale, 'admin.status.published')}</option>
+      <option value="draft">{t(locale, 'admin.status.draft')}</option>
+    </select>
+    <select class="ui-input admin-select" data-admin-locale>
+      <option value="">{t(locale, 'admin.filter.localeAll')}</option>
+      <option value="zh">zh</option>
+      <option value="en">en</option>
+    </select>
+    <span class="admin-toolbar__count" data-admin-count></span>
+  </div>
+
+  <div class="admin-list" data-admin-list></div>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { t } from '../../../i18n'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  interface DocumentRow {
+    id: string
+    slug: string
+    locale: string
+    title: string
+    description: string
+    status: string
+    pub_date: string | null
+    updated_at: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const list = document.querySelector<HTMLElement>('[' + ATTR.adminList + ']')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+  const countLabel = document.querySelector<HTMLElement>('[data-admin-count]')
+  const searchInput = document.querySelector<HTMLInputElement>('[data-admin-search]')
+  const statusFilter = document.querySelector('[data-admin-status]') as HTMLSelectElement | null
+  const localeFilter = document.querySelector('[data-admin-locale]') as HTMLSelectElement | null
+  const base = '/' + locale + '/admin'
+
+  let documents: DocumentRow[] = []
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function button(label: string, action: () => void, className = 'ui-btn'): HTMLButtonElement {
+    const element = document.createElement('button')
+    element.className = className
+    element.type = 'button'
+    element.textContent = label
+    element.addEventListener('click', action)
+    return element
+  }
+
+  function formatDate(value: string | null): string {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  }
+
+  function visible(): DocumentRow[] {
+    const term = (searchInput?.value ?? '').trim().toLowerCase()
+    const status = statusFilter?.value ?? ''
+    const lang = localeFilter?.value ?? ''
+    return documents.filter((item) => {
+      if (status && item.status !== status) return false
+      if (lang && item.locale !== lang) return false
+      if (!term) return true
+      return (
+        item.title.toLowerCase().includes(term) ||
+        item.slug.toLowerCase().includes(term) ||
+        (item.description ?? '').toLowerCase().includes(term)
+      )
+    })
+  }
+
+  function row(item: DocumentRow): HTMLElement {
+    const line = document.createElement('div')
+    line.className = 'admin-doc'
+
+    const main = document.createElement('div')
+    main.className = 'admin-doc__main'
+
+    const title = document.createElement('span')
+    title.className = 'admin-doc__title'
+    title.textContent = item.title || item.slug
+    main.appendChild(title)
+
+    const path = document.createElement('span')
+    path.className = 'admin-doc__path'
+    const date = formatDate(item.pub_date)
+    path.textContent = '/' + item.locale + '/' + item.slug + (date ? ' · ' + date : '')
+    main.appendChild(path)
+
+    line.appendChild(main)
+
+    const published = item.status === 'published'
+    const status = document.createElement('span')
+    status.className = 'admin-pill' + (published ? ' admin-pill--published' : '')
+    status.innerHTML =
+      '<span class="admin-pill__dot"></span>' +
+      (published ? t(locale, 'admin.status.published') : t(locale, 'admin.status.draft'))
+    line.appendChild(status)
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-doc__actions'
+
+    const edit = document.createElement('a')
+    edit.className = 'ui-btn'
+    edit.href = base + '/documents/' + item.id
+    edit.textContent = t(locale, 'admin.action.edit')
+    actions.appendChild(edit)
+
+    if (published) {
+      const view = document.createElement('a')
+      view.className = 'ui-btn'
+      view.href = '/' + item.locale + '/posts/' + item.slug + '/'
+      view.target = '_blank'
+      view.rel = 'noopener'
+      view.textContent = t(locale, 'admin.action.view')
+      actions.appendChild(view)
+    }
+
+    actions.appendChild(
+      button(
+        published ? t(locale, 'admin.action.unpublish') : t(locale, 'admin.action.publish'),
+        async () => {
+          try {
+            const result = await api<{ buildTriggered?: boolean }>(
+              '/api/admin/documents/' + item.id + '/publish',
+              {
+                method: 'POST',
+                body: JSON.stringify({ published: !published }),
+              },
+            )
+            say(
+              published
+                ? t(
+                    locale,
+                    result.buildTriggered
+                      ? 'admin.hint.draftBuilding'
+                      : 'admin.hint.draftNoBuild',
+                  )
+                : t(
+                    locale,
+                    result.buildTriggered
+                      ? 'admin.hint.publishedBuilding'
+                      : 'admin.hint.publishedNoBuild',
+                  ),
+            )
+            await render()
+          } catch (error) {
+            say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+          }
+        },
+        'ui-btn' + (published ? '' : ' ui-btn--primary'),
+      ),
+    )
+
+    actions.appendChild(
+      button(
+        t(locale, 'admin.action.delete'),
+        async () => {
+          if (!confirm(t(locale, 'admin.confirm.delete'))) return
+          try {
+            await api('/api/admin/documents/' + item.id, { method: 'DELETE' })
+            say(t(locale, 'admin.hint.deleted'))
+            await render()
+          } catch (error) {
+            say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+          }
+        },
+        'ui-btn admin-btn--danger',
+      ),
+    )
+
+    line.appendChild(actions)
+    return line
+  }
+
+  function emptyState(message: string, action?: { label: string; href: string }): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'admin-empty'
+    const mark = document.createElement('span')
+    mark.className = 'admin-empty__mark'
+    mark.setAttribute('aria-hidden', 'true')
+    mark.textContent = '✎'
+    box.appendChild(mark)
+    const text = document.createElement('p')
+    text.className = 'admin-empty__text'
+    text.textContent = message
+    box.appendChild(text)
+    if (action) {
+      const link = document.createElement('a')
+      link.className = 'ui-btn ui-btn--primary'
+      link.href = action.href
+      link.textContent = action.label
+      box.appendChild(link)
+    }
+    return box
+  }
+
+  async function render() {
+    if (!list) return
+    try {
+      const data = await api<{ documents: DocumentRow[] }>('/api/admin/documents')
+      documents = data.documents
+      const rows = visible()
+      if (countLabel) countLabel.textContent = t(locale, 'admin.list.count', { count: documents.length })
+      list.textContent = ''
+      if (documents.length === 0) {
+        list.appendChild(
+          emptyState(t(locale, 'admin.list.empty'), {
+            label: t(locale, 'admin.action.new'),
+            href: base + '/documents/new',
+          }),
+        )
+        return
+      }
+      if (rows.length === 0) {
+        list.appendChild(emptyState(t(locale, 'admin.list.noMatch')))
+        return
+      }
+      for (const item of rows) list.appendChild(row(item))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  searchInput?.addEventListener('input', render)
+  statusFilter?.addEventListener('change', render)
+  localeFilter?.addEventListener('change', render)
+
+  void render()
+</script>

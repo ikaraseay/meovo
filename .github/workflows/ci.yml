@@ -1,0 +1,36 @@
+# 每次 push / PR 跑一遍站点自检。
+# 部署不在 GitHub 上跑 —— 由 Cloudflare Workers Builds 直连仓库（push 即构建/部署），
+# 后台改内容走 Deploy Hook。这份流水线只管「代码能不能发」，不需要任何凭证。
+# 这里没有 D1 凭证，prebuild 的导出会跳过 —— 检查流水线不需要后台的文章。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm/action-setup 不带 version 时读 package.json 的 packageManager 字段
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # worker-configuration.d.ts 不入库（由 wrangler types 生成）—— CI 里先生成，
+      # 否则类型检查拿不到 D1 / R2 的绑定类型
+      - run: pnpm types
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:i18n
+      - run: pnpm check:seo
+      # 运维脚本（scripts/ops.sh）的语法与行为由 test/ops-config.test.ts 守着，
+      # pnpm test 已经覆盖 —— 这里不再重复一遍。

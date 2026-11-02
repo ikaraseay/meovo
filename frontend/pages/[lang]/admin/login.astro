@@ -1,0 +1,62 @@
+---
+/**
+ * 后台登录 —— 只有一位作者，一个口令就够。
+ * 口令本身不在仓库里：Worker secret 里存的是它的 SHA-256。
+ */
+export const prerender = false
+
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+---
+
+<BaseLayout locale={locale} title={t(locale, 'admin.login.title')} noindex chrome={false}>
+  <div class="admin-login">
+    <div class="admin-login__card">
+      <!-- 只有一个口令：标题与说明都去掉，只留输入框和按钮 -->
+      <form class="admin-login__form" data-admin-login>
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.password')}</span>
+          <input
+            class="ui-input"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+        </label>
+        <button class="ui-btn ui-btn--primary admin-login__submit" type="submit">
+          {t(locale, 'admin.login.submit')}
+        </button>
+        <p class="admin-flash admin-flash--error" data-admin-error hidden></p>
+      </form>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const form = document.querySelector<HTMLFormElement>('[' + ATTR.adminLogin + ']')
+  const errorLine = document.querySelector<HTMLElement>('[' + ATTR.adminError + ']')
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    if (errorLine) errorLine.hidden = true
+    const password = String(new FormData(form).get('password') ?? '')
+    try {
+      await api('/api/admin/login', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      })
+      location.href = '/' + locale + '/admin/'
+    } catch (error) {
+      if (!errorLine) return
+      errorLine.textContent = errorText(locale, (error as { code?: string }).code ?? 'request_failed')
+      errorLine.hidden = false
+    }
+  })
+</script>

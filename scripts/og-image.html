@@ -1,0 +1,138 @@
+<!doctype html>
+<!--
+  OG 图的渲染源（public/og-default.png 就是从这里出来的）。
+
+  为什么要这么绕：
+    这台机器上无头 Chrome 起不来（沙箱不让写用户 profile），
+    sips 也写不了临时文件（/var/folders 被挡），
+    所以走「浏览器半尺寸渲染 → 精确 clip → 纯 Python 放大 2 倍」这条路。
+
+  出图步骤：
+    1. 页面按 600×315 渲染（下面用 transform: scale(0.5) 把 1200×630 缩一半）
+    2. 浏览器里打开这个文件，截图裁到 {x:0, y:0, width:600, height:315}
+    3. python3 .scratch/.runtime/upscale.py <截图> public/og-default.png 2
+       → 得到正好 1200×630 的 PNG（1:1 像素放大，不会有缩放失真）
+
+  改完这个文件后重跑上面三步。真正的设计尺寸是 1200×630。
+-->
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      /* 半尺寸渲染 —— 截图 clip 的就是这 600×315 */
+      html,
+      body {
+        margin: 0;
+        width: 600px;
+        height: 315px;
+        overflow: hidden;
+        background: #0d0d0d;
+      }
+      #art {
+        width: 1200px;
+        height: 630px;
+        transform: scale(0.5);
+        transform-origin: top left;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(900px 520px at 12% 8%, rgba(255, 107, 53, 0.22) 0%, transparent 62%),
+          radial-gradient(760px 480px at 92% 96%, rgba(255, 159, 28, 0.16) 0%, transparent 60%),
+          radial-gradient(600px 400px at 78% 12%, rgba(99, 102, 241, 0.14) 0%, transparent 62%),
+          #0d0d0d;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        color: #fff;
+        font-family:
+          ui-sans-serif, -apple-system, 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+      }
+      .content {
+        position: absolute;
+        inset: 0;
+        padding: 76px 84px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        align-self: flex-start;
+        padding: 9px 20px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 19px;
+        letter-spacing: 0.06em;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff6b35, #ffbe0b);
+      }
+      .wordmark {
+        margin-top: 34px;
+        font-family: ui-serif, 'Songti SC', Georgia, serif;
+        font-size: 116px;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, #ff6b35 0%, #ff9f1c 50%, #ffbe0b 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .tagline {
+        margin-top: 26px;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 32px;
+        letter-spacing: 0.02em;
+      }
+      .foot {
+        position: absolute;
+        left: 84px;
+        right: 84px;
+        bottom: 58px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 20px;
+        letter-spacing: 0.04em;
+      }
+      .rule {
+        position: absolute;
+        left: 84px;
+        right: 84px;
+        bottom: 116px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 107, 53, 0.55) 0%,
+          rgba(255, 255, 255, 0.06) 45%,
+          transparent 100%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div id="art">
+      <div class="content">
+        <span class="eyebrow"><span class="dot"></span>ASTRO 7 · 中 / EN</span>
+        <div class="wordmark">My Blog</div>
+        <p class="tagline">写点代码，记点笔记</p>
+      </div>
+      <div class="rule"></div>
+      <div class="foot">
+        <span>Notes on code and other things</span>
+        <span>meovo</span>
+      </div>
+    </div>
+  </body>
+</html>

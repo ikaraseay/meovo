@@ -1,0 +1,129 @@
+---
+/**
+ * 文章卡片 —— 玻璃部件（GlassWidget）里的正文内容。
+ * 自身不画背景/圆角/阴影（那由 .ui-card 原语负责），只排内容。
+ */
+import { t, localeLabel, type Locale } from '../i18n'
+import { tagPath, categoryPath, getTagLabel, getCategoryLabel, type Post } from '../lib/posts'
+
+interface Props {
+  post: Post
+  locale: Locale
+  href: string
+  /** 真实语言与当前 URL 语言不一致（回退条目） */
+  isFallback?: boolean
+}
+
+const { post, locale, href, isFallback = false } = Astro.props
+
+const dateFormat = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+---
+
+<article class="post-card">
+  <div class="post-card__top">
+    <time class="post-card__date" datetime={post.data.pubDate.toISOString()}>
+      {dateFormat.format(post.data.pubDate)}
+    </time>
+    {
+      post.data.category && (
+        <a class="ui-chip post-card__chip" href={categoryPath(locale, post.data.category)}>
+          {getCategoryLabel(locale, post.data.category)}
+        </a>
+      )
+    }
+  </div>
+
+  <h3 class="post-card__title">
+    <a href={href}>{post.data.title}</a>
+  </h3>
+  <p class="post-card__summary">{post.data.description}</p>
+
+  <div class="post-card__tags">
+    {
+      post.data.tags.map((tag) => (
+        <a class="ui-chip post-card__chip" href={tagPath(locale, tag)}>
+          #{getTagLabel(locale, tag)}
+        </a>
+      ))
+    }
+    {
+      isFallback && (
+        <span class="ui-chip post-card__warn">
+          {t(locale, 'post.noTranslationShort', { locale: localeLabel(locale, locale) })}
+        </span>
+      )
+    }
+  </div>
+</article>
+
+<style>
+  .post-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  .post-card__top {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-sm);
+  }
+
+  .post-card__date {
+    font-family: var(--ui-font-mono);
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+  }
+
+  .post-card__title {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+
+  .post-card__title a {
+    color: var(--ui-text);
+    text-decoration: none;
+    transition: color var(--ui-transition-fast);
+  }
+
+  .post-card__title a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .post-card__summary {
+    font-size: 0.9375rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .post-card__tags {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-xs);
+    flex-wrap: wrap;
+    margin-block-start: var(--ui-space-xs);
+  }
+
+  a.ui-chip,
+  .post-card__chip {
+    text-decoration: none;
+    color: var(--ui-text-muted);
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  a.ui-chip:hover {
+    color: var(--ui-text-accent);
+    background: var(--ui-surface-hover);
+  }
+
+  .post-card__warn {
+    background: var(--ui-warning-bg);
+    color: var(--ui-warning);
+  }
+</style>

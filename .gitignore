@@ -1,0 +1,48 @@
+# build output
+dist/
+# generated types
+.astro/
+# local dev server runtime (preview log)
+.scratch/.runtime/
+# Cloudflare 本地状态与临时探针
+.scratch/cfhome/
+.scratch/probe/
+.scratch/tmp/
+# dependencies
+node_modules/
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.preview.log
+# environment variables
+.env
+# 部署配置（含 secret，真实值不入库；模板在 config.env.example）
+config.env
+.dev.vars
+.env.production
+# macOS
+.DS_Store
+
+# Cloudflare
+.wrangler/
+# 本地 preview 日志
+.scratch/*.log
+# 本机一次性脚本（不入库）
+.scratch/*.py
+# Worker 环境类型（由 wrangler types 生成，随 wrangler.jsonc 变）
+worker-configuration.d.ts
+
+# 后台导出的文章 —— 构建期由 scripts/export-d1-posts.mjs 生成，不入库
+frontend/content/generated/*.md
+frontend/content/generated/*.mdx
+frontend/content/generated/.manifest.json
+
+# 开发笔记（issue / spec）—— 本地的事，不进模版仓库
+.scratch/
+
+# 生成的数据（内容在 D1 里，仓库只留模版与主题）
+# 这两个文件由 backend/scripts/export-d1-posts.mjs 生成，缺失时用 --ensure 补空壳
+frontend/i18n/overrides.ts
+frontend/data/projects.ts

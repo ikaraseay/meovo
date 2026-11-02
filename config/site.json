@@ -1,0 +1,15 @@
+{
+  "site.name": { "zh": "Meo", "en": "Meo" },
+  "site.author": { "zh": "幸运夜降临", "en": "ikaraseay" },
+  "site.tagline": { "zh": "写点代码，记点笔记", "en": "Notes on code and other things" },
+  "site.email": { "zh": "contact@ikaraseay.dev", "en": "contact@ikaraseay.dev" },
+  "home.title": { "zh": "你好，世界", "en": "Hello, world" },
+  "home.subtitle": {
+    "zh": "喵喵",
+    "en": "Meow meow"
+  },
+  "about.intro": {
+    "zh": "这里写关于你自己、这个博客以及为什么写。",
+    "en": "Say something about yourself, this blog, and why you write."
+  }
+}

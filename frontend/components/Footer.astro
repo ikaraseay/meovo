@@ -1,0 +1,60 @@
+---
+/**
+ * 页脚 —— 一张可拖拽的玻璃卡片（在 BaseLayout 里包在 [data-desk] 中）。
+ * 位置相对固定在页面底部，但也能拖走。
+ */
+import GlassWidget from './GlassWidget.astro'
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+
+const { locale } = Astro.props
+const year = new Date().getFullYear()
+---
+
+<GlassWidget id="footer" width="auto" full locale={locale}>
+  <div class="footer-inner">
+    <p class="footer-copyright">
+      {t(locale, 'footer.copyright', { year, name: t(locale, 'site.author') })}
+    </p>
+
+    <div class="footer-links">
+      <a href="https://icp.gov.moe/?keyword=20269919" target="_blank">萌ICP备20269919号</a>
+      <span class="footer-note ui-text--muted">{t(locale, 'footer.builtWith')}</span>
+    </div>
+  </div>
+</GlassWidget>
+
+<style>
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+  }
+
+  .footer-copyright {
+    color: var(--ui-text-secondary);
+  }
+
+  .footer-links {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+  }
+
+  .footer-link {
+    color: var(--ui-text-secondary);
+    text-decoration: none;
+    transition: color var(--ui-transition-fast);
+  }
+
+  .footer-link:hover {
+    color: var(--ui-text-accent);
+  }
+</style>

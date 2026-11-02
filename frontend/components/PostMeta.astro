@@ -1,0 +1,126 @@
+---
+import { t, type Locale } from '../i18n'
+import {
+  tagPath,
+  categoryPath,
+  seriesPath,
+  getTagLabel,
+  getCategoryLabel,
+  type Post,
+} from '../lib/posts'
+
+interface Props {
+  post: Post
+  locale: Locale
+  /** 阅读时间（分钟）—— 不传就不显示 */
+  readingMinutes?: number
+}
+
+const { post, locale, readingMinutes } = Astro.props
+
+const dateFormat = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+---
+
+<div class="post-meta-bar">
+  <p class="post-dates">
+    <span>{t(locale, 'post.publishedOn', { date: dateFormat.format(post.data.pubDate) })}</span>
+    {
+      post.data.updatedDate && (
+        <span class="post-updated">
+          {t(locale, 'post.updatedOn', { date: dateFormat.format(post.data.updatedDate) })}
+        </span>
+      )
+    }
+    {
+      readingMinutes !== undefined && (
+        <span class="post-reading-time">
+          {t(locale, 'post.readingTime', { minutes: readingMinutes })}
+        </span>
+      )
+    }
+  </p>
+
+  {
+    post.data.series && (
+      <p class="post-series">
+        <a href={seriesPath(locale, post.data.series.id)}>
+          {t(locale, 'post.series', { title: post.data.series.title })}
+        </a>
+      </p>
+    )
+  }
+
+  <div class="post-meta-links">
+    {
+      post.data.category && (
+        <a class="ui-chip" href={categoryPath(locale, post.data.category)}>
+          {getCategoryLabel(locale, post.data.category)}
+        </a>
+      )
+    }
+    {
+      post.data.tags.map((tag) => (
+        <a class="ui-chip" href={tagPath(locale, tag)}>
+          #{getTagLabel(locale, tag)}
+        </a>
+      ))
+    }
+  </div>
+</div>
+
+<style>
+  .post-meta-bar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+    padding-block-end: var(--ui-space-lg);
+    margin-block-end: var(--ui-space-lg);
+    border-block-end: 1px solid var(--ui-border);
+    font-size: 0.875rem;
+    color: var(--ui-text-muted);
+  }
+
+  .post-dates {
+    display: flex;
+    gap: var(--ui-space-md);
+    flex-wrap: wrap;
+  }
+
+  .post-series {
+    color: var(--ui-text-secondary);
+  }
+
+  .post-series a {
+    color: inherit;
+    text-decoration: none;
+    transition: color var(--ui-transition-fast);
+  }
+
+  .post-series a:hover {
+    color: var(--ui-text-accent);
+  }
+
+  .post-meta-links {
+    display: flex;
+    gap: var(--ui-space-sm);
+    flex-wrap: wrap;
+  }
+
+  .post-meta-links a.ui-chip {
+    text-decoration: none;
+    color: var(--ui-text-muted);
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .post-meta-links a.ui-chip:hover {
+    color: var(--ui-text-accent);
+    background: var(--ui-surface-hover);
+  }
+</style>

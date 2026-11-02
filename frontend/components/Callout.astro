@@ -1,0 +1,39 @@
+---
+/**
+ * 提示块 —— 正文里的 aside。
+ * 目前是 MDX 示例在用，也可以直接在 Markdown 里通过 HTML 引入。
+ */
+interface Props {
+  type?: 'note' | 'warning'
+  title?: string
+}
+
+const { type = 'note', title } = Astro.props
+---
+
+<aside class={`callout callout--${type}`}>
+  {title && <p class="callout-title">{title}</p>}
+  <div class="callout-body"><slot /></div>
+</aside>
+
+<style>
+  .callout {
+    margin-block: var(--ui-space-lg);
+    padding-inline-start: var(--ui-space-lg);
+    border-inline-start: 2px solid var(--ui-text);
+  }
+
+  .callout--warning {
+    border-inline-start-color: var(--ui-warning);
+  }
+
+  .callout-title {
+    font-weight: 600;
+    color: var(--ui-text);
+    margin-block-end: var(--ui-space-xs);
+  }
+
+  .callout-body :global(p) {
+    margin: 0;
+  }
+</style>

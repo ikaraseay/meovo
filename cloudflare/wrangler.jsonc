@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "meovo",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../dist/client",
+    "binding": "ASSETS"
+  },
+  // 后台的数据层：documents（草稿）+ media（图库元数据）+ login_attempts（限流）
+  // ⚠️ 模版里是**占位符** —— 真值在 config.env（不入库），
+  //    构建前由 scripts/apply-config.mjs 填回来（ops.sh doctor 会查两处是否一致）。
+  //    换库后要重新跑 `pnpm types`。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "meovo-content",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../backend/db/migrations"
+    }
+  ],
+  // 自定义域名 —— 直连 Worker（不是 workers.dev）；跟 config.env 的 SITE_URL 同步
+  "routes": [
+    { "pattern": "example.com", "custom_domain": true }
+  ],
+  // 图片二进制 —— key 形如 media/<yyyy-mm>/<uuid>.<ext>，内容不变即可永久缓存
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "meovo-media"
+    }
+  ]
+}

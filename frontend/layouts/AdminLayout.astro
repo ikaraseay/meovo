@@ -1,0 +1,126 @@
+---
+/**
+ * 后台外壳 —— 左侧分区导航 + 右侧内容区。
+ *
+ * 所有后台页面（文章 / 图库 / 设置）都用它：
+ * 导航、页头、状态提示条、登出都在这儿，页面只管自己的内容。
+ */
+import BaseLayout from './BaseLayout.astro'
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+  /** 页头标题 */
+  title: string
+  /** 页头副标题 */
+  intro?: string
+  /** 当前分区 */
+  section: 'documents' | 'gallery' | 'comments' | 'projects' | 'settings'
+}
+
+const { locale, title, intro, section } = Astro.props
+const base = '/' + locale + '/admin'
+
+const nav: { id: Props['section']; label: string; href: string; hint: string }[] = [
+  { id: 'documents', label: t(locale, 'admin.nav.documents'), href: base + '/', hint: t(locale, 'admin.nav.documentsHint') },
+  { id: 'gallery', label: t(locale, 'admin.nav.gallery'), href: base + '/gallery', hint: t(locale, 'admin.nav.galleryHint') },
+  { id: 'projects', label: t(locale, 'admin.nav.projects'), href: base + '/projects', hint: t(locale, 'admin.nav.projectsHint') },
+  { id: 'settings', label: t(locale, 'admin.nav.settings'), href: base + '/settings', hint: t(locale, 'admin.nav.settingsHint') },
+]
+---
+
+<BaseLayout locale={locale} title={title} noindex chrome={false}>
+  <div class="admin-shell">
+    <aside class="admin-side">
+      <a class="admin-side__brand" href={base + '/'}>
+        <span class="admin-side__logo">{t(locale, 'site.name')}</span>
+        <span class="admin-side__sub">{t(locale, 'admin.title')}</span>
+      </a>
+
+      <nav class="admin-side__nav">
+        {
+          nav.map((item) => (
+            <a
+              class="admin-side__link"
+              href={item.href}
+              aria-current={item.id === section ? 'page' : undefined}
+            >
+              <span class="admin-side__label">{item.label}</span>
+              <span class="admin-side__hint">{item.hint}</span>
+            </a>
+          ))
+        }
+      </nav>
+
+      <div class="admin-side__foot">
+        <button class="admin-side__logout" type="button" data-admin-logout>
+          {t(locale, 'admin.action.logout')}
+        </button>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-head">
+        <div class="admin-head__text">
+          <h1 class="admin-head__title">{title}</h1>
+          {intro && <p class="admin-head__intro">{intro}</p>}
+        </div>
+        <div class="admin-head__actions">
+          <button class="ui-btn" type="button" data-admin-build>
+            {t(locale, 'admin.action.build')}
+          </button>
+          <slot name="actions" />
+        </div>
+      </header>
+
+      <p class="admin-flash" data-admin-flash hidden></p>
+
+      <slot />
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { api } from '../../backend/lib/admin/client'
+  import { t } from '../i18n'
+  import { ATTR } from '../lib/dom-contract'
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+
+  /** 提示条 —— 与各页面的 say() 同一块 DOM，这里独立一份给页头按钮用 */
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  document
+    .querySelector<HTMLButtonElement>('[' + ATTR.adminBuild + ']')
+    ?.addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement
+      button.disabled = true
+      try {
+        const result = await api<{ buildTriggered?: boolean }>('/api/admin/build', {
+          method: 'POST',
+        })
+        say(
+          t(locale, result.buildTriggered ? 'admin.hint.buildStarted' : 'admin.hint.buildFailed'),
+          !result.buildTriggered,
+        )
+      } catch {
+        say(t(locale, 'admin.hint.buildFailed'), true)
+      } finally {
+        button.disabled = false
+      }
+    })
+
+  document
+    .querySelector<HTMLButtonElement>('[data-admin-logout]')
+    ?.addEventListener('click', async () => {
+      await api('/api/admin/logout', { method: 'POST' })
+      location.href = '/' + locale + '/admin/login'
+    })
+</script>

@@ -1,0 +1,218 @@
+---
+/**
+ * 文章结构图 —— 由 markdown 目录生成的思维导图
+ * ---------------------------------------------------------
+ * 构建期算好的 SVG：没有客户端 JS，背景透明，颜色全走 token
+ * （夜间模式自动跟着变）。
+ *
+ * 画法是「瑞士式」的：直角连线、按层级定字号与灰阶，
+ * 不是有机生长的曲线。根节点用主色，其余靠字重分层。
+ *
+ * 导航职责归侧栏 TOC —— 这张图只负责「看结构」，
+ * 所以对屏幕阅读器隐藏（aria-hidden），完整标题在 TOC 列表里。
+ */
+import { t, type Locale } from '../i18n'
+import { DESKTOP_MIN_WIDTH } from '../lib/breakpoint'
+import { tocHeadings, type Heading } from '../lib/content-queries'
+
+interface Props {
+  headings: Heading[]
+  /** 根节点文字 —— 文章标题 */
+  title: string
+  locale: Locale
+}
+
+const { headings, title, locale } = Astro.props
+
+/** 只有 h2 / h3 进图 —— 再深的层级在这张图里没有意义（规则与侧栏目录共用） */
+const nodes = tocHeadings(headings)
+
+const CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/
+
+/** 估算字宽：中文按 1em，西文按 0.54em —— 构建期量不到真实字宽 */
+function textWidth(text: string, size: number): number {
+  let w = 0
+  for (const ch of text) w += CJK.test(ch) ? size : size * 0.54
+  return w
+}
+
+/** 截断到给定宽度，超出部分用省略号（完整标题在 TOC 里） */
+function truncate(text: string, size: number, maxWidth: number): string {
+  if (textWidth(text, size) <= maxWidth) return text
+  let w = 0
+  let out = ''
+  for (const ch of text) {
+    const cw = CJK.test(ch) ? size : size * 0.54
+    if (w + cw > maxWidth - size * 0.54) break
+    w += cw
+    out += ch
+  }
+  return `${out}…`
+}
+
+const ROOT_SIZE = 13
+const H2_SIZE = 12
+const H3_SIZE = 11
+const ROW_H = 22
+const ROOT_MAX = 120
+const H2_MAX = 210
+const H3_MAX = 190
+
+const rootText = truncate(title, ROOT_SIZE, ROOT_MAX)
+const rootW = textWidth(rootText, ROOT_SIZE)
+
+const SPINE_X = rootW + 20
+const RAIL_X = SPINE_X + 16
+const H2_X = RAIL_X + 14
+const H3_X = RAIL_X + 26
+
+interface Row {
+  x: number
+  y: number
+  text: string
+  slug: string
+  kind: 'h2' | 'h3'
+  parentY: number | null
+}
+
+const rows: Row[] = []
+let y = 0
+let currentH2Y: number | null = null
+for (const h of nodes) {
+  if (h.depth === 2) {
+    currentH2Y = y
+    rows.push({ x: H2_X, y, text: truncate(h.text, H2_SIZE, H2_MAX), slug: h.slug, kind: 'h2', parentY: null })
+  } else {
+    rows.push({ x: H3_X, y, text: truncate(h.text, H3_SIZE, H3_MAX), slug: h.slug, kind: 'h3', parentY: currentH2Y })
+  }
+  y += ROW_H
+}
+
+const h2Rows = rows.filter((r) => r.kind === 'h2')
+const rootY = rows.length > 0 ? (rows[rows.length - 1].y + ROW_H) / 2 : 0
+const spineTop = h2Rows.length > 0 ? h2Rows[0].y : rootY
+const spineBottom = h2Rows.length > 0 ? h2Rows[h2Rows.length - 1].y : rootY
+const width = H3_X + H3_MAX + 8
+const height = Math.max(rows.length > 0 ? rows[rows.length - 1].y + ROW_H : 0, rootY + ROOT_SIZE)
+---
+
+<details class="outline-map" data-outline data-desktop-min={DESKTOP_MIN_WIDTH}>
+  <summary class="outline-summary">{t(locale, 'post.structure')}</summary>
+  {
+    rows.length === 0 ? null : (
+      <svg
+        class="outline-svg"
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
+        height={height}
+        role="presentation"
+        aria-hidden="true"
+      >
+        {/* 根节点 → 主干 */}
+        <line class="outline-line" x1={rootW} y1={rootY} x2={SPINE_X} y2={rootY} />
+        {/* 主干：串起所有 h2 */}
+        <line class="outline-line" x1={SPINE_X} y1={spineTop} x2={SPINE_X} y2={spineBottom} />
+        {rows.map((row) => (
+          <>
+            {row.kind === 'h2' ? (
+              <line class="outline-line" x1={SPINE_X} y1={row.y} x2={H2_X} y2={row.y} />
+            ) : (
+              <>
+                <line class="outline-line" x1={RAIL_X} y1={row.parentY ?? row.y} x2={RAIL_X} y2={row.y} />
+                <line class="outline-line" x1={RAIL_X} y1={row.y} x2={H3_X} y2={row.y} />
+              </>
+            )}
+            <a href={`#${row.slug}`}>
+              <text
+                class={row.kind === 'h2' ? 'outline-node outline-node--h2' : 'outline-node outline-node--h3'}
+                x={row.x}
+                y={row.y + ROW_H / 2}
+                dominant-baseline="central"
+                font-size={row.kind === 'h2' ? H2_SIZE : H3_SIZE}
+              >
+                {row.text}
+              </text>
+            </a>
+          </>
+        ))}
+        <text
+          class="outline-node outline-node--root"
+          x={0}
+          y={rootY}
+          dominant-baseline="central"
+          font-size={ROOT_SIZE}
+        >
+          {rootText}
+        </text>
+      </svg>
+    )
+  }
+</details>
+
+<script is:inline>
+  // 桌面端常驻展开；移动端默认折叠（summary 可点开）
+  ;(() => {
+    const el = document.querySelector('[data-outline]')
+    const min = el?.dataset.desktopMin
+    if (el && min && window.matchMedia(`(min-width: ${min}px)`).matches) el.setAttribute('open', '')
+  })()
+</script>
+
+<style>
+  .outline-map {
+    margin: 0;
+  }
+
+  .outline-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-sm);
+    padding-block: var(--ui-space-xs);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ui-text-secondary);
+    cursor: pointer;
+  }
+
+  .outline-summary::marker {
+    content: '';
+  }
+
+  .outline-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .outline-line {
+    stroke: var(--ui-border);
+    stroke-width: 1;
+    fill: none;
+  }
+
+  .outline-node {
+    fill: var(--ui-text-secondary);
+    font-family: var(--ui-font-body);
+  }
+
+  .outline-node--root {
+    fill: var(--ui-accent);
+    font-weight: 700;
+  }
+
+  .outline-node--h2 {
+    fill: var(--ui-text);
+    font-weight: 600;
+  }
+
+  /* 桌面端：summary 藏起来，图常驻 */
+  @media (min-width: 1024px) {
+    .outline-summary {
+      display: none;
+    }
+  }
+</style>
