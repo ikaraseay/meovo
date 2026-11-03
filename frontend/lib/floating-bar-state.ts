@@ -16,8 +16,12 @@ const KEY = 'floating-bar-state'
 const VERSION = 1
 
 export type FloatingBarState = {
-  /** 栏体：左上角坐标 */
-  menu?: { x: number; y: number }
+  /**
+   * 栏体：视口里的相对位置（比例 0~1）——
+   * 记比例而不是像素：分辨率变了栏体跟着走，用户摆的相对位置不丢。
+   * 用户没摆过时这块不存在 —— 用默认的顶部居中，那个不落盘、每次重算。
+   */
+  menu?: { fx: number; fy: number }
   /** 设置悬浮按钮：距右、距下 */
   fab?: { right: number; bottom: number }
   /** 设置弹窗：左上角坐标 */
@@ -29,6 +33,9 @@ export type FloatingBarState = {
 /** 兼容旧签名 —— 测试塞假对象即可 */
 export type StateStore = StorageLike
 
+/** 视口尺寸 —— 换算旧格式的绝对像素要用 */
+export type Viewport = { width: number; height: number }
+
 function defaultStorage(): StorageLike | null {
   try {
     return globalThis.localStorage
@@ -37,16 +44,29 @@ function defaultStorage(): StorageLike | null {
   }
 }
 
+/** 当前视口 —— 浏览器里有；Node（测试）里没有就是 0 */
+function currentViewport(): Viewport {
+  const g = globalThis as { innerWidth?: number; innerHeight?: number }
+  return { width: g.innerWidth ?? 0, height: g.innerHeight ?? 0 }
+}
+
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
 /** 坏值只丢自己那一块，别连累别的 */
-function clean(value: unknown): FloatingBarState {
+function clean(value: unknown, vp: Viewport): FloatingBarState {
   if (!value || typeof value !== 'object') return {}
   const o = value as Record<string, unknown>
   const state: FloatingBarState = {}
 
-  const menu = o.menu as { x?: unknown; y?: unknown } | undefined
-  if (menu && finite(menu.x) && finite(menu.y)) state.menu = { x: menu.x, y: menu.y }
+  const menu = o.menu as { fx?: unknown; fy?: unknown; x?: unknown; y?: unknown } | undefined
+  if (menu) {
+    if (finite(menu.fx) && finite(menu.fy)) {
+      state.menu = { fx: menu.fx, fy: menu.fy }
+    } else if (finite(menu.x) && finite(menu.y) && vp.width > 0 && vp.height > 0) {
+      // 旧格式是绝对像素 —— 按当前视口换算成比例：升级那一刻位置不跳，之后跟着分辨率走
+      state.menu = { fx: menu.x / vp.width, fy: menu.y / vp.height }
+    }
+  }
 
   const fab = o.fab as { right?: unknown; bottom?: unknown } | undefined
   if (fab && finite(fab.right) && finite(fab.bottom)) state.fab = { right: fab.right, bottom: fab.bottom }
@@ -63,27 +83,30 @@ function clean(value: unknown): FloatingBarState {
 }
 
 /** 旧格式是平铺的几何、没有信封 —— 搬过来，用户摆的位置不丢 */
-function migrate(legacy: unknown): FloatingBarState | null {
+function migrate(legacy: unknown, vp: Viewport): FloatingBarState | null {
   if (!legacy || typeof legacy !== 'object') return null
   const o = legacy as Record<string, unknown>
   // 带信封的说明是别的版本 —— 认不出来就当没有
   if ('version' in o || 'data' in o) return null
-  return clean(o)
+  return clean(o, vp)
 }
 
-function barStore(storage: StorageLike | null): Store<FloatingBarState> {
+function barStore(storage: StorageLike | null, vp: Viewport): Store<FloatingBarState> {
   return createStore<FloatingBarState>({
     key: KEY,
     version: VERSION,
-    clean,
-    migrate,
+    clean: (value) => clean(value, vp),
+    migrate: (legacy) => migrate(legacy, vp),
     storage,
   })
 }
 
 /** 读整份状态 —— 存的是坏 JSON 就当没有 */
-export function readFloatingBarState(store: StateStore | null = defaultStorage()): FloatingBarState {
-  return barStore(store).read()
+export function readFloatingBarState(
+  store: StateStore | null = defaultStorage(),
+  vp: Viewport = currentViewport(),
+): FloatingBarState {
+  return barStore(store, vp).read()
 }
 
 /** 按块合并写入 —— 只写栏体不会把设置按钮的位置抹掉 */
@@ -91,21 +114,20 @@ export function saveFloatingBarState(
   patch: FloatingBarState,
   store: StateStore | null = defaultStorage(),
 ): void {
-  barStore(store).save(patch)
+  barStore(store, currentViewport()).save(patch)
 }
 
 /**
- * 删掉一块 —— 设置弹窗靠它回到自动落点：
- * 摆过了就存着位置，没摆过（这一块不存在）就用自动落点。
+ * 删掉一块 —— 设置弹窗靠它回到自动落点：摆过了就存着位置，没摆过（这一块不存在）就用自动落点。
  */
 export function removeFloatingBarState(
   key: keyof FloatingBarState,
   store: StateStore | null = defaultStorage(),
 ): void {
-  barStore(store).remove(key)
+  barStore(store, currentViewport()).remove(key)
 }
 
 /** 全清 —— 「重置布局」用：悬浮栏的所有摆放都回到默认 */
 export function clearFloatingBarState(store: StateStore | null = defaultStorage()): void {
-  barStore(store).clear()
+  barStore(store, currentViewport()).clear()
 }

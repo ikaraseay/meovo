@@ -375,6 +375,7 @@ const navItems: NavItem[] = [
   import {
     clearFloatingBarState,
     readFloatingBarState,
+    removeFloatingBarState,
     saveFloatingBarState,
   } from '../lib/floating-bar-state'
   import { ATTR, CLASS } from '../lib/dom-contract'
@@ -409,8 +410,14 @@ const navItems: NavItem[] = [
 
   const MARGIN = 10
 
-  let menuX = 0
-  let menuY = 0
+  /**
+   * 栏体位置记成「视口里的比例」—— 分辨率变了跟着走，
+   * 用户摆在视口里的相对位置不丢。
+   * 用户没摆过（menuPlaced = false）就用默认的顶部居中：那个不落盘，每次重算。
+   */
+  let menuFx = 0
+  let menuFy = 0
+  let menuPlaced = false
   let hideTimer = 0
 
   /** 菜单默认停在视口顶部正中 —— 用实测宽度算，菜单长短变了也不会跑偏 */
@@ -421,24 +428,31 @@ const navItems: NavItem[] = [
 
   function placeMenu() {
     if (!menu) return
+    const w = window.innerWidth
+    const h = window.innerHeight
+    // 摆过的按比例摆（分辨率变了跟着走）；没摆过的回默认的顶部居中
+    const want = menuPlaced ? { x: menuFx * w, y: menuFy * h } : { x: defaultMenuX(), y: h / 100 }
     const p = clampPoint(
-      { x: menuX, y: menuY },
+      want,
       { width: menu.offsetWidth || 320, height: menu.offsetHeight || 200 },
-      { width: window.innerWidth, height: window.innerHeight },
+      { width: w, height: h },
       MARGIN,
     )
-    menuX = p.x
-    menuY = p.y
-    menu.style.left = `${menuX}px`
-    menu.style.top = `${menuY}px`
+    // 夹取后的位置写回比例 —— 拖到边缘也停在屏幕里
+    if (w > 0 && h > 0) {
+      menuFx = p.x / w
+      menuFy = p.y / h
+    }
+    menu.style.left = `${p.x}px`
+    menu.style.top = `${p.y}px`
   }
 
   function resetMenu() {
-    menuX = defaultMenuX()
-    menuY = window.innerHeight / 100
+    // 回默认位 —— 删掉存的那块（没摆过 = 用默认落点）
+    menuPlaced = false
+    removeFloatingBarState('menu')
     placeMenu()
     hideReset()
-    saveFloatingBarState({ menu: { x: menuX, y: menuY } })
   }
 
   function showReset() {
@@ -452,9 +466,12 @@ const navItems: NavItem[] = [
   }
 
   if (menu) {
-    // 存过就用存的，没存过才落默认位
-    menuX = saved.menu?.x ?? defaultMenuX()
-    menuY = saved.menu?.y ?? window.innerHeight / 100
+    // 存过就用存的（比例），没存过才落默认位
+    menuPlaced = !!saved.menu
+    if (saved.menu) {
+      menuFx = saved.menu.fx
+      menuFy = saved.menu.fy
+    }
     // 视口尺寸还没出来时（innerWidth 为 0）先别摆 —— 那会儿夹取会把位置夹到角落
     if (window.innerWidth > 0) placeMenu()
     menu.addEventListener('mouseenter', showReset)
@@ -475,17 +492,19 @@ const navItems: NavItem[] = [
     let startMenuY = 0
     beginDrag(menuHandle, {
       onStart: () => {
-        startMenuX = menuX
-        startMenuY = menuY
+        // 拖动用像素 —— 从比例换算回来
+        startMenuX = menuFx * window.innerWidth
+        startMenuY = menuFy * window.innerHeight
       },
       onMove: (s) => {
-        menuX = startMenuX + s.dx
-        menuY = startMenuY + s.dy
+        menuPlaced = true
+        menuFx = (startMenuX + s.dx) / window.innerWidth
+        menuFy = (startMenuY + s.dy) / window.innerHeight
         placeMenu()
       },
       onEnd: () => {
         showReset()
-        saveFloatingBarState({ menu: { x: menuX, y: menuY } })
+        saveFloatingBarState({ menu: { fx: menuFx, fy: menuFy } })
       },
     })
   }
@@ -687,9 +706,8 @@ const navItems: NavItem[] = [
     drawerHeight = DRAWER_MAX
     drawerExpanded = true
     placeDrawer()
-    // 栏体回视口顶部正中
-    menuX = defaultMenuX()
-    menuY = window.innerHeight / 100
+    // 栏体回视口顶部正中 —— 不落盘，跟着分辨率走
+    menuPlaced = false
     placeMenu()
     // 设置按钮回右下角
     fabRight = 20
@@ -915,7 +933,8 @@ const navItems: NavItem[] = [
   function placeAll(save = false) {
     if (menu && menu.offsetWidth > 0) {
       placeMenu()
-      if (save) saveFloatingBarState({ menu: { x: menuX, y: menuY } })
+      // 用户没摆过就别落盘 —— 默认位每次重算，不占状态
+      if (save && menuPlaced) saveFloatingBarState({ menu: { fx: menuFx, fy: menuFy } })
     }
     if (fab && fab.offsetWidth > 0) {
       placeFab()
