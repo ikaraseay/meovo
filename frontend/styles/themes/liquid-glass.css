@@ -209,11 +209,11 @@ html[data-theme='liquid-glass'] {
 
   /* ==================== 字体 ==================== */
   /* 系统字体栈 —— 项目里没有任何 @font-face，别写不存在的 webfont 名 */
-  --ui-font-heading: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
-  --ui-font-body: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Noto Sans CJK SC', system-ui, sans-serif;
-  --ui-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, 'Noto Sans Mono CJK SC', monospace;
+  /* 统一一套等宽字体栈，全页面共用 */
+  --ui-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, 'Noto Sans Mono CJK SC', 'WenQuanYi Micro Hei Mono', monospace;
+
+  --ui-font-heading: var(--ui-font-mono);
+  --ui-font-body: var(--ui-font-mono);
 }
 
 /* ==================== 深色模式 ==================== */
