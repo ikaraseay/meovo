@@ -10,7 +10,6 @@ import {
   updateDocument,
 } from '../../../../../backend/lib/admin/db.ts'
 import { fail, json, readJson } from '../../../../../backend/lib/admin/api.ts'
-import { triggerBuild } from '../../../../../backend/lib/admin/build-hook.ts'
 
 export const GET: APIRoute = async ({ params }) => {
   const document = await getDocument(params.id ?? '')
@@ -58,18 +57,13 @@ export const PUT: APIRoute = async ({ params, request }) => {
   if (result === 'conflict') return fail('conflict', 409)
   if (result === 'missing') return fail('not_found', 404)
 
-  // 已发布的文档改完正文要重建才看得见；草稿站上还没有它，不用构建
-  const buildTriggered = existing.status === 'published' ? await triggerBuild() : false
   // 新令牌回传 —— 客户端不换掉手里那份，下一次保存必然 409
-  return json({ ok: true, buildTriggered, updatedAt })
+  return json({ ok: true, updatedAt })
 }
 
 export const DELETE: APIRoute = async ({ params }) => {
   const document = await getDocument(params.id ?? '')
   if (!document) return fail('not_found', 404)
   await deleteDocument(document.id)
-
-  // 删的是已发布的文档 → 站点上也要把它删掉（导出脚本先清后写）
-  const buildTriggered = document.status === 'published' ? await triggerBuild() : false
-  return json({ ok: true, buildTriggered })
+  return json({ ok: true })
 }

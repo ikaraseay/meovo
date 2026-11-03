@@ -112,23 +112,15 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     save.textContent = t(locale, 'admin.action.save')
     save.addEventListener('click', async () => {
       try {
-        const result = await api<{ buildTriggered?: boolean }>(
-          '/api/admin/projects/' + item.id,
-          {
-            method: 'PUT',
-            body: JSON.stringify({
-              name: name.value,
-              description: description.value,
-              url: url.value,
-            }),
-          },
-        )
-        say(
-          t(
-            locale,
-            result.buildTriggered ? 'admin.hint.savedBuilding' : 'admin.hint.savedNoBuild',
-          ),
-        )
+        await api('/api/admin/projects/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: name.value,
+            description: description.value,
+            url: url.value,
+          }),
+        })
+        say(t(locale, 'admin.hint.saved'))
         await render()
       } catch (error) {
         say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
@@ -185,7 +177,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     event.preventDefault()
     const data = new FormData(form)
     try {
-      const result = await api<{ buildTriggered?: boolean }>('/api/admin/projects', {
+      await api('/api/admin/projects', {
         method: 'POST',
         body: JSON.stringify({
           name: String(data.get('name') ?? ''),
@@ -194,12 +186,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
         }),
       })
       form.reset()
-      say(
-        t(
-          locale,
-          result.buildTriggered ? 'admin.hint.savedBuilding' : 'admin.hint.savedNoBuild',
-        ),
-      )
+      say(t(locale, 'admin.hint.saved'))
       await render()
     } catch (error) {
       say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)

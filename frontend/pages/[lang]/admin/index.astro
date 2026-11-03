@@ -171,28 +171,11 @@ const base = '/' + locale + '/admin'
         published ? t(locale, 'admin.action.unpublish') : t(locale, 'admin.action.publish'),
         async () => {
           try {
-            const result = await api<{ buildTriggered?: boolean }>(
-              '/api/admin/documents/' + item.id + '/publish',
-              {
-                method: 'POST',
-                body: JSON.stringify({ published: !published }),
-              },
-            )
-            say(
-              published
-                ? t(
-                    locale,
-                    result.buildTriggered
-                      ? 'admin.hint.draftBuilding'
-                      : 'admin.hint.draftNoBuild',
-                  )
-                : t(
-                    locale,
-                    result.buildTriggered
-                      ? 'admin.hint.publishedBuilding'
-                      : 'admin.hint.publishedNoBuild',
-                  ),
-            )
+            await api('/api/admin/documents/' + item.id + '/publish', {
+              method: 'POST',
+              body: JSON.stringify({ published: !published }),
+            })
+            say(t(locale, published ? 'admin.hint.draft' : 'admin.hint.published'))
             await render()
           } catch (error) {
             say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)

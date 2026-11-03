@@ -12,8 +12,10 @@
 export type EditorToolKind = 'link' | 'image' | 'table'
 
 export interface EditorTool {
-  /** 按钮上印的字 */
-  label: string
+  /** 按钮上印的字（文字类按钮） */
+  label?: string
+  /** 内联 SVG（图标类按钮）—— emoji 跟正文排版打架，别用 */
+  icon?: string
   /** 词典 key —— 悬停提示与 aria-label 都走它 */
   title: string
   /** 包住选区的前后缀（加粗 / 斜体 / 行内代码 …） */
@@ -31,15 +33,15 @@ export const EDITOR_TOOLS: EditorTool[] = [
   { label: 'S', title: 'admin.editor.strikethrough', before: '~~', after: '~~' },
   { label: 'U', title: 'admin.editor.underline', before: '<u>', after: '</u>' },
   {
-    label: '👁',
+    icon: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S4 3.75 8 3.75 14.5 8 14.5 8 12 12.25 8 12.25 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="1.9"/></svg>',
     title: 'admin.editor.hoverReveal',
     before: '<span class="spoiler">',
     after: '</span>',
   },
   { label: '</>', title: 'admin.editor.inlineCode', before: '`', after: '`' },
   { label: '{ }', title: 'admin.editor.codeBlock', before: '```\n', after: '\n```' },
-  { label: '🔗', title: 'admin.editor.link', kind: 'link' },
-  { label: '🖼', title: 'admin.editor.image', kind: 'image' },
+  { icon: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 9.4 9.4 6.6"/><path d="M7.2 4.3 8.3 3.2a2.85 2.85 0 0 1 4 4l-1.5 1.5"/><path d="M8.8 11.7 7.7 12.8a2.85 2.85 0 0 1-4-4l1.5-1.5"/></svg>', title: 'admin.editor.link', kind: 'link' },
+  { icon: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="9.6" rx="1.6"/><circle cx="5.9" cy="6.6" r="1"/><path d="m2.6 11.4 2.9-2.9 2.4 2.4 2.2-2.2 3.3 3.3"/></svg>', title: 'admin.editor.image', kind: 'image' },
   { label: 'H', title: 'admin.editor.heading', prefix: '## ' },
   { label: '❝', title: 'admin.editor.quote', prefix: '> ' },
   { label: '•', title: 'admin.editor.bulletList', prefix: '- ' },

@@ -1,7 +1,10 @@
 ---
 /**
  * 文档编辑器 —— 新建 / 修改 / 预览 / 插图 / 导入 .md。
- * 正文是普通 markdown；发布只是把状态改成 published，站点要等下一次构建。
+ *
+ * 中英文各摆一块编辑界面：同一篇文章的两个语言版本，
+ * 标题 / 摘要 / 正文各自独立，slug 与分类这些字段共用。
+ * 改完一起保存 —— 上线由「构建上线」那一步决定。
  */
 export const prerender = false
 
@@ -12,6 +15,7 @@ import { LICENSES, LICENSE_IDS } from '../../../../lib/licenses'
 const locale = (Astro.params.lang as Locale) ?? 'zh'
 const docId = Astro.params.id ?? 'new'
 const isNew = docId === 'new'
+const langs = ['zh', 'en'] as const
 ---
 
 <AdminLayout
@@ -34,23 +38,10 @@ const isNew = docId === 'new'
     <section class="admin-card">
       <h2 class="admin-card__title">{t(locale, 'admin.card.basics')}</h2>
       <div class="admin-grid">
-        <label class="admin-field admin-field--wide">
-          <span class="admin-field__label">{t(locale, 'admin.field.title')}</span>
-          <input class="ui-input" type="text" name="title" required />
-        </label>
-
         <label class="admin-field">
           <span class="admin-field__label">{t(locale, 'admin.field.slug')}</span>
           <input class="ui-input admin-input--mono" type="text" name="slug" required />
           <span class="admin-field__hint">{t(locale, 'admin.hint.slug')}</span>
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.locale')}</span>
-          <select class="ui-input" name="locale">
-            <option value="zh">zh</option>
-            <option value="en">en</option>
-          </select>
         </label>
 
         <label class="admin-field">
@@ -61,11 +52,6 @@ const isNew = docId === 'new'
         <label class="admin-field">
           <span class="admin-field__label">{t(locale, 'admin.field.updatedDate')}</span>
           <input class="ui-input" type="date" name="updatedDate" />
-        </label>
-
-        <label class="admin-field admin-field--wide">
-          <span class="admin-field__label">{t(locale, 'admin.field.description')}</span>
-          <input class="ui-input" type="text" name="description" />
         </label>
       </div>
     </section>
@@ -109,40 +95,46 @@ const isNew = docId === 'new'
       </div>
     </section>
 
-    <section class="admin-card">
-      <div class="admin-card__head">
-        <h2 class="admin-card__title">{t(locale, 'admin.card.bodyAndPreview')}</h2>
-        <button class="ui-btn" type="button" data-admin-parallel aria-pressed="false">
-          {t(locale, 'admin.action.parallel')}
-        </button>
-      </div>
-      <div class="admin-editor" data-admin-editor-panes>
-        <div class="admin-editor__pane">
-          <span class="admin-field__label">{t(locale, 'admin.field.body')}</span>
-          <div
-            class="admin-editor__tools"
-            data-admin-tools
-            role="toolbar"
-            aria-label={t(locale, 'admin.editor.toolbar')}
-          ></div>
-          <textarea class="ui-input admin-editor__body" name="body"></textarea>
-        </div>
-        <!-- 对版：同 slug 的另一种语言版本（只读参考） -->
-        <div class="admin-editor__pane" data-admin-parallel-pane hidden>
-          <span class="admin-field__label" data-admin-parallel-label></span>
-          <textarea
-            class="ui-input admin-editor__body admin-editor__body--readonly"
-            data-admin-parallel-body
-            readonly
-          ></textarea>
-          <a class="ui-btn" data-admin-parallel-link hidden target="_blank" rel="noopener"></a>
-        </div>
-        <div class="admin-editor__pane" data-admin-preview-pane>
-          <span class="admin-field__label">{t(locale, 'admin.action.preview')}</span>
-          <div class="admin-preview prose" data-admin-preview></div>
-        </div>
-      </div>
-    </section>
+    {
+      langs.map((lang) => (
+        <section class="admin-card" data-admin-lang={lang}>
+          <div class="admin-card__head">
+            <h2 class="admin-card__title">
+              {t(locale, lang === 'zh' ? 'admin.lang.zh' : 'admin.lang.en')}
+            </h2>
+            <span class="admin-pill admin-pill--ghost" data-admin-lang-status={lang} hidden></span>
+          </div>
+
+          <div class="admin-grid">
+            <label class="admin-field admin-field--wide">
+              <span class="admin-field__label">{t(locale, 'admin.field.title')}</span>
+              <input class="ui-input" type="text" name={`title-${lang}`} />
+            </label>
+
+            <label class="admin-field admin-field--wide">
+              <span class="admin-field__label">{t(locale, 'admin.field.description')}</span>
+              <input class="ui-input" type="text" name={`description-${lang}`} />
+            </label>
+          </div>
+
+          <div class="admin-editor">
+            <div class="admin-editor__pane">
+              <div
+                class="admin-editor__tools"
+                data-admin-tools={lang}
+                role="toolbar"
+                aria-label={t(locale, 'admin.editor.toolbar')}
+              ></div>
+              <textarea class="ui-input admin-editor__body" name={`body-${lang}`}></textarea>
+            </div>
+            <div class="admin-editor__pane">
+              <span class="admin-field__label">{t(locale, 'admin.action.preview')}</span>
+              <div class="admin-preview prose" data-admin-preview={lang}></div>
+            </div>
+          </div>
+        </section>
+      ))
+    }
 
     <div class="admin-actionbar">
       <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
@@ -210,11 +202,29 @@ const isNew = docId === 'new'
     mime: string
   }
 
+  /** 两种语言 —— 各自一份文档，各自带标题 / 摘要 / 正文 */
+  type Lang = 'zh' | 'en'
+  const LANGS: Lang[] = ['zh', 'en']
+
+  interface DocState {
+    id: string | null
+    status: string
+    updatedAt: string | null
+  }
+
+  /** 一块编辑界面：工具栏 + 正文 + 预览 */
+  interface Pane {
+    lang: Lang
+    tools: HTMLElement
+    body: HTMLTextAreaElement
+    preview: HTMLElement
+    timer: number
+    seq: number
+  }
+
   const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
   const form = document.querySelector<HTMLFormElement>('[' + ATTR.adminEditor + ']')
   const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
-  const preview = document.querySelector<HTMLElement>('[' + ATTR.adminPreview + ']')
-  const toolsBox = document.querySelector<HTMLElement>('[' + ATTR.adminTools + ']')
   const picker = document.querySelector<HTMLElement>('[' + ATTR.adminMediaPicker + ']')
   const docId = form?.getAttribute('data-doc-id') ?? 'new'
   const statusTag = document.querySelector<HTMLElement>('[data-admin-status]')
@@ -222,15 +232,16 @@ const isNew = docId === 'new'
   const viewLink = document.querySelector<HTMLAnchorElement>('[data-admin-view]')
   const deleteButton = document.querySelector<HTMLButtonElement>('[data-admin-delete]')
   const publishButton = document.querySelector<HTMLButtonElement>('[data-admin-publish]')
-  const parallelButton = document.querySelector<HTMLButtonElement>('[data-admin-parallel]')
-  const parallelPane = document.querySelector<HTMLElement>('[data-admin-parallel-pane]')
-  const parallelBody = document.querySelector<HTMLTextAreaElement>('[data-admin-parallel-body]')
-  const parallelLabel = document.querySelector<HTMLElement>('[data-admin-parallel-label]')
-  const parallelLink = document.querySelector<HTMLAnchorElement>('[data-admin-parallel-link]')
-  const editorPanes = document.querySelector<HTMLElement>('[data-admin-editor-panes]')
-  let parallelOn = false
-  let updatedAt: string | null = null
-  let status = 'draft'
+
+  const docs: Record<Lang, DocState> = {
+    zh: { id: null, status: 'draft', updatedAt: null },
+    en: { id: null, status: 'draft', updatedAt: null },
+  }
+  const panes: Pane[] = []
+  /** 当前在写的那一版 —— 底部那些按钮（插图 / 导入）跟着它走 */
+  let activePane: Pane | null = null
+  /** 页面上这篇文档是哪种语言 */
+  let currentLang: Lang = 'zh'
   let dirty = false
 
   function field(name: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null {
@@ -250,92 +261,15 @@ const isNew = docId === 'new'
     if (element) element.value = value
   }
 
-  function collect() {
-    return {
-      title: field('title')?.value ?? '',
-      slug: field('slug')?.value ?? '',
-      locale: field('locale')?.value ?? 'zh',
-      description: field('description')?.value ?? '',
-      body: field('body')?.value ?? '',
-      pubDate: field('pubDate')?.value ?? '',
-      updatedDate: field('updatedDate')?.value ?? '',
-      category: field('category')?.value ?? '',
-      tags: field('tags')?.value ?? '',
-      seriesId: field('seriesId')?.value ?? '',
-      seriesTitle: field('seriesTitle')?.value ?? '',
-      seriesOrder: field('seriesOrder')?.value ?? '',
-      license: field('license')?.value ?? 'cc-by',
-      updatedAt: updatedAt ?? '',
-    }
+  /** 某种语言的字段：title-zh / title-en … */
+  function langField(name: string, lang: Lang) {
+    return field(name + '-' + lang)
   }
 
-  function fill(item: DocumentRow) {
-    updatedAt = item.updated_at
-    status = item.status
-    dirty = false
-    setField('title', item.title)
-    setField('slug', item.slug)
-    setField('locale', item.locale)
-    setField('description', item.description)
-    setField('body', item.body)
-    setField('pubDate', (item.pub_date ?? '').slice(0, 10))
-    setField('updatedDate', (item.updated_date ?? '').slice(0, 10))
-    setField('category', item.category ?? '')
-    setField('tags', safeTags(item.tags))
-    setField('seriesId', item.series_id ?? '')
-    setField('seriesTitle', item.series_title ?? '')
-    setField('seriesOrder', item.series_order == null ? '' : String(item.series_order))
-    setField('license', item.license)
+  function setLangField(name: string, lang: Lang, value: string) {
+    const element = langField(name, lang)
+    if (element) element.value = value
   }
-
-  /** 对版：拉同 slug 的另一种语言版本（只读参考） */
-  async function loadParallel() {
-    if (!parallelOn || !parallelLabel || !parallelBody) return
-    const slug = (field('slug')?.value ?? '').trim()
-    const other = (field('locale')?.value ?? 'zh') === 'zh' ? 'en' : 'zh'
-
-    if (parallelLink) parallelLink.hidden = true
-    if (!slug) {
-      parallelLabel.textContent = t(locale, 'admin.editor.parallelLabel', { locale: other })
-      parallelBody.value = ''
-      return
-    }
-
-    try {
-      const data = await api<{ document: DocumentRow | null }>(
-        '/api/admin/documents?slug=' + encodeURIComponent(slug) + '&locale=' + other,
-      )
-      const sibling = data.document
-      if (!sibling) {
-        parallelLabel.textContent = t(locale, 'admin.editor.parallelMissing', { locale: other })
-        parallelBody.value = ''
-        return
-      }
-      parallelLabel.textContent =
-        t(locale, 'admin.editor.parallelLabel', { locale: other }) + ' · ' + sibling.title
-      parallelBody.value = sibling.body
-      if (parallelLink) {
-        parallelLink.hidden = false
-        parallelLink.href = '/' + locale + '/admin/documents/' + sibling.id
-        parallelLink.textContent = t(locale, 'admin.editor.parallelOpen', { locale: other })
-      }
-    } catch (error) {
-      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
-    }
-  }
-
-  parallelButton?.addEventListener('click', () => {
-    parallelOn = !parallelOn
-    parallelButton.setAttribute('aria-pressed', String(parallelOn))
-    parallelButton.classList.toggle('ui-btn--primary', parallelOn)
-    if (parallelPane) parallelPane.hidden = !parallelOn
-    editorPanes?.classList.toggle('admin-editor--parallel', parallelOn)
-    void loadParallel()
-  })
-
-  // slug 或语言改了 —— 对版要跟着换
-  field('slug')?.addEventListener('change', () => void loadParallel())
-  field('locale')?.addEventListener('change', () => void loadParallel())
 
   function safeTags(raw: string): string {
     try {
@@ -346,26 +280,83 @@ const isNew = docId === 'new'
     }
   }
 
-  /** 状态条：草稿 / 已发布 + 最后保存时间 + 线上链接 */
+  /** 两种语言共用的字段 */
+  function collectShared() {
+    return {
+      slug: field('slug')?.value ?? '',
+      pubDate: field('pubDate')?.value ?? '',
+      updatedDate: field('updatedDate')?.value ?? '',
+      category: field('category')?.value ?? '',
+      tags: field('tags')?.value ?? '',
+      license: field('license')?.value ?? 'cc-by',
+      seriesId: field('seriesId')?.value ?? '',
+      seriesTitle: field('seriesTitle')?.value ?? '',
+      seriesOrder: field('seriesOrder')?.value ?? '',
+    }
+  }
+
+  function fillShared(doc: DocumentRow) {
+    setField('slug', doc.slug)
+    setField('pubDate', (doc.pub_date ?? '').slice(0, 10))
+    setField('updatedDate', (doc.updated_date ?? '').slice(0, 10))
+    setField('category', doc.category ?? '')
+    setField('tags', safeTags(doc.tags))
+    setField('seriesId', doc.series_id ?? '')
+    setField('seriesTitle', doc.series_title ?? '')
+    setField('seriesOrder', doc.series_order == null ? '' : String(doc.series_order))
+    setField('license', doc.license)
+  }
+
+  /** 一篇文档 → 一种语言 */
+  function fillDoc(lang: Lang, doc: DocumentRow) {
+    docs[lang] = { id: doc.id, status: doc.status, updatedAt: doc.updated_at }
+    setLangField('title', lang, doc.title)
+    setLangField('description', lang, doc.description)
+    setLangField('body', lang, doc.body)
+    renderLangStatus(lang)
+  }
+
+  /** 另一种语言还没有这一版 —— 清空那一块 */
+  function clearDoc(lang: Lang) {
+    docs[lang] = { id: null, status: 'draft', updatedAt: null }
+    setLangField('title', lang, '')
+    setLangField('description', lang, '')
+    setLangField('body', lang, '')
+    renderLangStatus(lang)
+  }
+
+  /** 某个语言的发布状态药丸 */
+  function renderLangStatus(lang: Lang) {
+    const tag = document.querySelector<HTMLElement>('[data-admin-lang-status="' + lang + '"]')
+    if (!tag) return
+    const state = docs[lang]
+    tag.hidden = !state.id
+    tag.innerHTML =
+      '<span class="admin-pill__dot"></span>' +
+      (state.status === 'published'
+        ? t(locale, 'admin.status.published')
+        : t(locale, 'admin.status.draft'))
+  }
+
   function renderStatus() {
-    const published = status === 'published'
+    const state = docs[currentLang]
+    const published = state.status === 'published'
     if (statusTag) {
       statusTag.hidden = false
-      statusTag.className = 'admin-pill' + (published ? ' admin-pill--published' : ' admin-pill--ghost')
       statusTag.innerHTML =
         '<span class="admin-pill__dot"></span>' +
         (published ? t(locale, 'admin.status.published') : t(locale, 'admin.status.draft'))
     }
     if (savedAt) {
       savedAt.hidden = false
-      savedAt.textContent = updatedAt
-        ? t(locale, 'admin.editor.lastSaved', { time: formatTime(updatedAt) })
+      savedAt.textContent = state.updatedAt
+        ? t(locale, 'admin.editor.lastSaved', { time: formatTime(state.updatedAt) })
         : t(locale, 'admin.editor.notPublished')
     }
     if (viewLink) {
       viewLink.hidden = !published
       const slug = field('slug')?.value ?? ''
-      if (published && slug) viewLink.href = '/' + (field('locale')?.value ?? locale) + '/posts/' + slug + '/'
+      if (published && slug) viewLink.href = '/' + currentLang + '/posts/' + slug + '/'
     }
     if (deleteButton) deleteButton.hidden = docId === 'new'
     if (publishButton) {
@@ -388,56 +379,66 @@ const isNew = docId === 'new'
     }).format(date)
   }
 
-  async function save(publish: boolean): Promise<boolean> {
-    const payload = collect()
-    try {
-      if (docId === 'new') {
-        const created = await api<{ id: string }>('/api/admin/documents', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        })
-        location.href = '/' + locale + '/admin/documents/' + created.id
-        return true
-      }
-      const saved = await api<{ buildTriggered?: boolean; updatedAt?: string }>('/api/admin/documents/' + docId, {
+  /* ---------------- 保存 ---------------- */
+
+  /** 一篇文档存一次 —— 有了就改，没有就建 */
+  async function saveDoc(lang: Lang, publish: boolean): Promise<string | null> {
+    const state = docs[lang]
+    const title = langField('title', lang)?.value ?? ''
+    // 没填标题 —— 这一版就不存在（只写了中文是很正常的事）
+    if (!title.trim()) return null
+    const payload = {
+      ...collectShared(),
+      locale: lang,
+      title,
+      description: langField('description', lang)?.value ?? '',
+      body: langField('body', lang)?.value ?? '',
+      updatedAt: state.updatedAt ?? '',
+    }
+    let created = false
+    if (state.id) {
+      const saved = await api<{ updatedAt?: string }>('/api/admin/documents/' + state.id, {
         method: 'PUT',
         body: JSON.stringify(payload),
       })
       // 令牌换新的 —— 服务端每次写入都换，不换的话第二次保存必然 409
-      updatedAt = nextToken(updatedAt, saved)
-      dirty = false
-      if (publish) {
-        const result = await api<{ buildTriggered?: boolean; updatedAt?: string }>(
-          '/api/admin/documents/' + docId + '/publish',
-          {
-            method: 'POST',
-            body: JSON.stringify({ published: true }),
-          },
-        )
-        updatedAt = nextToken(updatedAt, result)
-        status = 'published'
-        say(
-          t(
-            locale,
-            result.buildTriggered
-              ? 'admin.hint.publishedBuilding'
-              : 'admin.hint.publishedNoBuild',
-          ),
-        )
-      } else {
-        // 已发布的文章保存 → 服务端会敲构建钩子；草稿不触发
-        say(
-          t(
-            locale,
-            saved.buildTriggered
-              ? 'admin.hint.savedBuilding'
-              : status === 'published'
-                ? 'admin.hint.savedNoBuild'
-                : 'admin.hint.saved',
-          ),
-        )
+      state.updatedAt = nextToken(state.updatedAt, saved)
+    } else {
+      const result = await api<{ id?: string; updatedAt?: string }>('/api/admin/documents', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      state.id = result.id ?? null
+      state.updatedAt = nextToken(null, result)
+      created = true
+    }
+    if (publish && state.id) {
+      const result = await api<{ updatedAt?: string }>('/api/admin/documents/' + state.id + '/publish', {
+        method: 'POST',
+        body: JSON.stringify({ published: true }),
+      })
+      state.updatedAt = nextToken(state.updatedAt, result)
+      state.status = 'published'
+    }
+    renderLangStatus(lang)
+    return created ? state.id : null
+  }
+
+  async function save(publish: boolean): Promise<boolean> {
+    try {
+      let created: string | null = null
+      for (const lang of LANGS) {
+        const id = await saveDoc(lang, publish)
+        if (id && !created) created = id
       }
+      dirty = false
       renderStatus()
+      say(t(locale, publish ? 'admin.hint.published' : 'admin.hint.saved'))
+      // 新建完跳到正式页面 —— 两种语言都已经存进库了
+      if (created && docId === 'new') {
+        location.href = '/' + locale + '/admin/documents/' + (docs[locale as Lang].id ?? created)
+        return true
+      }
       return true
     } catch (error) {
       const failure = error as { code?: string; errors?: string[] }
@@ -447,168 +448,169 @@ const isNew = docId === 'new'
     }
   }
 
+  /** 发布 / 撤回 —— 两种语言一起 */
+  async function setPublished(published: boolean) {
+    try {
+      for (const lang of LANGS) {
+        const state = docs[lang]
+        if (!state.id) continue
+        const result = await api<{ updatedAt?: string }>('/api/admin/documents/' + state.id + '/publish', {
+          method: 'POST',
+          body: JSON.stringify({ published }),
+        })
+        state.updatedAt = nextToken(state.updatedAt, result)
+        state.status = published ? 'published' : 'draft'
+        renderLangStatus(lang)
+      }
+      dirty = false
+      renderStatus()
+      say(t(locale, published ? 'admin.hint.published' : 'admin.hint.draft'))
+    } catch (error) {
+      const failure = error as { code?: string }
+      say(errorText(locale, failure.code ?? 'request_failed'), true)
+    }
+  }
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault()
     await save(false)
-  })
+  });
 
   form?.addEventListener('input', (event) => {
     dirty = true
     // 正文改了 → 停手就刷新预览
-    if (event.target === bodyField()) schedulePreview()
-  })
+    const pane = panes.find((item) => item.body === event.target)
+    if (pane) schedulePreview(pane)
+  });
 
   publishButton?.addEventListener('click', async () => {
-    if (status === 'published') {
-      // 撤回 —— 只改状态，正文不动
-      try {
-        const result = await api<{ buildTriggered?: boolean; updatedAt?: string }>(
-          '/api/admin/documents/' + docId + '/publish',
-          {
-            method: 'POST',
-            body: JSON.stringify({ published: false }),
-          },
-        )
-        updatedAt = nextToken(updatedAt, result)
-        status = 'draft'
-        dirty = false
-        say(
-          t(
-            locale,
-            result.buildTriggered ? 'admin.hint.draftBuilding' : 'admin.hint.draftNoBuild',
-          ),
-        )
-        renderStatus()
-      } catch (error) {
-        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
-      }
+    if (docs[currentLang].status === 'published') {
+      await setPublished(false)
       return
     }
     await save(true)
-  })
+  });
 
   deleteButton?.addEventListener('click', async () => {
+    const state = docs[currentLang]
+    if (!state.id) return
     if (!confirm(t(locale, 'admin.confirm.delete'))) return
     try {
-      await api('/api/admin/documents/' + docId, { method: 'DELETE' })
+      await api('/api/admin/documents/' + state.id, { method: 'DELETE' })
       location.href = '/' + locale + '/admin/'
     } catch (error) {
-      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      const failure = error as { code?: string }
+      say(errorText(locale, failure.code ?? 'request_failed'), true)
     }
-  })
+  });
 
   /* ---------------- 格式工具栏 ---------------- */
 
-  function bodyField(): HTMLTextAreaElement | null {
-    return field('body') as HTMLTextAreaElement | null
-  }
-
   /** 改完正文要自己触发一次 input —— 脏标记与自动预览都听它 */
-  function bodyChanged() {
-    bodyField()?.dispatchEvent(new Event('input', { bubbles: true }))
+  function bodyChanged(pane: Pane) {
+    pane.body.dispatchEvent(new Event('input', { bubbles: true }))
   }
 
   /** 把算好的结果写回正文，并把选区挪到新位置 */
-  function applyEdit(edit: EditResult) {
-    const body = bodyField()
-    if (!body) return
-    body.value = edit.value
-    body.focus()
-    body.setSelectionRange(edit.start, edit.end)
-    bodyChanged()
+  function applyEdit(pane: Pane, edit: EditResult) {
+    pane.body.value = edit.value
+    pane.body.focus()
+    pane.body.setSelectionRange(edit.start, edit.end)
+    bodyChanged(pane)
   }
 
-  /** 包住选区；没选中就插空的，光标落在中间 */
-  function applyWrap(before: string, after: string) {
-    const body = bodyField()
-    if (!body) return
-    applyEdit(wrapSelection(body.value, body.selectionStart, body.selectionEnd, before, after))
+  function applyWrap(pane: Pane, before: string, after: string) {
+    applyEdit(
+      pane,
+      wrapSelection(pane.body.value, pane.body.selectionStart, pane.body.selectionEnd, before, after),
+    )
   }
 
-  /** 行首加前缀（标题 / 引用 / 列表） */
-  function applyPrefix(prefix: string) {
-    const body = bodyField()
-    if (!body) return
-    applyEdit(prefixLines(body.value, body.selectionStart, body.selectionEnd, prefix))
+  function applyPrefix(pane: Pane, prefix: string) {
+    applyEdit(
+      pane,
+      prefixLines(pane.body.value, pane.body.selectionStart, pane.body.selectionEnd, prefix),
+    )
   }
 
   /** 链接 / 图片：问一句地址 */
-  function applyLink(image: boolean) {
-    const body = bodyField()
-    if (!body) return
+  function applyLink(pane: Pane, image: boolean) {
     const label = t(locale, image ? 'admin.editor.image' : 'admin.editor.link')
     const url = window.prompt(label, 'https://')
     if (!url) return
-    applyEdit(insertLink(body.value, body.selectionStart, body.selectionEnd, url, image))
+    applyEdit(
+      pane,
+      insertLink(pane.body.value, pane.body.selectionStart, pane.body.selectionEnd, url, image),
+    )
   }
 
-  /** 表格：塞一个空模板，光标落在第一格 */
-  function applyTable() {
-    const body = bodyField()
-    if (!body) return
-    applyEdit(insertTable(body.value, body.selectionStart))
+  function applyTable(pane: Pane) {
+    applyEdit(pane, insertTable(pane.body.value, pane.body.selectionStart))
   }
 
-  function renderTools() {
-    if (!toolsBox) return
-    toolsBox.textContent = ''
+  function renderTools(pane: Pane) {
+    pane.tools.textContent = ''
     for (const tool of EDITOR_TOOLS) {
       const button = document.createElement('button')
       button.className = 'ui-btn'
       button.type = 'button'
-      button.textContent = tool.label
+      if (tool.icon) button.innerHTML = tool.icon
+      else button.textContent = tool.label ?? ''
       const label = t(locale, tool.title)
       button.title = label
       button.setAttribute('aria-label', label)
       button.addEventListener('click', () => {
-        if (tool.kind === 'link') applyLink(false)
-        else if (tool.kind === 'image') applyLink(true)
-        else if (tool.kind === 'table') applyTable()
-        else if (tool.prefix) applyPrefix(tool.prefix)
-        else applyWrap(tool.before ?? '', tool.after ?? '')
+        if (tool.kind === 'link') applyLink(pane, false)
+        else if (tool.kind === 'image') applyLink(pane, true)
+        else if (tool.kind === 'table') applyTable(pane)
+        else if (tool.prefix) applyPrefix(pane, tool.prefix)
+        else applyWrap(pane, tool.before ?? '', tool.after ?? '')
       })
-      toolsBox.appendChild(button)
+      pane.tools.appendChild(button)
     }
   }
 
   /* ---------------- 预览：停手就刷新 ---------------- */
 
-  /** 预览请求的序号 —— 慢的旧响应不许盖掉新的 */
-  let previewSeq = 0
-  let previewTimer = 0
-
-  async function refreshPreview() {
-    const seq = ++previewSeq
+  async function refreshPreview(pane: Pane) {
+    const seq = ++pane.seq
     try {
       const data = await api<{ html: string }>('/api/admin/preview', {
         method: 'POST',
-        body: JSON.stringify({ markdown: field('body')?.value ?? '' }),
+        body: JSON.stringify({ markdown: pane.body.value }),
       })
-      if (seq !== previewSeq) return
-      if (preview) preview.innerHTML = data.html
+      // 慢的旧响应不许盖掉新的
+      if (seq !== pane.seq) return
+      pane.preview.innerHTML = data.html
     } catch (error) {
-      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      const failure = error as { code?: string }
+      say(errorText(locale, failure.code ?? 'request_failed'), true)
     }
   }
 
   /** 正文改完停 400ms 就刷新一次预览 */
-  function schedulePreview() {
-    window.clearTimeout(previewTimer)
-    previewTimer = window.setTimeout(() => void refreshPreview(), 400)
+  function schedulePreview(pane: Pane) {
+    window.clearTimeout(pane.timer)
+    pane.timer = window.setTimeout(() => void refreshPreview(pane), 400)
   }
 
   document
     .querySelector<HTMLButtonElement>('[data-admin-preview-button]')
-    ?.addEventListener('click', () => void refreshPreview())
+    ?.addEventListener('click', () => {
+      if (activePane) void refreshPreview(activePane)
+    })
+
+  /* ---------------- 图库与导入 ---------------- */
 
   function insertAtCursor(text: string) {
-    const body = bodyField()
-    if (!body) return
+    const pane = activePane
+    if (!pane) return
+    const body = pane.body
     const start = body.selectionStart ?? body.value.length
     const end = body.selectionEnd ?? body.value.length
     body.value = body.value.slice(0, start) + text + body.value.slice(end)
     body.focus()
-    bodyChanged()
+    bodyChanged(pane)
   }
 
   document
@@ -627,8 +629,8 @@ const isNew = docId === 'new'
           button.type = 'button'
           button.className = 'admin-media-picker__item'
           const image = document.createElement('img')
-          image.src = '/media/' + item.key
-          image.alt = item.alt
+          image.src = '/media/' + item.key;
+          image.alt = item.alt;
           image.loading = 'lazy'
           button.appendChild(image)
           button.addEventListener('click', () => {
@@ -638,7 +640,8 @@ const isNew = docId === 'new'
         }
         picker.hidden = false
       } catch (error) {
-        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+        const failure = error as { code?: string }
+        say(errorText(locale, failure.code ?? 'request_failed'), true)
       }
     })
 
@@ -647,7 +650,8 @@ const isNew = docId === 'new'
     ?.addEventListener('change', async (event) => {
       const input = event.target as HTMLInputElement
       const file = input.files?.[0]
-      if (!file) return
+      const pane = activePane
+      if (!file || !pane) return
       const parsed = parseFrontmatter(await file.text())
       const fields = parsed.fields
       const title = typeof fields.title === 'string' ? fields.title : ''
@@ -656,19 +660,40 @@ const isNew = docId === 'new'
       const license = typeof fields.license === 'string' ? fields.license : ''
       const pubDate = typeof fields.pubDate === 'string' ? fields.pubDate : ''
       const tags = Array.isArray(fields.tags) ? fields.tags.join(', ') : ''
-      setField('title', title)
-      setField('description', description)
+      setLangField('title', pane.lang, title)
+      setLangField('description', pane.lang, description)
       setField('category', category)
       setField('license', license)
       setField('pubDate', pubDate.slice(0, 10))
       setField('tags', tags)
-      setField('body', parsed.body)
+      setLangField('body', pane.lang, parsed.body)
       if (!field('slug')?.value) {
         setField('slug', title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-'))
       }
-      bodyChanged()
+      bodyChanged(pane)
       say(t(locale, 'admin.hint.imported'))
     })
+
+  /* ---------------- 载入 ---------------- */
+
+  /** 另一种语言的那一版 —— 同一 slug 下换个语言就是它 */
+  async function loadSibling() {
+    const slug = (field('slug')?.value ?? '').trim()
+    if (!slug) return
+    const other: Lang = currentLang === 'zh' ? 'en' : 'zh'
+    try {
+      const data = await api<{ document: DocumentRow | null }>(
+        '/api/admin/documents?slug=' + encodeURIComponent(slug) + '&locale=' + other,
+      )
+      if (data.document) fillDoc(other, data.document)
+      else clearDoc(other)
+      const pane = panes.find((item) => item.lang === other)
+      if (pane) void refreshPreview(pane)
+    } catch (error) {
+      const failure = error as { code?: string }
+      say(errorText(locale, failure.code ?? 'request_failed'), true)
+    }
+  }
 
   async function load() {
     if (docId === 'new') {
@@ -677,21 +702,45 @@ const isNew = docId === 'new'
     }
     try {
       const data = await api<{ document: DocumentRow }>('/api/admin/documents/' + docId)
-      fill(data.document)
+      const doc = data.document
+      currentLang = doc.locale === 'en' ? 'en' : 'zh'
+      fillShared(doc)
+      fillDoc(currentLang, doc)
       renderStatus()
-      void refreshPreview()
+      await loadSibling()
+      const pane = panes.find((item) => item.lang === currentLang)
+      if (pane) void refreshPreview(pane)
     } catch (error) {
-      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      const failure = error as { code?: string }
+      say(errorText(locale, failure.code ?? 'request_failed'), true)
     }
   }
+
+  // slug 改了 —— 另一语言的那一版要跟着换
+  field('slug')?.addEventListener('change', () => void loadSibling())
 
   // 没保存就离开 —— 别把改了一半的内容丢掉
   window.addEventListener('beforeunload', (event) => {
     if (!dirty) return
     event.preventDefault()
     event.returnValue = ''
-  })
+  });
 
-  renderTools()
+  /* ---------------- 起手 ---------------- */
+
+  for (const lang of LANGS) {
+    const tools = document.querySelector<HTMLElement>('[data-admin-tools="' + lang + '"]')
+    const body = document.querySelector<HTMLTextAreaElement>('[name="body-' + lang + '"]')
+    const preview = document.querySelector<HTMLElement>('[data-admin-preview="' + lang + '"]')
+    if (!tools || !body || !preview) continue
+    const pane: Pane = { lang, tools, body, preview, timer: 0, seq: 0 }
+    panes.push(pane)
+    renderTools(pane)
+    body.addEventListener('focus', () => {
+      activePane = pane
+    });
+  }
+  activePane = panes[0] ?? null
+
   void load()
 </script>

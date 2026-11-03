@@ -14,10 +14,10 @@ import { allText } from '../frontend/i18n/ui.ts'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
-test('站点配置：每条都有中英两种文案', () => {
+test('站点配置：每条都有中英两种文案（要么都填，要么都空）', () => {
   for (const [key, value] of Object.entries(siteConfig)) {
-    assert.ok(value.zh.trim(), `${key} 缺中文`)
-    assert.ok(value.en.trim(), `${key} 缺英文`)
+    // 空 = 站上不显示（作者可以在后台填）—— 但中英要么都填，要么都空
+    assert.equal(value.zh.trim() === '', value.en.trim() === '', `${key} 中英两栏不一致`)
   }
 })
 

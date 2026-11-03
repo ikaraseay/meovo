@@ -16,8 +16,10 @@ const year = new Date().getFullYear()
 /** 后台设的页脚卡片最小高度（px）—— 0 = 不限 */
 const minHeight = parseFooterMinHeight(t(locale, FOOTER_HEIGHT_KEY))
 /** 备案号 —— 默认值是占位（里面没有数字）；有数字才算真配过，链接也用它 */
-const icp = t(locale, 'site.icp')
+const icp = t(locale, 'footer.icp')
 const icpNumber = icp.match(/\d+/)?.[0] ?? ''
+/** 页脚附加内容 —— 后台可编辑，**按裸 HTML 渲染**；留空 = 不显示 */
+const custom = t(locale, 'footer.custom')
 ---
 
 <GlassWidget id="footer" width="auto" full locale={locale} minHeight={minHeight}>
@@ -32,6 +34,8 @@ const icpNumber = icp.match(/\d+/)?.[0] ?? ''
       )}
       <span class="footer-note ui-text--muted">{t(locale, 'footer.builtWith')}</span>
     </div>
+    {/* 附加内容按**裸 HTML** 渲染 —— 作者要写链接、图标就写标签 */}
+    {custom && <div class="footer-custom" set:html={custom}></div>}
   </div>
 </GlassWidget>
 
@@ -54,6 +58,13 @@ const icpNumber = icp.match(/\d+/)?.[0] ?? ''
     align-items: center;
     gap: var(--ui-space-md);
     flex-wrap: wrap;
+  }
+
+  .footer-custom {
+    flex-basis: 100%;
+    color: var(--ui-text-secondary);
+    /* 纯文本的换行留着；HTML 标签自己管排版 */
+    white-space: pre-line;
   }
 
   .footer-link {

@@ -181,11 +181,18 @@
 - **后台的「设置」分区能改全站默认文字** —— 站点信息（`site.*`）与语言包里的每一条词条都能改。
   - 数据在 D1 的 `settings` 表（`backend/db/migrations/0002_settings.sql`），
     **只存改过的**：与默认值一样的不落库，「恢复默认」= 删那一行
-  - **页脚高度也走这条管线** —— `site.footerMinHeight` 是**数值**（px，0 = 不限），
+  - **页脚高度也走这条管线** —— `footer.minHeight` 是**数值**（px，0 = 不限），
     但照样存成 zh/en 两份同值的文案设置：后台那个控件一次写两份，前台用
     `frontend/lib/footer-height.ts` 读成像素数（坏了的值一律当不限）
   - ⚠️ 数值设置**不进「界面文案」列表**（那里一个键有两列，会被拆成两份）——
     只有「站点信息」区里那一个控件能改它
+  - **后台有一张「页脚」卡** —— 页脚上显示的每一句都在那儿改：
+    备案号（`footer.icp`，含数字才渲染成链接）、版权行、构建说明、附加内容（`footer.custom`，可多行）。
+    这几条**不进「界面文案」列表**，也不在「站点信息」区里 —— 页脚的事一页说清
+  - **`footer.custom` 按裸 HTML 渲染**（`set:html`）—— 作者要写链接、图标就写标签。
+    跟正文一样不消毒：内容只来自后台那位作者
+  - ⚠️ `config/site.json` 的值**可以留空** —— 空 = 站上不显示（作者可以在后台填）。
+    但中英要么都填、要么都空；词典（`ui.ts`）里的每条仍必须非空
   - 构建期由 `backend/scripts/export-d1-posts.mjs` 写进 `frontend/i18n/overrides.ts`，
     `frontend/i18n/index.ts` 构建时把它叠在语言包上 —— **改文案要等下一次构建**
   - ⚠️ `frontend/i18n/overrides.ts` 是**生成的**，别手改；它入库是为了让 diff 里看得见改了什么
@@ -271,12 +278,13 @@
     后台是另一个应用，站点的导航在这儿只是噪音，还会压住页头
   - 文章的常用操作齐了：新建 / 编辑 / 发布 / 撤回（= 隐藏，不导出）/ 删除；
     编辑器里有状态条、最后保存时间、线上链接、删除按钮，离开前提醒未保存
-  - **页头有「立即构建」**（`POST /api/admin/build`，`AdminLayout.astro` 里接线）：
-    不用改内容也能敲一次 Deploy Hook —— 重试构建、或直接改过 D1 之后手动上线用。
-    发布 / 改稿 / 撤回 / 删除本来就会自动触发。
-  - **中英文对版**：正文卡右上角有「对版」开关 —— 左边是当前在写的那版，
-    右边并排显示**同 slug 的另一种语言版本**（只读，markdown 源码），底下给一个「去编辑那一版」的链接。
-    取另一版走 `GET /api/admin/documents?slug=&locale=`（不带参数还是原来的列表）
+  - **保存与构建是分开的两步** —— 保存只改 D1，**不触发构建**；
+    要上线点页头的「构建上线」（`POST /api/admin/build`，`AdminLayout.astro` 里接线）。
+    攒着改完一次构建就行，别每改一个字就构建一次。
+  - **中英文各摆一块编辑界面**（没有「切语言」这回事）：同一篇文章的两个语言版本
+    各占一张卡，各自带标题 / 摘要 / 正文 / 工具栏 / 预览；slug、日期、分类这些共用。
+    保存时两种语言一起存 —— 填了标题的那一版才存（只写中文很正常）。
+    另一版从 `GET /api/admin/documents?slug=&locale=` 取（同一 slug 换个语言就是它）
   - **编辑器有 markdown 工具栏 + 自动预览**：
     - 按钮表与纯文本改写函数都在 `frontend/lib/editor-tools.ts`（`EDITOR_TOOLS` +
       `wrapSelection` / `prefixLines` / `insertLink` / `insertTable`），组件只管读写 textarea。
@@ -328,11 +336,11 @@
   - `pnpm clean` —— 把本地的内容副本清掉（本地不留文章）
   - `pnpm check` / `pnpm test` / `pnpm dev` 前会自动补空壳（`--ensure`），
     所以新克隆的仓库不用先拉内容也能跑检查
-- **改内容即构建（Deploy Hook）**：Worker secret 里放 `DEPLOY_HOOK_URL`
+- **构建是手动的一步（Deploy Hook）**：Worker secret 里放 `DEPLOY_HOOK_URL`
   （Cloudflare Workers Builds 的 Deploy Hook，`Settings → Builds → Deploy Hooks` 建），
-  后台的发布 / 保存已发布文章 / 撤回 / 删除 / 改文案 / 改项目都会敲一下 → 构建 → 上线。
-  没配的话前台永远不更新 —— 这时只能去 Cloudflare 手动触发一次构建。
-  钩子 URL 本身就是一个凭证（谁拿到都能触发构建），只放 Worker secret。
+  后台页头的「构建上线」敲一下 → 构建 → 上线。
+  ⚠️ **保存不触发构建** —— 发布 / 改稿 / 撤回 / 删除 / 改文案 / 改项目都只改 D1，
+  要上线自己敲那一次钩子。钩子 URL 本身就是一个凭证（谁拿到都能触发构建），只放 Worker secret。
 - **项目**：关于页那张「项目」卡片 —— 名称 / 简介 / 地址，后台 `/<lang>/admin/projects` 可增删改
   - 表在 `backend/db/migrations/0004_projects.sql`；校验在 `backend/lib/admin/projects.ts`（纯函数）
   - **构建期导出**到 `frontend/data/projects.ts`（生成的文件，跟 overrides.ts 一个道理），

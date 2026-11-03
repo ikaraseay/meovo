@@ -23,6 +23,22 @@ test('每个按钮的词典 key 都在语言包里', () => {
   }
 })
 
+test('按钮不用 emoji —— emoji 跟正文排版打架', () => {
+  for (const tool of EDITOR_TOOLS) {
+    const text = (tool.label ?? '') + (tool.icon ?? '')
+    assert.ok(
+      !/\p{Extended_Pictographic}/u.test(text),
+      `按钮 ${tool.title} 用了 emoji`,
+    )
+  }
+})
+
+test('每个按钮都有名字或图标 —— 不能两者皆无', () => {
+  for (const tool of EDITOR_TOOLS) {
+    assert.ok(tool.label || tool.icon, `按钮 ${tool.title} 既没有字也没有图标`)
+  }
+})
+
 test('每个按钮都配齐了动作参数', () => {
   for (const tool of EDITOR_TOOLS) {
     const wrapped = tool.before !== undefined || tool.after !== undefined

@@ -3,7 +3,6 @@ export const prerender = false
 
 import type { APIRoute } from 'astro'
 import { fail, json, readJson } from '../../../../../backend/lib/admin/api.ts'
-import { triggerBuild } from '../../../../../backend/lib/admin/build-hook.ts'
 import { deleteProject, listProjects, updateProject } from '../../../../../backend/lib/admin/db.ts'
 import { normalizeProject } from '../../../../../backend/lib/admin/projects.ts'
 
@@ -25,12 +24,10 @@ export const PUT: APIRoute = async ({ params, request }) => {
     sort_order: values.sortOrder,
     created_at: current.created_at,
   })
-  const buildTriggered = await triggerBuild()
-  return json({ ok: true, buildTriggered })
+  return json({ ok: true })
 }
 
 export const DELETE: APIRoute = async ({ params }) => {
   await deleteProject(params.id ?? '')
-  const buildTriggered = await triggerBuild()
-  return json({ ok: true, buildTriggered })
+  return json({ ok: true })
 }

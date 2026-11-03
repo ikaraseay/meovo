@@ -19,7 +19,6 @@ import {
   type DefaultEntry,
 } from '../../../../../backend/lib/admin/settings.ts'
 import { fail, json, readJson } from '../../../../../backend/lib/admin/api.ts'
-import { triggerBuild } from '../../../../../backend/lib/admin/build-hook.ts'
 
 /** 语言包 → 默认条目表 */
 function defaultEntries(): Map<string, DefaultEntry> {
@@ -76,6 +75,5 @@ export const PUT: APIRoute = async ({ request }) => {
 
   // 文案改了 → 站点要重建才生效（恢复默认也算改动）
   const changed = saved + removed
-  const buildTriggered = changed > 0 ? await triggerBuild() : false
-  return json({ ok: true, saved: changed, buildTriggered })
+  return json({ ok: true, saved: changed })
 }

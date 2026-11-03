@@ -5,7 +5,14 @@
    所以 t() 是纯函数，没有响应式那一套。
    ========================================================= */
 
-import { allText, defaultLocale, locales, type Locale, type Translations } from './ui.ts'
+import {
+  allText,
+  defaultLocale,
+  locales,
+  type Locale,
+  type TranslationItem,
+  type Translations,
+} from './ui.ts'
 import { overrides } from './overrides.ts'
 
 export { locales, defaultLocale }
@@ -48,26 +55,39 @@ function interpolate(text: string, params?: TranslationParams): string {
 }
 
 /**
+ * 一条词条在这个界面语言下该显示什么。
+ *
+ * - null —— 没有这条词条（界面会显示成 key 本身）
+ * - ''  —— 有这条词条，但两种语言都是空的（**有意留空** = 不显示）
+ *
+ * 「留空」与「缺词条」是两回事：前者是作者的选择，后者是漏了。
+ */
+export function pickTranslation(
+  entry: TranslationItem | undefined,
+  locale: Locale,
+): string | null {
+  if (!entry) return null
+  return entry[locale] || entry[defaultLocale] || ''
+}
+
+/**
  * 取一条文案。
  *
  * - 找不到 key → **原样返回 key**（界面上会出现一串键名，这是有意为之：
  *   看得见的缺失比悄悄的空串好定位）
+ * - 有意留空（两种语言都空）→ 返回空串，**不显示**
  * - 当前语言缺文案 → 回落到默认语言（中文）
  */
 export function t(locale: Locale, key: string, params?: TranslationParams): string {
-  const entry = dictionary[key]
+  const raw = pickTranslation(dictionary[key], locale)
 
-  if (!entry) {
+  if (raw === null) {
     console.warn(`[i18n] 缺少翻译条目：${key}`)
     return key
   }
 
-  const raw = entry[locale] || entry[defaultLocale]
-
-  if (!raw) {
-    console.warn(`[i18n] 条目两种语言都为空：${key}`)
-    return key
-  }
+  // 有意留空 —— 显示成空，而不是一串键名
+  if (raw === '') return ''
 
   return interpolate(raw, params)
 }

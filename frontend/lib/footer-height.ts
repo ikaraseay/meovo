@@ -8,7 +8,7 @@
  */
 
 /** 设置键 —— 与 config/site.json 里的默认条目同名 */
-export const FOOTER_HEIGHT_KEY = 'site.footerMinHeight'
+export const FOOTER_HEIGHT_KEY = 'footer.minHeight'
 
 /** 上限：比这更高的页脚没意义（视口也就这么高） */
 export const MAX_FOOTER_HEIGHT = 2000

@@ -82,11 +82,11 @@ def check_dictionary() -> list[str]:
             # 显式 en: '' 表示有意留空，但本项目每条都要有英文
             failures.append(f"词条 {key} 的 en 是空的")
 
+    # config/site.json 里的值**允许留空** —— 那是「默认文字」，空 = 站上不显示
+    # （比如可清空的页脚附加内容）。但中英要么都填，要么都空。
     for key, zh, en in site_config_entries():
-        if not zh.strip():
-            failures.append(f"config/site.json 里的 {key} 的 zh 是空的")
-        if not en.strip():
-            failures.append(f"config/site.json 里的 {key} 的 en 是空的")
+        if bool(zh.strip()) != bool(en.strip()):
+            failures.append(f"config/site.json 里的 {key} 中英两栏不一致")
 
     return failures
 

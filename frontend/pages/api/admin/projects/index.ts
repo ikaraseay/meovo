@@ -3,7 +3,6 @@ export const prerender = false
 
 import type { APIRoute } from 'astro'
 import { json, readJson } from '../../../../../backend/lib/admin/api.ts'
-import { triggerBuild } from '../../../../../backend/lib/admin/build-hook.ts'
 import { createProject, listProjects } from '../../../../../backend/lib/admin/db.ts'
 import { normalizeProject } from '../../../../../backend/lib/admin/projects.ts'
 
@@ -28,6 +27,5 @@ export const POST: APIRoute = async ({ request }) => {
     sort_order: values.sortOrder,
     created_at: new Date().toISOString(),
   })
-  const buildTriggered = await triggerBuild()
-  return json({ ok: true, id, buildTriggered })
+  return json({ ok: true, id })
 }

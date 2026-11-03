@@ -259,6 +259,13 @@
 
 /* ---------------- 卡片 ---------------- */
 
+/* 表单 —— 卡片之间留出间距，不然几张卡粘在一起 */
+.admin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-lg);
+}
+
 .admin-card {
   display: flex;
   flex-direction: column;
@@ -485,16 +492,6 @@
   flex-wrap: wrap;
 }
 
-/* 对版打开时：正文与另一语言并排，预览整行挪到下面 */
-.admin-editor--parallel [data-admin-preview-pane] {
-  grid-column: 1 / -1;
-}
-
-/* 对版那一栏是只读的 —— 底色压暗一点，看得出不是当前在写的那版 */
-.admin-editor__body--readonly {
-  background: var(--ui-surface-sunken);
-}
-
 .admin-editor__pane {
   display: flex;
   flex-direction: column;
@@ -518,6 +515,9 @@
 }
 
 .admin-editor__tools .ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 2.25rem;
   padding-inline: var(--ui-space-sm);
   font-family: var(--ui-font-mono, ui-monospace, monospace);

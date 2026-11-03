@@ -26,6 +26,13 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     <div class="admin-settings__info" data-admin-info></div>
   </section>
 
+  <!-- 页脚：页脚上显示的每一句都在这儿改 -->
+  <section class="admin-card">
+    <h2 class="admin-card__title">{t(locale, 'admin.settings.footer')}</h2>
+    <p class="admin-card__hint">{t(locale, 'admin.settings.footerHint')}</p>
+    <div class="admin-settings__info" data-admin-footer-box></div>
+  </section>
+
   <!-- 界面文案：全量词条，可搜索、可按模块筛 -->
   <section class="admin-card">
     <div class="admin-settings__bar">
@@ -76,9 +83,23 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   const moduleSelect = document.querySelector('[data-admin-module]') as HTMLSelectElement | null
   const footer = document.querySelector<HTMLElement>('[data-admin-footer]')
   const countLabel = document.querySelector<HTMLElement>('[data-admin-count]')
+  const footerBox = document.querySelector<HTMLElement>('[data-admin-footer-box]')
+
+  /** 页脚那张卡里的条目 —— 都有自己的控件，不进「界面文案」列表 */
+  const FOOTER_TEXT_KEYS = [
+    { key: 'footer.icp', placeholder: 'admin.settings.icpHint' },
+    { key: 'footer.copyright' },
+    { key: 'footer.builtWith' },
+    { key: 'footer.custom', multiline: true },
+  ]
 
   /** 站点信息：这几条最常改，单独摆出来 */
   const INFO_KEYS = ['site.name', 'site.author', 'site.tagline', 'site.email']
+
+  /** 页脚那几条有自己的卡 —— 不进「界面文案」列表，也不进模块下拉 */
+  function isFooterKey(key: string): boolean {
+    return key === FOOTER_HEIGHT_KEY || FOOTER_TEXT_KEYS.some((item) => item.key === key)
+  }
 
   let entries: Entry[] = []
   /** 用户动过的条目：key → 想要的值（等于默认值时保存即删除那行） */
@@ -129,15 +150,24 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     value: string,
     onInput: (next: string) => void,
     placeholder?: string,
+    multiline = false,
   ): HTMLElement {
     const wrap = document.createElement('label')
     wrap.className = 'admin-settings__field'
     const caption = document.createElement('span')
     caption.className = 'admin-settings__label'
     caption.textContent = label
-    const input = document.createElement('input')
+    let input: HTMLInputElement | HTMLTextAreaElement
+    if (multiline) {
+      const area = document.createElement('textarea')
+      area.rows = 3
+      input = area
+    } else {
+      const box = document.createElement('input')
+      box.type = 'text'
+      input = box
+    }
     input.className = 'ui-input'
-    input.type = 'text'
     input.value = value
     if (placeholder) input.placeholder = placeholder
     input.addEventListener('input', () => onInput(input.value))
@@ -175,12 +205,59 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       )
       infoBox.appendChild(row)
     }
-    renderFooterHeight()
+  }
+
+  /** 恢复默认 —— 送回默认值，保存时后端删掉那一行 */
+  function resetButton(entry: Entry): HTMLElement {
+    const reset = document.createElement('button')
+    reset.className = 'ui-btn admin-settings__reset'
+    reset.type = 'button'
+    reset.textContent = t(locale, 'admin.settings.reset')
+    reset.addEventListener('click', () => {
+      markDirty(entry, entry.defaultZh, entry.defaultEn)
+      renderInfo()
+      renderFooterBox()
+      renderList()
+    })
+    return reset
+  }
+
+  /** 页脚那张卡 —— 页脚上显示的每一句都在这儿改 */
+  function renderFooterBox() {
+    if (!footerBox) return
+    footerBox.textContent = ''
+    for (const item of FOOTER_TEXT_KEYS) {
+      const entry = entries.find((row) => row.key === item.key)
+      if (!entry) continue
+      const values = current(entry)
+      const row = document.createElement('div')
+      row.className = 'admin-settings__info-row'
+      const keyLabel = document.createElement('span')
+      keyLabel.className = 'admin-settings__key'
+      keyLabel.textContent = item.key
+      row.appendChild(keyLabel)
+      const placeholder = item.placeholder ? t(locale, item.placeholder) : undefined
+      row.appendChild(
+        field(t(locale, 'admin.settings.hintZh'), values.zh, (next) => {
+          markDirty(entry, next, current(entry).en)
+          renderList()
+        }, placeholder, item.multiline),
+      )
+      row.appendChild(
+        field(t(locale, 'admin.settings.hintEn'), values.en, (next) => {
+          markDirty(entry, current(entry).zh, next)
+          renderList()
+        }, placeholder, item.multiline),
+      )
+      row.appendChild(resetButton(entry))
+      footerBox.appendChild(row)
+    }
+    renderFooterHeight(footerBox)
   }
 
   /** 页脚卡片最小高度 —— 数值设置：两份语言写同一个数，只有这一个控件能改它 */
-  function renderFooterHeight() {
-    if (!infoBox) return
+  function renderFooterHeight(box: HTMLElement | null) {
+    if (!box) return
     const entry = entries.find((item) => item.key === FOOTER_HEIGHT_KEY)
     if (!entry) return
 
@@ -217,18 +294,9 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     wrap.appendChild(hint)
     row.appendChild(wrap)
 
-    const reset = document.createElement('button')
-    reset.className = 'ui-btn admin-settings__reset'
-    reset.type = 'button'
-    reset.textContent = t(locale, 'admin.settings.reset')
-    reset.addEventListener('click', () => {
-      markDirty(entry, entry.defaultZh, entry.defaultEn)
-      renderInfo()
-      renderList()
-    })
-    row.appendChild(reset)
+    row.appendChild(resetButton(entry))
 
-    infoBox.appendChild(row)
+    box.appendChild(row)
   }
 
   function renderList() {
@@ -238,8 +306,8 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     listBox.textContent = ''
 
     const visible = entries.filter((entry) => {
-      // 数值设置有自己的控件 —— 进了文案列表就会被拆成中英两份
-      if (entry.key === FOOTER_HEIGHT_KEY) return false
+      // 页脚那几条有自己的卡 —— 进了文案列表就多出一个入口
+      if (isFooterKey(entry.key)) return false
       if (moduleName && moduleOf(entry.key) !== moduleName) return false
       if (!term) return true
       const values = current(entry)
@@ -283,17 +351,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
         }),
       )
 
-      const reset = document.createElement('button')
-      reset.className = 'ui-btn admin-settings__reset'
-      reset.type = 'button'
-      reset.textContent = t(locale, 'admin.settings.reset')
-      reset.addEventListener('click', () => {
-        // 恢复默认 = 把默认值送上去，保存时后端删掉那一行
-        markDirty(entry, entry.defaultZh, entry.defaultEn)
-        renderInfo()
-        renderList()
-      })
-      row.appendChild(reset)
+      row.appendChild(resetButton(entry))
 
       const changed = changedFor(entry)
       if (changed) {
@@ -315,7 +373,9 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
 
   function renderModules() {
     if (!moduleSelect) return
-    const modules = [...new Set(entries.map((entry) => moduleOf(entry.key)))].sort()
+    const modules = [
+      ...new Set(entries.filter((e) => !isFooterKey(e.key)).map((e) => moduleOf(e.key))),
+    ].sort()
     moduleSelect.textContent = ''
     const all = document.createElement('option')
     all.value = ''
@@ -333,7 +393,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     if (touched.size === 0) return
     const payload = [...touched.entries()].map(([key, value]) => ({ key, ...value }))
     try {
-      const result = await api<{ saved?: number; buildTriggered?: boolean }>(
+      await api<{ saved?: number }>(
         '/api/admin/settings',
         {
           method: 'PUT',
@@ -342,16 +402,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       )
       touched.clear()
       updateFooter()
-      say(
-        t(
-          locale,
-          result.buildTriggered
-            ? 'admin.hint.savedBuilding'
-            : (result.saved ?? 0) > 0
-              ? 'admin.hint.savedNoBuild'
-              : 'admin.hint.saved',
-        ),
-      )
+      say(t(locale, 'admin.hint.saved'))
       await load()
     } catch (error) {
       say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
@@ -364,6 +415,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       entries = data.entries
       renderModules()
       renderInfo()
+      renderFooterBox()
       renderList()
       updateFooter()
     } catch (error) {
@@ -381,6 +433,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     }
     updateFooter()
     renderInfo()
+    renderFooterBox()
     renderList()
   })
 
