@@ -17,6 +17,9 @@ export async function getStaticPaths() {
 }
 
 export const GET: APIRoute = ({ props }) =>
-  new Response((props as { body: string }).body, {
+  // 开头那个 BOM 是给静态托管看的：.md 文件多半没有 charset 头，
+  // 浏览器会按本地编码猜（中文系统就按 GBK 猜）—— 满屏乱码。
+  // BOM 让它一眼认出 UTF-8；带 charset 头的那条路（开发环境的按需响应）也留着。
+  new Response('\uFEFF' + (props as { body: string }).body, {
     headers: { 'content-type': 'text/markdown; charset=utf-8' },
   })
