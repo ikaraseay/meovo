@@ -11,6 +11,7 @@
 
 @import './tokens.css';
 @import './themes/liquid-glass.css';
+@import './motion.css';
 @import './prose.css';
 @import './terminal.css';
 @import './admin.css';
@@ -32,16 +33,17 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   tab-size: 4;
+  /* 全站相对字号 —— 相对浏览器的默认字号（100%），不是绝对 px。
+     用户在设置里调大一档，这里就整体放大一档。 */
+  font-size: calc(100% * var(--ui-root-scale, 1));
   /* 底色画在 html 上，body 透明 —— 固定层的 .ui-background（z-index:-1）
      才能透出来，又不被 body 的不透明背景挡住。 */
   background: var(--ui-bg);
 }
 
-/* 锚点平滑滚动只在用户没有要求「减少动态效果」时开 */
-@media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
+/* 锚点平滑滚动 —— 归零判定统一在 styles/motion.css，这里不再判一次 */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -153,12 +155,6 @@ button {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ui-aurora__blob {
-    animation: none;
-  }
-}
-
 /* =========================================================
    桌面加载 —— JS 布局完成前先藏起桌面，摆好后淡入
    ---------------------------------------------------------
@@ -167,13 +163,15 @@ button {
    无 JS（没有 .js）时桌面照常显示，不丢内容。
    布局期间 .is-laying-out 关掉部件自身的过渡，避免倾斜动画「抖动」。
    ========================================================= */
-html.js [data-desk] {
+/* 桌面卡片：JS 摆好位置前先藏起来（正文在文档流里，不用藏） */
+html.js [data-desk] .ui-widget {
   opacity: 0;
 }
 
-html.js [data-desk].desk--ready {
-  opacity: 1;
-  transition: opacity 500ms var(--ui-ease-out);
+/* 摆好后逐张进场 —— 索引由 draggable.ts 写进 --ui-stagger-index */
+html.js [data-desk].desk--ready .ui-widget {
+  animation: ui-fade-in var(--ui-motion-enter) both;
+  animation-delay: calc(var(--ui-motion-stagger) * var(--ui-stagger-index, 0));
 }
 
 .desk.is-laying-out .ui-widget {
@@ -236,12 +234,6 @@ html.js:not(.page-ready) .page-loader {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .page-loader__ring {
-    animation-duration: 2s;
-  }
-}
-
 /* =========================================================
    排版基线
    ========================================================= */
@@ -275,8 +267,8 @@ a:hover {
 }
 
 :focus-visible {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
+  outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color);
+  outline-offset: var(--ui-focus-ring-offset);
   border-radius: var(--ui-radius-sm);
 }
 
@@ -321,6 +313,51 @@ a:hover {
 /* =========================================================
    正文列 —— 排版细节在 styles/prose.css
    ========================================================= */
+
+/* =========================================================
+   无障碍开关 —— 用户在设置里选的
+   ---------------------------------------------------------
+   每一项都是 <html> 上的 class（契约见 lib/dom-contract.ts），
+   首屏脚本在渲染前挂上，不会闪。
+   ========================================================= */
+
+/* 强化焦点环 —— 键盘导航要一眼看得见焦点在哪 */
+html.focus-strong {
+  --ui-focus-ring-width: 3px;
+  --ui-focus-ring-offset: 3px;
+}
+
+/* 始终显示链接下划线 —— 链接不能只靠颜色区分。
+   按钮类原语除外（.ui-btn / .ui-choice 本来就是「按钮」不是「链接」）。 */
+html.links-always a:not(.ui-btn):not(.ui-choice) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* 更大的点击目标 —— 抬到 44px（常见的触达尺寸下限） */
+html.targets-large {
+  --ui-target-min-size: 44px;
+}
+
+/* =========================================================
+   装饰性渐变边框
+   ---------------------------------------------------------
+   描边走渐变而不是纯色。两层背景：内层铺底色（裁到 padding-box），
+   外层铺渐变（裁到 border-box）—— 露出来的那一圈就是渐变描边。
+
+   ⚠️ 这套只给**不透明底**的元素用：内层要是半透明的，渐变会从底下透上来，
+   整张卡都被染花（玻璃卡就是半透明的 —— 别往上套）。
+   ⚠️ 放在这一层而不是 tokens.css：终端卡（.term）自带 background 简写，
+   要靠后写的这条把背景图抢回来。
+   ========================================================= */
+.ui-gradient-border {
+  border: 1px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-image:
+    linear-gradient(var(--ui-gradient-border-base, var(--ui-card-bg)), var(--ui-gradient-border-base, var(--ui-card-bg))),
+    var(--ui-gradient-border);
+}
 
 /* =========================================================
    工具类

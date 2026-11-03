@@ -342,17 +342,27 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
   }
 
+  /** 移动端排布：卡片退回文档流，桌面留下的内联几何全部清掉 */
+  function layoutMobile() {
+    for (const entry of entries) placeFlow(entry)
+    if (contentEl) {
+      contentEl.style.marginTop = ''
+      contentEl.style.marginRight = ''
+      contentEl.style.width = ''
+    }
+    desk.style.minHeight = ''
+  }
+
   function apply() {
     if (!mq.matches) {
-      for (const entry of entries) placeFlow(entry)
-      if (contentEl) {
-        contentEl.style.marginTop = ''
-        contentEl.style.width = ''
-      }
-      desk.style.minHeight = ''
+      layoutMobile()
       return
     }
 
+    // 量之前先退回文档流 —— 量到的必须是自然宽度（CSS 给的那一档），
+    // 不能是上一趟布局写进 inline width 的值：那个值一旦量错就自我固化，
+    // 「窄屏 → 宽屏」之后再也回不来
+    for (const entry of entries) placeFlow(entry)
     measure()
     syncPinnedState()
     fitContentWidth()
@@ -518,36 +528,40 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   entries.forEach(wireRestore)
   void desk.offsetHeight
   desk.classList.remove(CLASS.layingOut)
+  // 错峰进场 —— 索引写进 --ui-stagger-index，样式层按它推迟动画
+  entries.forEach((entry, i) => entry.el.style.setProperty('--ui-stagger-index', String(i)))
   desk.classList.add(CLASS.deskReady)
 
+  /**
+   * 视口变了就重排 —— 判定挪到防抖之后。
+   * 事件到达那一刻 window.innerWidth 可能还是旧的（iOS Safari 旋转屏幕就这样），
+   * 那时若按「还是窄屏」直接返回，就再没人重排了 —— 页面卡在窄屏布局里出不来。
+   */
+  let relayoutTimer = 0
+  function scheduleRelayout() {
+    window.clearTimeout(relayoutTimer)
+    relayoutTimer = window.setTimeout(() => {
+      desk.classList.add(CLASS.layingOut)
+      apply()
+      void desk.offsetHeight
+      desk.classList.remove(CLASS.layingOut)
+    }, 150)
+  }
+
   const mqListener = (e: MediaQueryListEvent) => {
-    if (e.matches) apply()
-    else {
-      for (const entry of entries) placeFlow(entry)
-      if (contentEl) {
-        contentEl.style.marginTop = ''
-        contentEl.style.marginRight = ''
-        contentEl.style.width = ''
-      }
-      desk.style.minHeight = ''
+    if (e.matches) {
+      // 变宽：等浏览器把新视口尺寸算进去再排
+      scheduleRelayout()
+    } else {
+      // 变窄：立刻退回文档流 —— 桌面布局在窄屏里会溢出屏幕
+      layoutMobile()
     }
   }
   if (typeof mq.addEventListener === 'function') mq.addEventListener('change', mqListener)
   else mq.addListener(mqListener)
 
   // 窗口尺寸变了：百分比存档按新宽高等比还原（防抖 + 布局期间关过渡）
-  let resizeTimer = 0
-  window.addEventListener('resize', () => {
-    if (!mq.matches) return
-    window.clearTimeout(resizeTimer)
-    resizeTimer = window.setTimeout(() => {
-      if (!mq.matches) return
-      desk.classList.add(CLASS.layingOut)
-      apply()
-      void desk.offsetHeight
-      desk.classList.remove(CLASS.layingOut)
-    }, 150)
-  })
+  window.addEventListener('resize', () => scheduleRelayout())
 
   return { reset }
 }

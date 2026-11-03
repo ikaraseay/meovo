@@ -11,6 +11,8 @@
   overflow: hidden;
   font-family: var(--ui-font-mono);
   color: var(--ui-term-fg);
+  /* 渐变描边那套的内层底色 —— 终端是不透明的，正好能用 */
+  --ui-gradient-border-base: var(--ui-term-bg);
 }
 
 /* 标题栏：三个点 + 路径 */
@@ -122,10 +124,9 @@
   background: var(--ui-term-accent);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .term__cursor {
-    animation: term-cursor 1.2s steps(1) infinite;
-  }
+/* 光标闪烁 —— 归零判定在 styles/motion.css（系统减弱 / 用户减弱都停） */
+.term__cursor {
+  animation: term-cursor 1.2s steps(1) infinite;
 }
 
 @keyframes term-cursor {

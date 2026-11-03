@@ -28,6 +28,7 @@
   - `frontend/styles/tokens.css` —— 结构刻度（间距/圆角/动效）与共享原语类
   - `frontend/styles/themes/liquid-glass.css` —— 语义色层，浅色 + 深色两套
   - `frontend/styles/prose.css` —— 正文排版 / 代码块 / 目录样式（由 `global.css` 引入）
+  - `frontend/styles/motion.css` —— 动效原语与归零（由 `global.css` 引入）
   - 组件的 scoped 样式里**不要**再写 `background` / `border-radius` / `box-shadow`，会盖掉主题
   - **部件 tint**：组件（`GlassWidget.astro`）只内联**色相** `--ui-widget-hue`，
     浅色 / 深色两套配方在 `tokens.css` 的 `.ui-widget` 规则里（深色那组写在
@@ -63,6 +64,16 @@
     也不做宽高过渡 —— 尺寸逐帧变化的话每帧都要重建一张位移图
     （缓存一帧一条，全是元素从未有过的尺寸）
   - 改 `--ui-nav-blur` 的 blur 会连折射一起抹平（blur 作用在位移之后）
+- **动效系统**：三层，一处主人 —— 刻度（`tokens.css` 的 `--ui-motion-*`）、
+  原语（`frontend/styles/motion.css` 的 `.ui-anim-fade-up` / `.ui-anim-fade-in` /
+  `.ui-anim-pop` / `.ui-anim-stagger`）、归零（系统 `prefers-reduced-motion` +
+  用户显式选的「减弱」两套 `!important` 重置）。页面只编排原语，**别再各写各的 `@keyframes`**。
+  - **「完整」能顶掉系统那一条**，但顶不掉用户自己选的「减弱」—— 用户说的比系统设置更算数
+  - 原语用 `translate` / `scale` **独立属性**，别用 `transform` —— 会被卡片的倾斜占掉，两者打架
+  - 桌面卡片入场是**逐张错峰淡入**（`--ui-stagger-index` 由 `draggable.ts` 写），
+    容器不再整体淡入
+- **装饰性渐变边框**：`.ui-gradient-border` 原语 —— 两层背景 + `background-clip`。
+  **只用在不透明底的元素上**（终端卡）：玻璃卡表面半透明，渐变会从底下透上来把整张卡染花
 - **代码高亮**：Shiki 双主题（`markdown.shikiConfig.themes` + `defaultColor: false`），
   产物里只有 `--shiki-light` / `--shiki-dark` 变量，**Astro 自己不生成切换 CSS** ——
   明暗切换写在 `prose.css` 的 `html.dark` 规则里
@@ -98,9 +109,20 @@
   - 终端的色是**独立一套 token**（`--ui-term-*`）—— **浅色档是纸色、深色档是墨色**，
     两套都写在主题文件里（浅色块 / `.dark` 块）；别把它塞进 `--ui-card-*`（那是玻璃卡的表面）
   - 首页**没有「关于我」卡**了 —— 头像与名字都并进终端面板里（原来那张 profile 卡跟它打架）
-- **正文偏好**：字号 / 行距存在 localStorage，**key 的唯一主人在 `frontend/lib/preferences.ts`**
-  （`PREFS_KEYS`）。`BaseLayout.astro` 的首屏内联脚本不能 import 模块，
-  用 `define:vars` 把 key 注入进去 —— 别在别处再写死一份 key 名（改了会首屏静默回退）
+- **用户偏好（相对字号 / 行距 / 对比度 / 动效 / 无障碍）**：存在 localStorage，
+  **key 的唯一主人在 `frontend/lib/preferences.ts`**（`PREFS_KEYS`），
+  **class 名的唯一主人在 `PREF_CLASSES`**（值取自 `dom-contract.ts` 的 `CLASS`）。
+  `BaseLayout.astro` 的首屏内联脚本不能 import 模块，用 `define:vars` 把两张表注入进去 ——
+  别在别处再写死一份 key 或 class 名（改了会首屏静默回退）。
+  完整设计见 `docs/adr/0004-preference-motion-contrast-system.md`。
+  - **相对字号改根字号** —— `html { font-size: calc(100% * var(--ui-root-scale, 1)) }`，
+    全站一起缩；`--ui-space-*` 全部 rem，跟着根字号走。行距单独一档（`--ui-prose-lh`），
+    不跟字号绑。老的 `prose-scale` key 只作读侧兜底（迁到 `root-scale`），不主动写回
+  - **对比度两档** —— 标准档本身必须过 WCAG AA 4.5:1，高对比档在此之上再抬次要文字 /
+    描边 / 表面不透明度。取值由 `test/contrast.test.ts` 守着 —— 改主题色会有人喊
+  - **无障碍三开关** —— 强化焦点环（`--ui-focus-ring-width` / `-offset`）、
+    始终显示链接下划线、更大的点击目标（`--ui-target-min-size` 下限 44px）。
+    全部是 `<html>` 上的 class，首屏前挂上，不闪
 - **404 页**是 `frontend/pages/404.astro` —— 一台终端（`cat /404` → No such file +
   字符画猫 + `ls /`），中英文都摆出来（404 没有语言上下文）
 - **SEO**：canonical / hreflang / OG / Twitter / JSON-LD 都在 `BaseLayout.astro` 里统一输出；
@@ -129,6 +151,11 @@
   - **还原只夹取不重置** —— 视口变了按新尺寸夹回可见范围，别改成默认值
 - **玻璃桌面（卡片画布）**：`frontend/lib/draggable.ts` 驱动 `frontend/lib/desk-layout.ts` 的布局数学
   （散开 / 内容锚定 / 流动三种模式）。
+  - **视口变了要等尺寸落定再重排** —— MQ 的 `change` 事件可能早于视口尺寸更新
+    （真实窗口缩放就是这样），照那一刻的旧尺寸排，卡片会卡在窄屏布局里出不来。
+    `draggable.ts` 的 `scheduleRelayout()` 把判定挪到 150ms 之后；
+    并且**量宽度之前先把卡片退回文档流** —— 量到的必须是自然宽度，
+    不能是上一趟布局写进 inline width 的值（那个值一旦量错就自我固化）
   - **默认落位是基线** —— 散开布局按**全量**卡片排（固定卡也占槽位）：
     固定一张、拖走一张，都不挪动别人的落位与倾斜
   - **卡片不许出屏幕** —— 边缘与屏幕边缘至少留 **1vw / 1vh**：
@@ -138,9 +165,10 @@
   - **正文列是宽度的唯一基准** —— 内容锚定布局里，正文列（`[data-desk-content]`）里的卡片
     （顶部标题卡 / 底部协议卡 / 上下篇）一律取**正文列的宽度**，右缘才跟正文对齐。
     卡片自己的宽度档位（`--sm` / `--lg` / `--xl`）只管没进正文列的时候
-  - **侧栏卡片放不下就掉到正文下面** —— 760px 正文列 + 300px 侧栏要 1424px 才排得下。
+  - **侧栏卡片放不下就并到标题卡下面** —— 760px 正文列 + 300px 侧栏要 1424px 才排得下。
     窄桌面由 `fittedContentWidth` 收窄正文列给侧栏让位（保底 480px），
-    收到保底还放不下，侧栏就排到正文后面 —— **压在正文上比排到下面更糟**
+    收到保底还放不下，侧栏卡片就并进顶部堆 —— **排在标题卡下面**，
+    别掉到正文末尾（那儿是协议卡 / 上下篇的位置，目录与思维导图掉最后反而难找）
   - **默认固定位置贴着正文列的右缘** —— 不是视口右上角：右上角在窄桌面会正好压在正文上。
     判定「放得下」用**桌面的右缘**（与布局那侧同一把尺），固定 / 取消固定结果一致
 - **部署**：Cloudflare **Workers**（适配器 v14 已移除 Pages 支持）。构建 `pnpm build` → `dist/client`（静态资源）+ `dist/server`（Worker）；Node 钉在 `.node-version`，

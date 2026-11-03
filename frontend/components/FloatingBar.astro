@@ -229,82 +229,147 @@ const navItems: NavItem[] = [
     <span class="fab-text">{t(locale, 'settings.title')}</span>
 </button>
 
-<!-- 设置弹窗：语言 + 明暗模式 -->
-<div class="settings-popup ui-nav-surface" data-settings hidden>
+<!-- 设置弹窗：语言 / 主题 / 字号 / 对比度 / 无障碍 -->
+<div class="settings-popup ui-nav-surface ui-anim-pop" data-settings hidden>
   <div class="popup-header" data-popup-drag>
     <div class="popup-drag-handle"></div>
   </div>
 
   <p class="popup-title">{t(locale, 'settings.title')}</p>
 
-  <div class="settings-section">
-    <p class="section-label">{t(locale, 'lang.label')}</p>
-    <div class="options-grid">
-      {
-        locales.map((code) => (
-          <a
-            class:list={['ui-choice', 'option-lang', { 'is-active': code === locale }]}
-            href={getRelativeLocaleUrl(code, currentPath)}
-            hreflang={code}
-            lang={code}
-            aria-current={code === locale ? 'true' : undefined}
-          >
-            <span class="option-flag" aria-hidden="true">
-              {code === 'zh' ? '🇨🇳' : '🇺🇸'}
-            </span>
-            <span class="option-text">{localeLabel(code, locale)}</span>
-          </a>
-        ))}
-      <!-- 跟随系统 = 回根路径，由 Worker 按 Accept-Language 挑语言 -->
-      <a class="ui-choice option-lang" href="/" data-lang-system>
-        <span class="option-flag" aria-hidden="true">🌐</span>
-        <span class="option-text">{t(locale, 'lang.system')}</span>
-      </a>
+  <div class="settings-grid">
+    <div class="settings-section settings-section--wide">
+      <p class="section-label">{t(locale, 'lang.label')}</p>
+      <div class="options-grid">
+        {
+          locales.map((code) => (
+            <a
+              class:list={['ui-choice', 'option-lang', { 'is-active': code === locale }]}
+              href={getRelativeLocaleUrl(code, currentPath)}
+              hreflang={code}
+              lang={code}
+              aria-current={code === locale ? 'true' : undefined}
+            >
+              <span class="option-text">{localeLabel(code, locale)}</span>
+            </a>
+          ))
+        }
+        <!-- 跟随系统 = 回根路径，由 Worker 按 Accept-Language 挑语言 -->
+        <a class="ui-choice option-lang" href="/" data-lang-system>
+          <span class="option-text">{t(locale, 'lang.system')}</span>
+        </a>
+      </div>
     </div>
-  </div>
 
-  <div class="settings-section">
-    <p class="section-label">{t(locale, 'theme.label')}</p>
-    <div class="options-grid">
-      <button type="button" class="ui-choice option-theme" data-theme-mode="light">
-        <span>{t(locale, 'theme.light')}</span>
-      </button>
-      <button type="button" class="ui-choice option-theme" data-theme-mode="dark">
-        <span>{t(locale, 'theme.dark')}</span>
-      </button>
-      <button type="button" class="ui-choice option-theme" data-theme-mode="system">
-        <span>{t(locale, 'theme.system')}</span>
-      </button>
+    <div class="settings-section settings-section--wide">
+      <p class="section-label">{t(locale, 'theme.label')}</p>
+      <div class="options-grid">
+        <button type="button" class="ui-choice option-theme" data-theme-mode="light">
+          <span>{t(locale, 'theme.light')}</span>
+        </button>
+        <button type="button" class="ui-choice option-theme" data-theme-mode="dark">
+          <span>{t(locale, 'theme.dark')}</span>
+        </button>
+        <button type="button" class="ui-choice option-theme" data-theme-mode="system">
+          <span>{t(locale, 'theme.system')}</span>
+        </button>
+      </div>
     </div>
-  </div>
 
-  <div class="settings-section">
-    <p class="section-label">{t(locale, 'settings.fontSize')}</p>
-    <div class="options-grid options-grid--tight">
-      <button type="button" class="ui-choice option-step" data-prose-scale="0.9">
-        {t(locale, 'settings.sizeSmall')}
-      </button>
-      <button type="button" class="ui-choice option-step" data-prose-scale="1">
-        {t(locale, 'settings.sizeMedium')}
-      </button>
-      <button type="button" class="ui-choice option-step" data-prose-scale="1.12">
-        {t(locale, 'settings.sizeLarge')}
-      </button>
+    <!-- 相对字号：全站一起缩（根字号），不是只缩正文 -->
+    <div class="settings-section">
+      <p class="section-label">{t(locale, 'settings.relativeSize')}</p>
+      <div class="options-grid options-grid--tight">
+        <button type="button" class="ui-choice option-step" data-root-scale="0.9">
+          {t(locale, 'settings.sizeSmall')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-root-scale="1">
+          {t(locale, 'settings.sizeMedium')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-root-scale="1.12">
+          {t(locale, 'settings.sizeLarge')}
+        </button>
+      </div>
     </div>
-  </div>
 
-  <div class="settings-section">
-    <p class="section-label">{t(locale, 'settings.lineHeight')}</p>
-    <div class="options-grid options-grid--tight">
-      <button type="button" class="ui-choice option-step" data-prose-lh="1.65">
-        {t(locale, 'settings.heightCompact')}
-      </button>
-      <button type="button" class="ui-choice option-step" data-prose-lh="1.85">
-        {t(locale, 'settings.heightStandard')}
-      </button>
-      <button type="button" class="ui-choice option-step" data-prose-lh="2.05">
-        {t(locale, 'settings.heightRelaxed')}
-      </button>
+    <div class="settings-section">
+      <p class="section-label">{t(locale, 'settings.lineHeight')}</p>
+      <div class="options-grid options-grid--tight">
+        <button type="button" class="ui-choice option-step" data-prose-lh="1.65">
+          {t(locale, 'settings.heightCompact')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-prose-lh="1.85">
+          {t(locale, 'settings.heightStandard')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-prose-lh="2.05">
+          {t(locale, 'settings.heightRelaxed')}
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <p class="section-label">{t(locale, 'settings.contrast')}</p>
+      <div class="options-grid options-grid--tight">
+        <button type="button" class="ui-choice option-step" data-contrast="standard">
+          {t(locale, 'settings.contrastStandard')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-contrast="high">
+          {t(locale, 'settings.contrastHigh')}
+        </button>
+      </div>
+    </div>
+
+    <!-- 动效：完整 / 减弱 / 跟随系统（完整能顶掉系统的「减弱动态效果」） -->
+    <div class="settings-section">
+      <p class="section-label">{t(locale, 'settings.motion')}</p>
+      <div class="options-grid options-grid--tight">
+        <button type="button" class="ui-choice option-step" data-motion="full">
+          {t(locale, 'settings.motionFull')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-motion="reduced">
+          {t(locale, 'settings.motionReduced')}
+        </button>
+        <button type="button" class="ui-choice option-step" data-motion="auto">
+          {t(locale, 'settings.motionAuto')}
+        </button>
+      </div>
+    </div>
+
+    <!-- 无障碍：三个开关（开=高亮，按钮是 aria-pressed 的开关） -->
+    <div class="settings-section settings-section--wide">
+      <p class="section-label">{t(locale, 'settings.accessibility')}</p>
+      <div class="options-grid options-grid--tight">
+        <button
+          type="button"
+          class="ui-choice option-step"
+          data-toggle="focus"
+          data-value="strong"
+          data-off="auto"
+          aria-pressed="false"
+        >
+          {t(locale, 'settings.focusStrong')}
+        </button>
+        <button
+          type="button"
+          class="ui-choice option-step"
+          data-toggle="links"
+          data-value="always"
+          data-off="auto"
+          aria-pressed="false"
+        >
+          {t(locale, 'settings.linksAlways')}
+        </button>
+        <button
+          type="button"
+          class="ui-choice option-step"
+          data-toggle="targets"
+          data-value="large"
+          data-off="normal"
+          aria-pressed="false"
+        >
+          {t(locale, 'settings.targetsLarge')}
+        </button>
+      </div>
     </div>
   </div>
 
@@ -338,9 +403,8 @@ const navItems: NavItem[] = [
     clearMode,
     readModeChoice,
     readPreferences,
-    setMode,
-    setProseLh,
-    setProseScale,
+    setPref,
+    type PrefKey,
     type ThemeMode,
   } from '../lib/preferences'
   import {
@@ -715,7 +779,7 @@ const navItems: NavItem[] = [
       } else {
         const mode: ThemeMode = choice === 'dark' ? 'dark' : 'light'
         applyPreferences(document.documentElement, { ...readPreferences(), mode })
-        setMode(mode)
+        setPref('mode', mode)
       }
       syncThemeButtons()
     })
@@ -731,46 +795,84 @@ const navItems: NavItem[] = [
     syncThemeButtons()
   })
 
-  /* ---------- 正文字号 / 行距 ---------- */
+  /* ---------- 字号 / 行距 / 对比度 / 动效 / 无障碍 ---------- */
 
   /**
-   * 当前值从**计算样式**里读 —— 默认值由 styles/prose.css 的 :root 提供，
+   * 当前值从**计算样式**里读 —— 默认值由 styles 的 :root 提供，
    * 这里不用再写一遍。首屏脚本已经按 localStorage 覆盖过了。
    */
-  function currentProse(prop: string): string {
+  function currentVar(prop: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(prop).trim()
   }
 
-  function syncProseButtons() {
-    const scale = currentProse('--ui-prose-scale')
-    const lineHeight = currentProse('--ui-prose-lh')
-    document.querySelectorAll<HTMLButtonElement>('[data-prose-scale]').forEach((btn) => {
-      btn.classList.toggle(CLASS.active, btn.dataset.proseScale === scale)
+  const html = document.documentElement
+  const has = (name: string) => html.classList.contains(name)
+
+  /**
+   * 二选一 / 三选一：值写在 data-* 上，点一下存进偏好。
+   * current 给出「当前是哪一档」—— 变量型的读计算样式，
+   * class 型的从 <html> 的 class 反推。
+   */
+  function bindChoice(
+    selector: string,
+    attr: string,
+    key: PrefKey,
+    current: () => string,
+  ) {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(selector)]
+    const sync = () => {
+      const value = current()
+      buttons.forEach((btn) => btn.classList.toggle(CLASS.active, btn.dataset[attr] === value))
+    }
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        setPref(key, btn.dataset[attr] ?? '')
+        applyPreferences(html, readPreferences())
+        sync()
+        // 字号变了弹窗大小也跟着变 —— 位置重新夹回视口
+        placePopup()
+      })
     })
-    document.querySelectorAll<HTMLButtonElement>('[data-prose-lh]').forEach((btn) => {
-      btn.classList.toggle(CLASS.active, btn.dataset.proseLh === lineHeight)
+    sync()
+  }
+
+  bindChoice('[data-root-scale]', 'rootScale', 'rootScale', () => currentVar('--ui-root-scale'))
+  bindChoice('[data-prose-lh]', 'proseLh', 'proseLh', () => currentVar('--ui-prose-lh'))
+  bindChoice('[data-contrast]', 'contrast', 'contrast', () =>
+    has(CLASS.contrastHigh) ? 'high' : 'standard',
+  )
+  bindChoice('[data-motion]', 'motion', 'motion', () =>
+    has(CLASS.motionReduced) ? 'reduced' : has(CLASS.motionFull) ? 'full' : 'auto',
+  )
+
+  /* ---------- 无障碍开关（aria-pressed 的开关按钮） ---------- */
+
+  const toggleButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-toggle]')]
+
+  function syncToggles() {
+    const prefs = readPreferences()
+    toggleButtons.forEach((btn) => {
+      const key = btn.dataset.toggle as PrefKey
+      const on = prefs[key] === (btn.dataset.value ?? '')
+      btn.classList.toggle(CLASS.active, on)
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false')
     })
   }
 
-  document.querySelectorAll<HTMLButtonElement>('[data-prose-scale]').forEach((btn) => {
+  toggleButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const value = btn.dataset.proseScale ?? ''
-      applyPreferences(document.documentElement, { ...readPreferences(), proseScale: value })
-      setProseScale(value)
-      syncProseButtons()
+      const key = btn.dataset.toggle as PrefKey
+      const on = btn.dataset.value ?? ''
+      const off = btn.dataset.off ?? ''
+      const prefs = readPreferences()
+      setPref(key, prefs[key] === on ? off : on)
+      applyPreferences(html, readPreferences())
+      syncToggles()
+      placePopup()
     })
   })
 
-  document.querySelectorAll<HTMLButtonElement>('[data-prose-lh]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const value = btn.dataset.proseLh ?? ''
-      applyPreferences(document.documentElement, { ...readPreferences(), proseLh: value })
-      setProseLh(value)
-      syncProseButtons()
-    })
-  })
-
-  syncProseButtons()
+  syncToggles()
 
   /* ---------- 二级菜单：长按展开 + 拖拽选择（实现在 lib/nav-panel.ts） ---------- */
 
@@ -891,6 +993,13 @@ const navItems: NavItem[] = [
     transition:
       color var(--ui-transition-fast),
       background var(--ui-transition-fast);
+  }
+
+  /* 「大点击区」档 —— 导航链接是全站最小的目标（37px），
+     这里抬到 44px 的下限；抽屉里的条目同理 */
+  :global(html.targets-large) .menu-link,
+  :global(html.targets-large) .drawer-item {
+    min-height: var(--ui-target-min-size);
   }
 
   .menu-link:hover {
@@ -1161,20 +1270,17 @@ const navItems: NavItem[] = [
   .settings-popup {
     position: fixed;
     z-index: var(--ui-z-popup);
-    width: 280px;
-    max-height: min(560px, 85dvh);
-    overflow-y: auto;
+    /* 宽度用 rem —— 跟着根字号走：相对字号放大时面板跟着放大，
+       否则里面的选项会挤到换行 */
+    width: 21.25rem;
+    max-height: min(42.5rem, 88dvh);
+    /* 只滚内容，头尾留在原地 —— 字号放大时「关闭」不能被挤到折叠线下 */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding-bottom: var(--ui-space-md);
     border-radius: var(--ui-nav-radius-lg);
     color: var(--ui-text);
-    animation: ui-pop-in var(--ui-duration-base) var(--ui-ease-out);
-  }
-
-  @keyframes ui-pop-in {
-    from {
-      opacity: 0;
-      transform: scale(0.92);
-    }
   }
 
   .popup-header {
@@ -1183,6 +1289,7 @@ const navItems: NavItem[] = [
     padding: 10px 0 6px;
     cursor: grab;
     touch-action: none;
+    flex: none;
   }
 
   .popup-header:active {
@@ -1204,10 +1311,28 @@ const navItems: NavItem[] = [
     font-size: 1.125rem;
     font-weight: 600;
     text-align: center;
+    flex: none;
   }
 
   .settings-section {
-    padding: var(--ui-space-sm) var(--ui-space-md);
+    /* 竖向收到 xs —— 七段叠起来正好一屏，字号放大时也不必滚 */
+    padding: var(--ui-space-xs) var(--ui-space-md);
+  }
+
+  /* 设置项分两列排 —— 项多了，一列排下来要滚半天。
+     列宽跟着内容走（auto），不等分 —— 等分在字号放大时会把中文标签挤断 */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+    /* 弹窗里唯一的滚动区 */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .settings-section--wide {
+    grid-column: 1 / -1;
   }
 
   .section-label {
@@ -1230,17 +1355,14 @@ const navItems: NavItem[] = [
     padding: var(--ui-space-xs) var(--ui-space-xs);
     font-size: 0.8125rem;
     font-weight: 500;
+    /* 不换行 —— 字号放大时「紧凑」断成两行很难看 */
+    white-space: nowrap;
   }
 
   .option-lang,
   .option-theme {
     flex: 1;
     position: relative;
-  }
-
-  .option-flag {
-    font-size: 1.5rem;
-    line-height: 1.2;
   }
 
   .option-text {
@@ -1253,6 +1375,7 @@ const navItems: NavItem[] = [
     margin: var(--ui-space-sm) var(--ui-space-md) 0;
     padding: var(--ui-space-md);
     font-size: 1rem;
+    flex: none;
   }
 
   /* ==================== 桌面 / 移动 切换 ==================== */

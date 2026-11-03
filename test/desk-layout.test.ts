@@ -100,8 +100,9 @@ test('内容锚定：顶部 / 右侧 / 底部各就各位', () => {
   assert.equal(result.minHeight, 1008)
 })
 
-test('内容锚定：侧栏放不下就掉到正文下面 —— 压在正文上更糟', () => {
+test('内容锚定：侧栏放不下就并到标题卡下面 —— 别掉到正文末尾', () => {
   const cards: DeskCard[] = [
+    { id: 'head', width: 720, height: 100, zone: 'top' },
     { id: 'toc', width: 300, height: 200, zone: 'side' },
   ]
   // 桌面 1200：正文右缘 = (1200+760)/2 = 980，980+32+300 = 1312 放不下
@@ -111,12 +112,17 @@ test('内容锚定：侧栏放不下就掉到正文下面 —— 压在正文上
     contentWidth: 760,
     contentHeight: 500,
   })
+  const head = result.positions.get('head')!
   const toc = result.positions.get('toc')!
-  // 掉到正文下面，而不是悬在正文右边
-  assert.equal(toc.x, 220)
-  assert.equal(toc.y, 144 + 500 + 44)
-  // 宽度跟正文列一致
+  const contentLeft = (1200 - 760) / 2
+  // 标题卡在最上面，目录紧跟其后 —— 不是掉到正文末尾
+  assert.equal(head.y, 100)
+  assert.equal(toc.y, 100 + 100 + 44)
+  // 都在正文列的宽度上，右缘跟正文对齐
+  assert.equal(toc.x, contentLeft)
   assert.equal(toc.width, 760)
+  // 正文顶部要把这两张卡让出来
+  assert.equal(result.contentMarginTop, 100 + (100 + 44) + (200 + 44) + 44)
 })
 
 test('内容锚定：正文列里的卡片右缘跟正文对齐', () => {

@@ -17,14 +17,22 @@
    ========================================================= */
 
 :root {
+  /* ==================== 字号刻度 ==================== */
+  /* 全站相对字号 —— 作用在 html 的 font-size 上。
+     「相对」是相对浏览器的默认字号：用户把浏览器字号调大，这里跟着放大。
+     首屏脚本按偏好覆盖这个值（--ui-root-scale）。 */
+  --ui-root-scale: 1;
+
   /* ==================== 间距刻度 ==================== */
-  --ui-space-xs: 4px;
-  --ui-space-sm: 8px;
-  --ui-space-md: 16px;
-  --ui-space-lg: 24px;
-  --ui-space-xl: 32px;
-  --ui-space-2xl: 48px;
-  --ui-space-3xl: 64px;
+  /* 用 rem 而不是 px —— 相对字号放大时间距跟着走，不然字变大了间距不变会挤。
+     数值与原来的 px 一一对应（默认根字号 16px 下完全等价）。 */
+  --ui-space-xs: 0.25rem;
+  --ui-space-sm: 0.5rem;
+  --ui-space-md: 1rem;
+  --ui-space-lg: 1.5rem;
+  --ui-space-xl: 2rem;
+  --ui-space-2xl: 3rem;
+  --ui-space-3xl: 4rem;
 
   /* ==================== 层级刻度 ====================
      悬浮栏的四个面 —— 栏体 / 二级面板 / 设置按钮 / 设置弹窗。
@@ -80,34 +88,47 @@
   /* 卡片位移的曲线 */
   --ui-card-ease: var(--ui-ease-out);
 
+  /* ==================== 语义动效 ==================== */
+  /* 「这个动作要多久」，而不是「这个元素要多久」——
+     页面编排（入场 / 错峰 / 退场）只认这一层，不去碰具体时长。 */
+  --ui-motion-enter: var(--ui-transition-slow);
+  --ui-motion-exit: var(--ui-transition-fast);
+  --ui-motion-hover: var(--ui-transition-normal);
+  --ui-motion-pop: var(--ui-duration-base) var(--ui-ease-spring);
+  /* 错峰间隔 —— 一串元素依次进场时，每个之间隔多久 */
+  --ui-motion-stagger: 60ms;
+
+  /* ==================== 焦点与点击目标 ==================== */
+  /* 焦点环 —— 「强化焦点环」档会把它加粗 */
+  --ui-focus-ring-width: 2px;
+  --ui-focus-ring-offset: 2px;
+  --ui-focus-ring-color: var(--ui-accent);
+  /* 点击目标下限 —— 「更大的点击目标」档会把它抬到 44px（0 = 不设限） */
+  --ui-target-min-size: 0px;
+
   /* 回弹曲线 —— 菜单展开、镜片落位这类「弹出来」的动作 */
   --ui-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* =========================================================
-   降低动效：系统开了「减弱动态效果」就一律停掉位移
+   降低动效：时长刻度归零
+   ---------------------------------------------------------
+   判定与「CSS 动画一并停掉」在 styles/motion.css —— 这里是结构层，
+   只管刻度。「完整动效」（html.motion-full）能顶掉系统那一条，
+   但顶不掉用户自己在设置里选的「减弱」。
    ========================================================= */
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  html:not(.motion-full) {
     --ui-duration-fast: 1ms;
     --ui-duration-base: 1ms;
     --ui-duration-slow: 1ms;
   }
+}
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  /* 卡片抬起是「位移」，这里直接停掉（主题里的 --ui-card-lift 优先级更高，
-     所以不能只靠改 token） */
-  .ui-card--interactive:hover {
-    transform: none !important;
-  }
+html.motion-reduced {
+  --ui-duration-fast: 1ms;
+  --ui-duration-base: 1ms;
+  --ui-duration-slow: 1ms;
 }
 
 /* =========================================================
@@ -433,6 +454,8 @@ html.glass-fallback .ui-glass-lens::after {
   align-items: center;
   justify-content: center;
   gap: var(--ui-space-sm);
+  /* 「更大的点击目标」档会把它抬到 44px（默认 0 = 不设限） */
+  min-height: var(--ui-target-min-size);
   padding: var(--ui-space-sm) var(--ui-space-md);
   border-radius: var(--ui-btn-radius);
   border: none;
@@ -607,6 +630,8 @@ html.glass-refract .ui-nav-surface {
   align-items: center;
   justify-content: center;
   gap: var(--ui-space-xs);
+  /* 「更大的点击目标」档会把它抬到 44px（默认 0 = 不设限） */
+  min-height: var(--ui-target-min-size);
   padding: var(--ui-space-sm) var(--ui-space-xs);
   border: 1px solid transparent;
   border-radius: var(--ui-radius-md);

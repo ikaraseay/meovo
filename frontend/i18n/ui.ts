@@ -55,14 +55,32 @@ export const ui = {
   'settings.title': { zh: '设置', en: 'Settings' },
   'settings.open': { zh: '打开设置', en: 'Open settings' },
   'settings.close': { zh: '关闭', en: 'Close' },
-  'settings.fontSize': { zh: '字号', en: 'Font size' },
-  'settings.lineHeight': { zh: '行距', en: 'Line height' },
+  // 相对字号 —— 全站一起缩（相对浏览器的默认字号）
+  'settings.relativeSize': { zh: '相对字号', en: 'Relative size' },
   'settings.sizeSmall': { zh: '小', en: 'Small' },
-  'settings.sizeMedium': { zh: '中', en: 'Medium' },
+  'settings.sizeMedium': { zh: '标准', en: 'Standard' },
   'settings.sizeLarge': { zh: '大', en: 'Large' },
+  'settings.lineHeight': { zh: '行距', en: 'Line height' },
   'settings.heightCompact': { zh: '紧凑', en: 'Compact' },
   'settings.heightStandard': { zh: '标准', en: 'Standard' },
   'settings.heightRelaxed': { zh: '宽松', en: 'Relaxed' },
+
+  // 对比度
+  'settings.contrast': { zh: '对比度', en: 'Contrast' },
+  'settings.contrastStandard': { zh: '标准', en: 'Standard' },
+  'settings.contrastHigh': { zh: '高对比', en: 'High' },
+
+  // 动效
+  'settings.motion': { zh: '动效', en: 'Motion' },
+  'settings.motionFull': { zh: '完整', en: 'Full' },
+  'settings.motionReduced': { zh: '减弱', en: 'Reduced' },
+  'settings.motionAuto': { zh: '自动', en: 'Auto' },
+
+  // 无障碍
+  'settings.accessibility': { zh: '无障碍', en: 'Accessibility' },
+  'settings.focusStrong': { zh: '强化焦点环', en: 'Strong focus ring' },
+  'settings.linksAlways': { zh: '链接下划线', en: 'Link underlines' },
+  'settings.targetsLarge': { zh: '大点击区', en: 'Larger targets' },
 
   // 首页
   'home.profileTitle': { zh: '关于我', en: 'About me' },

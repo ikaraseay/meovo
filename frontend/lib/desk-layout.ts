@@ -129,26 +129,30 @@ export function contentAnchoredLayout(
   const sideAll = unpinned.filter((c) => c.zone === 'side')
   const tailAll = unpinned.filter((c) => c.zone === 'tail')
 
-  // 顶部卡片从上往下堆，堆完的高度就是正文要留的顶部空间
-  let topH = topOffset
-  for (const c of top) topH += c.height + DESK_GAP_Y
-  const contentMarginTop = topH + DESK_GAP_Y
-
   const contentLeft = Math.max(0, (deskWidth - contentWidth) / 2)
   const contentRight = contentLeft + contentWidth
+
+  // 侧栏卡片放不下（窄桌面）就并进顶部 —— 排在标题卡下面。
+  // 别掉到正文末尾：那儿是协议卡 / 上下篇的位置，
+  // 目录与思维导图是「进正文前」要看的东西，掉到最后反而难找。
+  const fitsSide = (c: DeskCard) =>
+    contentRight + DESK_GAP_X + c.width <= deskWidth - DESK_EDGE
+  const side = sideAll.filter(fitsSide)
+  const topStack = [...top, ...sideAll.filter((c) => !fitsSide(c))]
+  const tail = [...tailAll]
+
+  // 顶部卡片从上往下堆，堆完的高度就是正文要留的顶部空间
+  let topH = topOffset
+  for (const c of topStack) topH += c.height + DESK_GAP_Y
+  const contentMarginTop = topH + DESK_GAP_Y
+
   const contentTop = contentMarginTop
   const contentBottom = contentTop + contentHeight
 
   const positions = new Map<string, Position>()
 
-  // 侧栏卡片放不下（窄桌面）就掉到正文下面 —— 压在正文上比排到下面更糟
-  const fitsSide = (c: DeskCard) =>
-    contentRight + DESK_GAP_X + c.width <= deskWidth - DESK_EDGE
-  const side = sideAll.filter(fitsSide)
-  const tail = [...tailAll, ...sideAll.filter((c) => !fitsSide(c))]
-
   let topY = topOffset
-  for (const c of top) {
+  for (const c of topStack) {
     // 正文列里的卡片宽度 = 正文列宽度 —— 右缘才跟正文对齐
     positions.set(c.id, { x: contentLeft, y: topY, width: contentWidth })
     topY += c.height + DESK_GAP_Y

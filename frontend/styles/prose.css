@@ -7,16 +7,26 @@
    ========================================================= */
 
 /* ==================== 正文 ==================== */
-/* 正文偏好。首屏脚本会按 localStorage 覆盖这两个值 */
+/* 行距偏好。首屏脚本会按 localStorage 覆盖这个值 */
 :root {
-  --ui-prose-scale: 1;
   --ui-prose-lh: 1.85;
 }
 
 .prose {
-  font-size: calc(1.0625rem * var(--ui-prose-scale));
+  /* 字号跟根字号走 —— 「相对字号」作用在 html 上，这里只定正文与根的比例 */
+  font-size: 1.0625rem;
   line-height: var(--ui-prose-lh);
   color: var(--ui-text);
+  /* 两端对齐 —— 中文按字距撑开，西文按词间距撑开 */
+  text-align: justify;
+  /* 英文版要断词连字符，否则两端对齐会拉出大空隙 */
+  hyphens: auto;
+}
+
+/* 这几个不对齐：标题是短句（撑开反而怪），代码是等宽字（撑不开），
+   表格每格一行（撑开就出空格） */
+.prose :is(h1, h2, h3, h4, h5, h6, pre, table) {
+  text-align: start;
 }
 
 .prose > * + * {

@@ -5,9 +5,7 @@ import {
   applyPreferences,
   PREFS_KEYS,
   readPreferences,
-  setMode,
-  setProseLh,
-  setProseScale,
+  setPref,
   type PreferenceRoot,
   type PreferenceStore,
 } from '../frontend/lib/preferences.ts'
@@ -49,36 +47,82 @@ test('没存过模式：跟随系统（Node 里没有 window → light）；存�
   assert.equal(readPreferences(fakeStore({ 'theme-mode': 'nonsense' })).mode, 'light')
 })
 
-test('读出字号 / 行距', () => {
-  const prefs = readPreferences(fakeStore({ 'prose-scale': '1.12', 'prose-lh': '2.05' }))
-  assert.equal(prefs.proseScale, '1.12')
+test('相对字号：新 key 优先，老的 prose-scale 只作兜底', () => {
+  const prefs = readPreferences(fakeStore({ 'root-scale': '1.12', 'prose-lh': '2.05' }))
+  assert.equal(prefs.rootScale, '1.12')
   assert.equal(prefs.proseLh, '2.05')
+  // 老用户设过的正文字号不能丢 —— 兜底读得到
+  assert.equal(readPreferences(fakeStore({ 'prose-scale': '0.9' })).rootScale, '0.9')
+  // 两个都在时新的赢
+  assert.equal(readPreferences(fakeStore({ 'root-scale': '1.12', 'prose-scale': '0.9' })).rootScale, '1.12')
+})
+
+test('对比度 / 动效 / 无障碍开关：坏值一律退回默认', () => {
+  const prefs = readPreferences(
+    fakeStore({
+      contrast: 'nonsense',
+      motion: 'nope',
+      links: 'x',
+      targets: 'y',
+      focus: 'z',
+    }),
+  )
+  assert.equal(prefs.contrast, 'standard')
+  assert.equal(prefs.motion, 'auto')
+  assert.equal(prefs.links, 'auto')
+  assert.equal(prefs.targets, 'normal')
+  assert.equal(prefs.focus, 'auto')
 })
 
 test('applyPreferences 落到根元素', () => {
   const root = fakeRoot()
-  applyPreferences(root, { mode: 'dark', proseScale: '1.12', proseLh: '2.05' })
+  applyPreferences(root, {
+    mode: 'dark',
+    rootScale: '1.12',
+    proseLh: '2.05',
+    motion: 'reduced',
+    contrast: 'high',
+    links: 'always',
+    targets: 'large',
+    focus: 'strong',
+  })
   assert.ok(root.classes.has('dark'))
-  assert.equal(root.vars['--ui-prose-scale'], '1.12')
+  assert.ok(root.classes.has('motion-reduced'))
+  assert.ok(root.classes.has('contrast-high'))
+  assert.ok(root.classes.has('links-always'))
+  assert.ok(root.classes.has('targets-large'))
+  assert.ok(root.classes.has('focus-strong'))
+  assert.equal(root.vars['--ui-root-scale'], '1.12')
   assert.equal(root.vars['--ui-prose-lh'], '2.05')
 })
 
 test('applyPreferences：light 时移除 dark，空值不覆盖', () => {
   const root = fakeRoot()
   root.classes.add('dark')
-  applyPreferences(root, { mode: 'light', proseScale: '', proseLh: '' })
+  applyPreferences(root, {
+    mode: 'light',
+    rootScale: '',
+    proseLh: '',
+    motion: 'auto',
+    contrast: 'standard',
+    links: 'auto',
+    targets: 'normal',
+    focus: 'auto',
+  })
   assert.ok(!root.classes.has('dark'))
-  assert.equal(root.vars['--ui-prose-scale'], undefined)
+  assert.equal(root.vars['--ui-root-scale'], undefined)
 })
 
-test('setX 写进 store', () => {
+test('setPref 写进 store', () => {
   const store = fakeStore()
-  setMode('dark', store)
-  setProseScale('0.9', store)
-  setProseLh('1.65', store)
+  setPref('mode', 'dark', store)
+  setPref('rootScale', '0.9', store)
+  setPref('proseLh', '1.65', store)
+  setPref('contrast', 'high', store)
   assert.equal(store.data[PREFS_KEYS.mode], 'dark')
-  assert.equal(store.data[PREFS_KEYS.scale], '0.9')
-  assert.equal(store.data[PREFS_KEYS.lh], '1.65')
+  assert.equal(store.data[PREFS_KEYS.rootScale], '0.9')
+  assert.equal(store.data[PREFS_KEYS.proseLh], '1.65')
+  assert.equal(store.data[PREFS_KEYS.contrast], 'high')
 })
 
 test('首屏脚本的偏好 key 来自模块 —— 不能写死一份', () => {
@@ -94,9 +138,9 @@ test('首屏脚本的偏好 key 来自模块 —— 不能写死一份', () => {
 test('没有 store / 抛异常时不炸', () => {
   assert.doesNotThrow(() => {
     readPreferences(null)
-    setMode('dark', null)
-    setProseScale('1', null)
-    setProseLh('1.8', null)
+    setPref('mode', 'dark', null)
+    setPref('rootScale', '1', null)
+    setPref('proseLh', '1.8', null)
   })
   const broken: PreferenceStore = {
     getItem: () => {
@@ -108,8 +152,8 @@ test('没有 store / 抛异常时不炸', () => {
   }
   assert.doesNotThrow(() => {
     readPreferences(broken)
-    setMode('dark', broken)
-    setProseScale('1', broken)
-    setProseLh('1.8', broken)
+    setPref('mode', 'dark', broken)
+    setPref('rootScale', '1', broken)
+    setPref('proseLh', '1.8', broken)
   })
 })

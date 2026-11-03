@@ -1,0 +1,102 @@
+/* =========================================================
+   动效系统
+   ---------------------------------------------------------
+   三层，一处主人：
+     ① 刻度 —— tokens.css 的 --ui-duration-* / --ui-motion-*
+        「这个动作要多久」，页面只引用语义名，不碰具体时长
+     ② 原语 —— 这一层的 .ui-anim-* 类。页面编排只用这些，
+        别再各写各的 @keyframes
+     ③ 归零 —— 系统开了「减弱动态效果」或用户在设置里选了「减弱」
+        就一律停；用户选「完整」能顶掉系统那一条，
+        但顶不掉用户自己选的那一条（用户说的比系统设置更算数）
+   ========================================================= */
+
+/* ==================== ③ 归零 ==================== */
+/* 系统那一条 —— 没有 JS 时也生效 */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.motion-full) *,
+  html:not(.motion-full) *::before,
+  html:not(.motion-full) *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 用户显式选了「减弱」—— 系统怎么设都停 */
+html.motion-reduced *,
+html.motion-reduced *::before,
+html.motion-reduced *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* 卡片抬起是「位移」—— 归零时直接停掉（主题里的 --ui-card-lift 优先级更高，
+   不能只靠改时长 token） */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.motion-full) .ui-card--interactive:hover {
+    transform: none !important;
+  }
+}
+
+html.motion-reduced .ui-card--interactive:hover {
+  transform: none !important;
+}
+
+/* ==================== ② 原语 ==================== */
+
+/* 淡入 + 上移 —— 进场用。
+   用 translate / scale 这两个独立属性，别用 transform ——
+   transform 会被卡片的倾斜（.is-tilted）占掉，两者会打架。 */
+.ui-anim-fade-up {
+  animation: ui-fade-up var(--ui-motion-enter) both;
+}
+
+@keyframes ui-fade-up {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* 淡入 —— 只动 opacity。给带 transform 的元素用（卡片倾斜不打架） */
+.ui-anim-fade-in {
+  animation: ui-fade-in var(--ui-motion-enter) both;
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 弹出 —— 缩放 + 淡入 */
+.ui-anim-pop {
+  animation: ui-pop var(--ui-motion-pop) both;
+}
+
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* 错峰 —— 子元素各自带 --ui-stagger-index（0 起），进场依次推迟 */
+.ui-anim-stagger > * {
+  animation-delay: calc(var(--ui-motion-stagger) * var(--ui-stagger-index, 0));
+}

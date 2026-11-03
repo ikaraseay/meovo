@@ -151,10 +151,17 @@ const height = Math.max(rows.length > 0 ? rows[rows.length - 1].y + ROW_H : 0, r
 
 <script is:inline>
   // 桌面端常驻展开；移动端默认折叠（summary 可点开）
+  // 跟着断点走 —— 只在加载时判一次的话，窄屏进来的页面放大后还是折叠的
   ;(() => {
     const el = document.querySelector('[data-outline]')
     const min = el?.dataset.desktopMin
-    if (el && min && window.matchMedia(`(min-width: ${min}px)`).matches) el.setAttribute('open', '')
+    if (!el || !min) return
+    const mq = window.matchMedia(`(min-width: ${min}px)`)
+    const sync = () => {
+      if (mq.matches) el.setAttribute('open', '')
+    }
+    sync()
+    mq.addEventListener('change', sync)
   })()
 </script>
 

@@ -10,7 +10,7 @@ import { getAbsoluteLocaleUrl } from 'astro:i18n'
 import { t, locales, defaultLocale, stripLocalePrefix, type Locale } from '../i18n'
 import FloatingBar from '../components/FloatingBar.astro'
 import Footer from '../components/Footer.astro'
-import { PREFS_KEYS } from '../lib/preferences'
+import { PREF_CLASSES, PREFS_KEYS } from '../lib/preferences'
 import { ogImageUrl } from '../lib/urls'
 
 interface Props {
@@ -148,7 +148,7 @@ const webSiteLd = {
       但 key 名只能有一个主人 —— 这里再写死一份的话，
       改了模块那份首屏会静默回退到默认值（深色闪一下又变回来）。
     -->
-    <script define:vars={{ prefKeys: PREFS_KEYS }}>
+    <script define:vars={{ prefKeys: PREFS_KEYS, prefClasses: PREF_CLASSES }}>
       ;(() => {
         // 有 JS 就挂 .js：桌面卡片在布局完成前先藏起，布局好再淡入（见 global.css）
         const root = document.documentElement
@@ -171,12 +171,21 @@ const webSiteLd = {
               : 'light'
         root.classList.toggle('dark', mode === 'dark')
 
-        // 正文字号 / 行距：写在内联样式上，CSS 里只用 var() 读。
-        // 默认值在 styles/prose.css 的 :root 里，这里只在有偏好时覆盖。
-        const scale = get(prefKeys.scale)
-        const lineHeight = get(prefKeys.lh)
-        if (scale) root.style.setProperty('--ui-prose-scale', scale)
+        // 全站字号 / 行距：写在内联样式上，CSS 里只用 var() 读。
+        // 默认值在 styles/tokens.css 的 :root 里，这里只在有偏好时覆盖。
+        // 老的 prose-scale 只作兜底 —— 别把老用户设过的字号弄丢。
+        const rootScale = get(prefKeys.rootScale) || get(prefKeys.legacyScale)
+        const lineHeight = get(prefKeys.proseLh)
+        if (rootScale) root.style.setProperty('--ui-root-scale', rootScale)
         if (lineHeight) root.style.setProperty('--ui-prose-lh', lineHeight)
+
+        // 对比度 / 动效 / 下划线 / 点击目标 —— 有/无用 class
+        root.classList.toggle(prefClasses.contrastHigh, get(prefKeys.contrast) === 'high')
+        root.classList.toggle(prefClasses.motionReduced, get(prefKeys.motion) === 'reduced')
+        root.classList.toggle(prefClasses.motionFull, get(prefKeys.motion) === 'full')
+        root.classList.toggle(prefClasses.linksAlways, get(prefKeys.links) === 'always')
+        root.classList.toggle(prefClasses.targetsLarge, get(prefKeys.targets) === 'large')
+        root.classList.toggle(prefClasses.focusStrong, get(prefKeys.focus) === 'strong')
       })()
     </script>
 

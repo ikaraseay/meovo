@@ -36,9 +36,12 @@ html[data-theme='liquid-glass'] {
   /* ==================== 文字 ==================== */
   --ui-text: #241a12;
   --ui-text-secondary: #6b5a4c;
-  --ui-text-muted: #8a7a6b;
-  --ui-text-faint: rgba(36, 26, 18, 0.55);
-  --ui-text-accent: #e8492f;
+  /* muted / faint / accent 三处原本低于 WCAG AA（4.5:1），这里抬到线上。
+     纸色底 #efe8dd 上实测：muted 4.96:1、faint 4.79:1、accent 4.98:1。
+     改这几个要连着 check-look 的对比度自检一起看（test/contrast.test.ts）。 */
+  --ui-text-muted: #6f6055;
+  --ui-text-faint: #706355;
+  --ui-text-accent: #b03a1e;
   --ui-text-on-accent: #ffffff;
   /* 压在色块（--ui-block-*）上的文字：高饱和亮色底 → 一律墨色 */
   --ui-text-on-block: #2e2a33;
@@ -62,6 +65,15 @@ html[data-theme='liquid-glass'] {
   /* 搜索命中高亮 */
   --ui-mark-bg: rgba(255, 109, 154, 0.22);
   --ui-mark-fg: #a8325c;
+
+  /* 装饰性渐变边框 —— 描边走渐变而不是纯色。
+     只做装饰：正文与关键信息不靠它区分。 */
+  --ui-gradient-border: linear-gradient(
+    135deg,
+    var(--ui-accent) 0%,
+    var(--ui-highlight) 52%,
+    var(--ui-block-3) 100%
+  );
 
   /* ASCII 画 —— 猫的配色（描边 / 深橙 / 橙身 / 白毛 / 阴影） */
   --ui-art-outline: #3b2f26;
@@ -343,4 +355,66 @@ html[data-theme='liquid-glass'].dark {
   --ui-shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
 
   --ui-icon-well-border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* ============================================================
+   高对比档
+   ------------------------------------------------------------
+   用户在设置里选的第二档。把次要文字、描边与表面都抬一档：
+     · 次要文字从 4.9 / 4.8 抬到 7.1 / 6.0
+     · 强调色再压深一档（#8f2810，6.96:1）
+     · 表面更实 —— 半透明叠多了对比度就不稳
+   选择器带 :not(.dark) 是为了压住深色那一组（同特异度时后者会赢）。
+   ============================================================ */
+html[data-theme='liquid-glass']:not(.dark).contrast-high {
+  --ui-text: #1a120c;
+  --ui-text-secondary: #463a30;
+  --ui-text-muted: #57493d;
+  --ui-text-faint: #625448;
+  --ui-text-accent: #8f2810;
+
+  --ui-border: rgba(70, 40, 20, 0.4);
+  --ui-border-subtle: rgba(70, 40, 20, 0.26);
+  --ui-border-accent: rgba(143, 40, 16, 0.7);
+
+  --ui-surface: rgba(255, 255, 255, 0.9);
+  --ui-surface-raised: rgba(255, 255, 255, 0.96);
+  --ui-surface-hover: rgba(255, 255, 255, 0.86);
+  --ui-surface-active: rgba(255, 255, 255, 0.7);
+
+  --ui-card-bg: rgba(255, 255, 255, 0.88);
+  --ui-card-border: rgba(255, 255, 255, 0.95);
+
+  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.82);
+  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.95);
+
+  --ui-focus-ring-color: #8f2810;
+  --ui-focus-ring-width: 3px;
+  --ui-focus-ring-offset: 3px;
+}
+
+html[data-theme='liquid-glass'].dark.contrast-high {
+  --ui-text-secondary: #e6ddd2;
+  --ui-text-muted: #cfc6bb;
+  --ui-text-faint: rgba(246, 241, 234, 0.85);
+  --ui-text-accent: #ffb59c;
+
+  --ui-border: rgba(255, 255, 255, 0.34);
+  --ui-border-subtle: rgba(255, 255, 255, 0.22);
+  --ui-border-accent: rgba(255, 181, 156, 0.7);
+
+  --ui-surface: rgba(24, 24, 34, 0.88);
+  --ui-surface-raised: rgba(30, 30, 42, 0.94);
+  --ui-surface-hover: rgba(255, 255, 255, 0.14);
+  --ui-surface-active: rgba(255, 255, 255, 0.18);
+
+  --ui-card-bg: rgba(26, 26, 38, 0.9);
+  --ui-card-border: rgba(255, 255, 255, 0.28);
+
+  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.14);
+  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.22);
+
+  --ui-focus-ring-color: #ffb59c;
+  --ui-focus-ring-width: 3px;
+  --ui-focus-ring-offset: 3px;
 }
