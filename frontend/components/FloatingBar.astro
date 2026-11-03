@@ -907,11 +907,31 @@ const navItems: NavItem[] = [
 
   /* ---------- 视口变化 ---------- */
 
-  window.addEventListener('resize', () => {
-    placeMenu()
-    placeFab()
+  /**
+   * 摆一遍四个面 —— 只夹取，不重置（用户摆的位置得留住）。
+   * 栏体在窄屏是 display:none，那会儿量不到尺寸，别拿假尺寸去夹、
+   * 更别把夹出来的位置存回去（用户原来的位置就丢了）。
+   */
+  function placeAll(save = false) {
+    if (menu && menu.offsetWidth > 0) {
+      placeMenu()
+      if (save) saveFloatingBarState({ menu: { x: menuX, y: menuY } })
+    }
+    if (fab && fab.offsetWidth > 0) {
+      placeFab()
+      if (save) saveFloatingBarState({ fab: { right: fabRight, bottom: fabBottom } })
+    }
     if (popup && !popup.hidden) placePopup()
+  }
+
+  // resize 事件触发时媒体查询还没重算 —— 那会儿元素可能还藏着、尺寸还是旧的，
+  // 照那一刻的尺寸摆会歪。等尺寸落定再摆一次（跟玻璃桌面一个口径）。
+  let resizeTimer = 0
+  window.addEventListener('resize', () => {
     navPanel?.close()
+    placeAll()
+    window.clearTimeout(resizeTimer)
+    resizeTimer = window.setTimeout(() => placeAll(true), 150)
   })
 
 </script>

@@ -86,10 +86,22 @@
     它们是「进正文前」要看的东西，隔一整个 gap 就跟标题分成两块不相干的卡片了
   - 窄屏的目录折叠头**不要自带边框**（`prose.css` 的 `.toc-toggle`）：卡本身已经有一圈，
     再套一层就是两层套着的描边 —— 跟结构图那行 `<summary>` 保持同一种素行样式
+  - **章节多了，目录与结构图自己滚** —— 两边都有 `max-height: calc(100vh - 12rem)` +
+    `overflow: auto`（目录在 `prose.css` 的 `.toc-list`，结构图在 `OutlineMap.astro`
+    的 `.outline-scroll`）：别让卡片长到屏幕外面去
+  - 目录高亮跟着正文走时，**当前章节要留在目录的可视区里**（`Article.astro`
+    的 `keepActiveVisible()`）—— 只滚目录，不动页面
 - **协议卡**：文章页正文后面的可拖拽玻璃部件（`zone="tail"`，排在上下篇之前），
   内容在 `frontend/components/PostLicense.astro`。协议取值来自 frontmatter `license`，
   `frontend/lib/licenses.ts` 是唯一事实来源（`LICENSE_IDS` 同时供 schema 派生），缺省 CC BY 4.0；
   协议名与说明走 i18n
+  - **开源协议（CC 系列）才给「Markdown 原文」链接** —— 指向
+    `/<内容语言>/raw/<slug>.md`（端点 `frontend/pages/[lang]/raw/[...slug].md.ts`，
+    静态输出每篇一个 .md，内容是正文原文，不含 frontmatter）
+- **正文图片能放大**：`frontend/lib/image-zoom.ts` —— 点开一层覆盖层，
+  滚轮对着指针那点缩放（1~4 倍）、按住拖动平移、双击还原、Esc / 点背景关闭。
+  夹取边界是纯函数 `clampPan()`（`test/image-zoom.test.ts` 守着）；
+  覆盖层的 class 名走 `dom-contract.ts` 的 `CLASS`
 - **评论**：读者填昵称 / 邮箱 / 个人网站 → 进 D1 待审队列 → 后台放行才出现在文章页
   - ⚠️ **已停用**（2026-11-02）：文章页不再渲染评论，后台导航里的「评论」入口也去掉了。
     代码还在（组件 / 接口 / 表），恢复只要把 `<Comments slug={getPostSlug(post)} locale={locale} />`
@@ -145,7 +157,9 @@
   跟 `frontend/pages/404.astro` 共用 `.term` 那套外观与 `--ui-term-*` 配色。
   遮罩在 `html.js:not(.page-ready)` 时可见，布局摆好（双 rAF）后加 `.page-ready` 淡出
 - **404 页**是 `frontend/pages/404.astro` —— 一台终端（`cat /404` → No such file +
-  字符画猫 + `ls /`），中英文都摆出来（404 没有语言上下文）
+  字符画猫 + `ls /`），中英文都摆出来（404 没有语言上下文）。
+  卡片里有「回到首页」，底下还有一行「如有错误或建议请联系作者邮箱」+
+  `site.email` 的 mailto 链接（中英文各一行，邮箱走 `t(locale,'site.email')`）
 - **SEO**：canonical / hreflang / OG / Twitter / JSON-LD 都在 `BaseLayout.astro` 里统一输出；
   文章页通过 `head` 插槽补自己的 BlogPosting 与 `article:*`
   - `frontend/pages/sitemap.xml.ts` —— sitemap 是**手写端点**，不是 `@astrojs/sitemap`：
@@ -170,6 +184,10 @@
   - **同一时刻只有一个覆盖层打开** —— 设置弹窗与二级面板互斥
   - **用户摆出来的位置属于用户** —— 几何状态存在 `frontend/lib/floating-bar-state.ts`，跨页面跨刷新还原
   - **还原只夹取不重置** —— 视口变了按新尺寸夹回可见范围，别改成默认值
+  - **分辨率变了要摆两次** —— `resize` 事件触发时媒体查询还没重算，
+    那会儿元素可能还藏着、尺寸还是旧的（照那一刻摆会歪）。
+    `FloatingBar.astro` 的 `placeAll()` 先立刻摆一次，150ms 后再摆一次并把
+    **夹取后**的位置存回去（窄屏栏体是 `display:none`，量不到尺寸就别夹也别存）
 - **玻璃桌面（卡片画布）**：`frontend/lib/draggable.ts` 驱动 `frontend/lib/desk-layout.ts` 的布局数学
   （散开 / 内容锚定 / 流动三种模式）。
   - **视口变了要等尺寸落定再重排** —— MQ 的 `change` 事件可能早于视口尺寸更新
@@ -350,6 +368,10 @@
       改完正文要自己 `dispatchEvent(new Event('input'))` 才会触发（脏标记与预览都听它）
     - **「悬停显示」插的是 `<span class="spoiler">…</span>`（裸 HTML，不是 markdown 语法）** ——
       站点与预览都渲染裸 HTML，共用 `frontend/styles/prose.css` 的 `.prose .spoiler`
+    - **编辑页是「左写右看」对版**：上中文下英文，每种语言一块，
+      桌面端左 textarea 右预览，两栏等高、各自滚动（高度 `--ui-editor-height`），
+      滚动位置按比例**同步**（`linkPanes()`）；编辑区装不下全文时用滚动同步，
+      装得下时按光标所在行定位预览。预览换内容不换位置（否则每敲一个字预览跳回顶上）
   - 列表支持搜索（标题 / slug / 摘要）+ 状态筛选 + 语言筛选
   - 样式全在 `frontend/styles/admin.css` —— 只用 `--ui-*` token，
     层级刻度用 `--ui-z-*`（提示条是 `--ui-z-panel`）

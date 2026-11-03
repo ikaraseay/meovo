@@ -117,26 +117,25 @@ const langs = ['zh', 'en'] as const
             </label>
           </div>
 
+          {/* 左写右看 —— 两边等高、各自滚动，脚本把滚动位置同步过去 */}
           <div class="admin-editor">
-            <div class="admin-editor__pane">
-              <div
-                class="admin-editor__tools"
-                data-admin-tools={lang}
-                role="toolbar"
-                aria-label={t(locale, 'admin.editor.toolbar')}
-              ></div>
-              <textarea class="ui-input admin-editor__body" name={`body-${lang}`}></textarea>
-            </div>
-            <div class="admin-editor__pane">
-              <span class="admin-field__label">{t(locale, 'admin.action.preview')}</span>
-              <div class="admin-preview prose" data-admin-preview={lang}></div>
-            </div>
+            <div
+              class="admin-editor__tools"
+              data-admin-tools={lang}
+              role="toolbar"
+              aria-label={t(locale, 'admin.editor.toolbar')}
+            ></div>
+            <textarea class="ui-input admin-editor__body" name={`body-${lang}`}></textarea>
+            <span class="admin-field__label admin-editor__label">
+              {t(locale, 'admin.action.preview')}
+            </span>
+            <div class="admin-preview prose" data-admin-preview={lang}></div>
           </div>
         </section>
       ))
     }
 
-    <div class="admin-actionbar">
+    <div class="admin-actionbar admin-actionbar--sticky">
       <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
       <div class="admin-actionbar__buttons">
         <button class="ui-btn" type="button" data-admin-preview-button>
@@ -220,6 +219,8 @@ const langs = ['zh', 'en'] as const
     preview: HTMLElement
     timer: number
     seq: number
+    /** 上次是我们自己写过去的滚动比例 —— 回声不算用户滚动 */
+    echo: number
   }
 
   const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
@@ -581,11 +582,63 @@ const langs = ['zh', 'en'] as const
       })
       // 慢的旧响应不许盖掉新的
       if (seq !== pane.seq) return
+      // 换内容不换位置 —— 不然每敲一个字预览就跳回顶上
+      const top = pane.preview.scrollTop
       pane.preview.innerHTML = data.html
+      pane.preview.scrollTop = top
+      pane.echo = scrollRatio(pane.preview)
     } catch (error) {
       const failure = error as { code?: string }
       say(errorText(locale, failure.code ?? 'request_failed'), true)
     }
+  }
+
+  /* ---------------- 编辑与预览同步滚动 ---------------- */
+
+  /** 滚了多少（0~1）—— 两边高度不同，按比例对 */
+  function scrollRatio(el: HTMLElement): number {
+    const max = el.scrollHeight - el.clientHeight
+    return max > 0 ? el.scrollTop / max : 0
+  }
+
+  function setScrollRatio(el: HTMLElement, ratio: number): void {
+    const max = el.scrollHeight - el.clientHeight
+    el.scrollTop = max > 0 ? ratio * max : 0
+  }
+
+  /** 光标停在全文的第几行 —— 0~1 */
+  function caretRatio(body: HTMLTextAreaElement): number {
+    const lines = body.value.split('\n')
+    if (lines.length < 2) return 0
+    const line = body.value.slice(0, body.selectionStart).split('\n').length
+    return Math.min(1, Math.max(0, (line - 1) / (lines.length - 1)))
+  }
+
+  /** 编辑区与预览区绑成一对 —— 滚一边，另一边跟着走 */
+  function linkPanes(pane: Pane): void {
+    const move = (ratio: number) => {
+      pane.echo = ratio
+      setScrollRatio(pane.preview, ratio)
+    }
+    pane.body.addEventListener('scroll', () => {
+      const ratio = scrollRatio(pane.body)
+      if (Math.abs(ratio - pane.echo) < 0.005) return
+      move(ratio)
+    })
+    pane.preview.addEventListener('scroll', () => {
+      const ratio = scrollRatio(pane.preview)
+      if (Math.abs(ratio - pane.echo) < 0.005) return
+      pane.echo = ratio
+      setScrollRatio(pane.body, ratio)
+    })
+    // 光标一动 —— 预览立刻跟到正在写的那一段
+    // 编辑区能滚的时候交给滚动同步（两套定位会打架），不能滚才用光标定位
+    const locate = () => {
+      if (pane.body.scrollHeight - pane.body.clientHeight > 0) return
+      move(caretRatio(pane.body))
+    }
+    pane.body.addEventListener('keyup', locate)
+    pane.body.addEventListener('click', locate)
   }
 
   /** 正文改完停 400ms 就刷新一次预览 */
@@ -738,8 +791,9 @@ const langs = ['zh', 'en'] as const
     const body = document.querySelector<HTMLTextAreaElement>('[name="body-' + lang + '"]')
     const preview = document.querySelector<HTMLElement>('[data-admin-preview="' + lang + '"]')
     if (!tools || !body || !preview) continue
-    const pane: Pane = { lang, tools, body, preview, timer: 0, seq: 0 }
+    const pane: Pane = { lang, tools, body, preview, timer: 0, seq: 0, echo: -1 }
     panes.push(pane)
+    linkPanes(pane)
     renderTools(pane)
     body.addEventListener('focus', () => {
       activePane = pane

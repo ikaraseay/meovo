@@ -470,17 +470,42 @@
   gap: var(--ui-space-md);
 }
 
-/* 编辑器 —— 左写右看 */
+/* 编辑器 —— 左写右看：左边写，右边看；上中文下英文 */
 .admin-editor {
   display: grid;
-  gap: var(--ui-space-lg);
+  gap: var(--ui-space-sm) var(--ui-space-lg);
   grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 1024px) {
   .admin-editor {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto var(--ui-editor-height);
   }
+
+  .admin-editor__tools {
+    grid-area: 1 / 1;
+  }
+
+  .admin-editor__body {
+    grid-area: 2 / 1;
+  }
+
+  .admin-editor__label {
+    grid-area: 1 / 2;
+  }
+
+  .admin-preview {
+    grid-area: 2 / 2;
+  }
+}
+
+/* 两边一样高 —— 滚动同步才有着落 */
+.admin-editor__body,
+.admin-preview {
+  height: var(--ui-editor-height);
+  min-height: 18rem;
+  overflow: auto;
 }
 
 /* 对版 —— 卡片头：标题 + 开关 */
@@ -492,19 +517,12 @@
   flex-wrap: wrap;
 }
 
-.admin-editor__pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-xs);
-  min-width: 0;
-}
-
 .admin-editor__body {
-  min-height: 26rem;
   font-family: var(--ui-font-mono, ui-monospace, monospace);
   font-size: 0.875rem;
   line-height: 1.7;
-  resize: vertical;
+  /* 高度锁死 —— 手动拉宽会让两边的滚动对不上 */
+  resize: none;
 }
 
 /* 格式工具栏 —— 常用 markdown 动作 */
@@ -525,9 +543,6 @@
 
 /* 预览用 .prose 排版 —— 跟文章页看到的一样（字号与行距交给 .prose） */
 .admin-preview {
-  min-height: 26rem;
-  max-height: 40rem;
-  overflow: auto;
   padding: var(--ui-space-md);
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);

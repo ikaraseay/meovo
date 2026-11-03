@@ -110,6 +110,8 @@ export const ui = {
   'post.license.note.ccBy': { zh: '允许转载，需署名并链回原文。', en: 'You may repost with attribution and a link back to the original.' },
   'post.license.note.ccByNc': { zh: '允许转载（禁止商用），需署名并链回原文。', en: 'You may repost non-commercially, with attribution and a link back.' },
   'post.license.note.allRights': { zh: '保留所有权利，转载需事先授权。', en: 'All rights reserved. Reposting requires permission.' },
+  'post.license.raw': { zh: '查看 Markdown 原文', en: 'Markdown source' },
+  'post.image.close': { zh: '关闭图片', en: 'Close image' },
 
   // 评论
   'comments.title': { zh: '评论', en: 'Comments' },
@@ -147,6 +149,10 @@ export const ui = {
   },
   'error404.home': { zh: '回到首页', en: 'Back home' },
   'error404.archive': { zh: '去归档翻翻', en: 'Browse the archive' },
+  'error404.feedback': {
+    zh: '如有错误或建议，请联系作者邮箱：',
+    en: 'Found an error or have a suggestion? Email the author:',
+  },
 
   // 标签显示名 —— 标签的**标识**是 ASCII slug，URL 里用的是它，显示名走词典
   'tag.astro': { zh: 'Astro', en: 'Astro' },

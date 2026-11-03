@@ -55,6 +55,18 @@ export const CLASS = {
   adminFlash: 'admin-flash',
   /** 后台：提示条里的错误态 */
   adminFlashError: 'admin-flash--error',
+  /** 正文排版容器 */
+  prose: 'prose',
+  /** 图片放大层 */
+  imgZoom: 'img-zoom',
+  /** 放大层里的那张图 */
+  imgZoomImage: 'img-zoom__img',
+  /** 放大层的关闭按钮 */
+  imgZoomClose: 'img-zoom__close',
+  /** 可以点开放大的正文图片 */
+  imgZoomable: 'img-zoomable',
+  /** 放大层里正在拖动 */
+  isPanning: 'is-panning',
 } as const
 
 /** data 属性名 */

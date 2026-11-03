@@ -5,7 +5,7 @@
  */
 import { t, type Locale } from '../i18n'
 import { LICENSES } from '../lib/licenses'
-import type { Post } from '../lib/posts'
+import { getPostLocale, getPostSlug, type Post } from '../lib/posts'
 
 interface Props {
   post: Post
@@ -15,6 +15,9 @@ interface Props {
 const { post, locale } = Astro.props
 
 const license = LICENSES[post.data.license]
+
+/** 开源协议（CC 系列）才给原文链接 —— 「保留所有权利」不给 */
+const openLicense = post.data.license !== 'all-rights'
 
 /** 版权年份取发布年 —— 文章的版权从发布那年算 */
 const year = post.data.pubDate.getFullYear()
@@ -40,6 +43,19 @@ const year = post.data.pubDate.getFullYear()
     }
   </p>
   <p class="post-license-note">{t(locale, license.noteKey)}</p>
+  {
+    openLicense && (
+      <p class="post-license-raw">
+        <a
+          href={`/${getPostLocale(post)}/raw/${getPostSlug(post)}.md`}
+          target="_blank"
+          rel="noopener"
+        >
+          {t(locale, 'post.license.raw')}
+        </a>
+      </p>
+    )
+  }
 </div>
 
 <style>
@@ -73,5 +89,14 @@ const year = post.data.pubDate.getFullYear()
 
   .post-license-note {
     color: var(--ui-text-muted);
+  }
+
+  .post-license-raw a {
+    color: var(--ui-text-accent);
+    text-decoration: none;
+  }
+
+  .post-license-raw a:hover {
+    text-decoration: underline;
   }
 </style>

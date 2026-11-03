@@ -100,6 +100,7 @@ const height = Math.max(rows.length > 0 ? rows[rows.length - 1].y + ROW_H : 0, r
   <summary class="outline-summary">{t(locale, 'post.structure')}</summary>
   {
     rows.length === 0 ? null : (
+      <div class="outline-scroll">
       <svg
         class="outline-svg"
         viewBox={`0 0 ${width} ${height}`}
@@ -145,6 +146,7 @@ const height = Math.max(rows.length > 0 ? rows[rows.length - 1].y + ROW_H : 0, r
           {rootText}
         </text>
       </svg>
+      </div>
     )
   }
 </details>
@@ -186,6 +188,14 @@ const height = Math.max(rows.length > 0 ? rows[rows.length - 1].y + ROW_H : 0, r
 
   .outline-summary::marker {
     content: '';
+  }
+
+  /* 章节多了图会很高 —— 图自己滚，别把卡片撑出屏幕 */
+  .outline-scroll {
+    max-height: calc(100vh - 12rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 
   .outline-svg {

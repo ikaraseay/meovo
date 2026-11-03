@@ -82,6 +82,63 @@
   border-radius: var(--ui-radius-md);
 }
 
+/* 点开能放大 —— 指一下就告诉用户可以点 */
+.prose img.img-zoomable {
+  cursor: zoom-in;
+}
+
+/* ==================== 图片放大层 ==================== */
+.img-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-popup);
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.72);
+  backdrop-filter: blur(6px);
+  cursor: zoom-out;
+}
+
+.img-zoom[hidden] {
+  display: none;
+}
+
+.img-zoom__img {
+  max-width: 92vw;
+  max-height: 92vh;
+  transform-origin: center center;
+  will-change: transform;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.img-zoom__img.is-panning {
+  cursor: grabbing;
+}
+
+.img-zoom__close {
+  position: absolute;
+  top: var(--ui-space-md);
+  inset-inline-end: var(--ui-space-md);
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #fff;
+  border-radius: var(--ui-radius-full);
+  border: 1px solid rgb(255 255 255 / 0.28);
+  background: rgb(255 255 255 / 0.12);
+  cursor: pointer;
+}
+
+.img-zoom__close:hover {
+  background: rgb(255 255 255 / 0.22);
+}
+
 .prose hr {
   height: 1px;
   margin-block: var(--ui-space-2xl);
@@ -243,6 +300,11 @@ html.dark .code-block pre.astro-code span {
   padding: 0;
   border-inline-start: 1px solid var(--ui-border);
   list-style: none;
+  /* 章节多了目录自己滚 —— 别把卡片撑出屏幕 */
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .toc[data-open] .toc-list {

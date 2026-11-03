@@ -103,6 +103,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       class="prose"
       data-copy-label={t(locale, 'post.copyCode')}
       data-copied-label={t(locale, 'post.copied')}
+      data-image-close={t(locale, 'post.image.close')}
     >
       <slot />
     </div>
@@ -167,6 +168,8 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
      恢复只要把 <Comments slug={getPostSlug(post)} locale={locale} /> 放回这里 -->
 
 <script>
+  import { initImageZoom } from '../lib/image-zoom'
+
   /* ---------- 目录：折叠 + 滚动高亮 ---------- */
 
   const toc = document.querySelector<HTMLElement>('[data-toc]')
@@ -187,6 +190,16 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   /** 悬浮状态栏会盖住标题，判定「到达」时留出这段距离 */
   const HEADING_OFFSET = 120
 
+  /** 目录自己会滚 —— 当前章节滚出视野时把它带回来（只滚目录，不动页面） */
+  function keepActiveVisible(link: HTMLAnchorElement) {
+    const list = link.closest('.toc-list')
+    if (!list) return
+    const rect = link.getBoundingClientRect()
+    const box = list.getBoundingClientRect()
+    if (rect.top < box.top) list.scrollTop -= box.top - rect.top
+    else if (rect.bottom > box.bottom) list.scrollTop += rect.bottom - box.bottom
+  }
+
   function syncActiveHeading() {
     let active: string | undefined
     for (const heading of tocHeadings) {
@@ -194,7 +207,9 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       else break
     }
     for (const link of tocLinks) {
-      link.classList.toggle('is-active', link.dataset.tocLink === active)
+      const isActive = link.dataset.tocLink === active
+      link.classList.toggle('is-active', isActive)
+      if (isActive) keepActiveVisible(link)
     }
   }
 
@@ -262,6 +277,12 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
         button.classList.remove('is-copied')
       }, 2000)
     })
+  })
+
+  /* ---------- 图片：点开能放大、能拖着挪 ---------- */
+
+  initImageZoom([...document.querySelectorAll<HTMLImageElement>('.prose img')], {
+    close: prose?.dataset.imageClose ?? '',
   })
 </script>
 

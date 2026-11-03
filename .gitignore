@@ -38,6 +38,9 @@ worker-configuration.d.ts
 frontend/content/generated/*.md
 frontend/content/generated/*.mdx
 frontend/content/generated/.manifest.json
+# 导出按语言分目录（zh/、en/）—— 通配也要盖住子目录
+frontend/content/generated/**/*.md
+frontend/content/generated/**/*.mdx
 
 # 开发笔记（issue / spec）—— 本地的事，不进模版仓库
 .scratch/
