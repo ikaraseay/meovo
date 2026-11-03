@@ -16,6 +16,10 @@ import { clamp, type Point, type Size, type Viewport } from './geometry.ts'
 export const DESK_PAD = 12
 export const DESK_GAP_X = 32
 export const DESK_GAP_Y = 44
+/** 卡片与屏幕边缘留的余量 */
+const DESK_EDGE = 16
+/** 正文列最窄多少 —— 再窄就没法读了 */
+export const MIN_CONTENT_WIDTH = 480
 
 /** 每列至少多宽才多开一列 */
 const COL_MIN_WIDTH = 380
@@ -122,8 +126,8 @@ export function contentAnchoredLayout(
   const { deskWidth, topOffset, contentWidth, contentHeight } = opts
   const unpinned = cards.filter((c) => !c.pinned)
   const top = unpinned.filter((c) => (c.zone ?? 'top') === 'top')
-  const side = unpinned.filter((c) => c.zone === 'side')
-  const tail = unpinned.filter((c) => c.zone === 'tail')
+  const sideAll = unpinned.filter((c) => c.zone === 'side')
+  const tailAll = unpinned.filter((c) => c.zone === 'tail')
 
   // 顶部卡片从上往下堆，堆完的高度就是正文要留的顶部空间
   let topH = topOffset
@@ -137,9 +141,16 @@ export function contentAnchoredLayout(
 
   const positions = new Map<string, Position>()
 
+  // 侧栏卡片放不下（窄桌面）就掉到正文下面 —— 压在正文上比排到下面更糟
+  const fitsSide = (c: DeskCard) =>
+    contentRight + DESK_GAP_X + c.width <= deskWidth - DESK_EDGE
+  const side = sideAll.filter(fitsSide)
+  const tail = [...tailAll, ...sideAll.filter((c) => !fitsSide(c))]
+
   let topY = topOffset
   for (const c of top) {
-    positions.set(c.id, { x: contentLeft, y: topY, width: Math.min(c.width, contentWidth) })
+    // 正文列里的卡片宽度 = 正文列宽度 —— 右缘才跟正文对齐
+    positions.set(c.id, { x: contentLeft, y: topY, width: contentWidth })
     topY += c.height + DESK_GAP_Y
   }
 
@@ -151,7 +162,7 @@ export function contentAnchoredLayout(
 
   let tailY = contentBottom + DESK_GAP_Y
   for (const c of tail) {
-    positions.set(c.id, { x: contentLeft, y: tailY, width: c.width })
+    positions.set(c.id, { x: contentLeft, y: tailY, width: contentWidth })
     tailY += c.height + DESK_GAP_Y
   }
 
@@ -160,6 +171,25 @@ export function contentAnchoredLayout(
     contentMarginTop,
     minHeight: Math.max(topY, sideY, tailY, contentBottom + DESK_GAP_Y) + DESK_PAD,
   }
+}
+
+/**
+ * 正文列该多宽 —— 给右边的侧栏让位。
+ *
+ * 列是居中的，所以左右各要一份侧栏的位；实在不够就保底宽度，
+ * 侧栏改排到正文下面（压在正文上更糟）。
+ *
+ * @param railWidth 侧栏卡片里最宽的那张（不含间距）
+ * @param maxWidth  CSS 给的宽度上限（正文列本来就多宽）
+ */
+export function fittedContentWidth(
+  deskWidth: number,
+  railWidth: number,
+  maxWidth: number,
+): number {
+  if (railWidth <= 0) return maxWidth
+  const room = deskWidth - 2 * (railWidth + DESK_GAP_X + DESK_EDGE)
+  return Math.max(MIN_CONTENT_WIDTH, Math.min(maxWidth, room))
 }
 
 /**

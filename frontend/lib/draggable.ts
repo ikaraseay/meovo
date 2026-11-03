@@ -25,10 +25,12 @@ import {
   clampToDesk,
   clampToViewport,
   contentAnchoredLayout,
+  fittedContentWidth,
   fromPct,
   restoreFromPct,
   scatterLayout,
   toPct,
+  DESK_GAP_X,
   DESK_GAP_Y,
   type DeskCard,
   type Position,
@@ -281,15 +283,52 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
   }
 
-  /** 首次进入（没有存档）时，把 data-default-pin 的卡片默认固定到视口右上 */
+  /** 侧栏卡片里最宽的那张 —— 正文列要给它们让位 */
+  function railCardWidth(): number {
+    let w = 0
+    for (const entry of entries) {
+      if ((entry.el.getAttribute(ATTR.zone) || 'top') !== 'side') continue
+      w = Math.max(w, entry.w)
+    }
+    return w
+  }
+
+  /**
+   * 正文列宽度 —— 给右边的侧栏让位。
+   * 列是居中的，所以左右各留一份侧栏的位；放不下就保底宽度，
+   * 侧栏改排到正文下面（压在正文上更糟）。
+   */
+  function fitContentWidth() {
+    if (!contentEl) return
+    contentEl.style.width = '' // 回到 CSS 的宽度再量
+    const max = contentEl.offsetWidth
+    contentEl.style.width = `${fittedContentWidth(desk.clientWidth, railCardWidth(), max)}px`
+  }
+
+  /** 正文列的右缘（视口坐标）—— 没有正文列时返回 0 */
+  function contentRightEdge(): number {
+    if (!contentEl) return 0
+    const deskRect = desk.getBoundingClientRect()
+    const w = contentEl.offsetWidth
+    return deskRect.left + (desk.clientWidth - w) / 2 + w
+  }
+
+  /** 首次进入（没有存档）时，把 data-default-pin 的卡片默认固定到**正文右边** */
   function applyDefaultPins() {
     let top = topOffset()
+    const right = contentRightEdge()
+    // 判定「放得下」用桌面的右缘 —— 与布局那侧同一把尺，固定 / 取消固定结果一致
+    const deskRight = desk.getBoundingClientRect().left + desk.clientWidth
     for (const entry of entries) {
       if (!entry.el.hasAttribute(ATTR.defaultPin)) continue
       if (saved[entry.id]) continue // 已有存档（用户 pin/拖过），尊重用户
+      // 视口右上角会压在正文上 —— 贴着正文列的右缘放
+      const x = right ? right + DESK_GAP_X : window.innerWidth - entry.w - 16
+      // 窄桌面放不下就不固定：让它回到正文旁边（排不下就掉到正文下面）
+      if (right && x + entry.w > deskRight - 16) continue
       entry.pinned = true
       const p = clampToViewport(
-        { x: window.innerWidth - entry.w - 16, y: top },
+        { x, y: top },
         { width: entry.w, height: entry.h },
         { width: window.innerWidth, height: window.innerHeight },
       )
@@ -306,13 +345,17 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   function apply() {
     if (!mq.matches) {
       for (const entry of entries) placeFlow(entry)
-      if (contentEl) contentEl.style.marginTop = ''
+      if (contentEl) {
+        contentEl.style.marginTop = ''
+        contentEl.style.width = ''
+      }
       desk.style.minHeight = ''
       return
     }
 
     measure()
     syncPinnedState()
+    fitContentWidth()
     applyDefaultPins()
 
     if (contentEl) layoutContentAnchored(contentEl)
@@ -484,6 +527,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       if (contentEl) {
         contentEl.style.marginTop = ''
         contentEl.style.marginRight = ''
+        contentEl.style.width = ''
       }
       desk.style.minHeight = ''
     }

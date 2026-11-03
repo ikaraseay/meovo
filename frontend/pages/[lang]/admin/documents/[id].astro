@@ -597,7 +597,12 @@ const langs = ['zh', 'en'] as const
   document
     .querySelector<HTMLButtonElement>('[data-admin-preview-button]')
     ?.addEventListener('click', () => {
-      if (activePane) void refreshPreview(activePane)
+      // 没聚焦过正文框就用第一块 —— 点了必须有个反应
+      const pane = activePane ?? panes[0]
+      if (!pane) return
+      void refreshPreview(pane)
+      // 预览面板在正文框旁边，按钮在页面最下面 —— 不滚过去看着像没反应
+      pane.preview.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
 
   /* ---------------- 图库与导入 ---------------- */

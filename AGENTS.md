@@ -135,6 +135,14 @@
     `clampToViewport` 一处算，拖拽、固定、默认固定全走它
   - **拖拽时卡片水平，放下后复原倾斜** —— 倾斜记在 `baseTilt`（默认落位的倾斜）：
     拖拽开始撤下 `is-tilted`，松手 `placeAbsolute` 复原
+  - **正文列是宽度的唯一基准** —— 内容锚定布局里，正文列（`[data-desk-content]`）里的卡片
+    （顶部标题卡 / 底部协议卡 / 上下篇）一律取**正文列的宽度**，右缘才跟正文对齐。
+    卡片自己的宽度档位（`--sm` / `--lg` / `--xl`）只管没进正文列的时候
+  - **侧栏卡片放不下就掉到正文下面** —— 760px 正文列 + 300px 侧栏要 1424px 才排得下。
+    窄桌面由 `fittedContentWidth` 收窄正文列给侧栏让位（保底 480px），
+    收到保底还放不下，侧栏就排到正文后面 —— **压在正文上比排到下面更糟**
+  - **默认固定位置贴着正文列的右缘** —— 不是视口右上角：右上角在窄桌面会正好压在正文上。
+    判定「放得下」用**桌面的右缘**（与布局那侧同一把尺），固定 / 取消固定结果一致
 - **部署**：Cloudflare **Workers**（适配器 v14 已移除 Pages 支持）。构建 `pnpm build` → `dist/client`（静态资源）+ `dist/server`（Worker）；Node 钉在 `.node-version`，
   pnpm 钉在 `package.json` 的 `packageManager`（Workers Builds 的镜像会读这个字段装对应版本）。
   - **部署只有一条路径：Cloudflare Workers Builds 直连 GitHub** —— push 自动构建 + 部署。
