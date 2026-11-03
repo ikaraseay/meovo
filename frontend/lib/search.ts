@@ -14,29 +14,42 @@ const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/
 /** 字母或数字 —— 拉丁词的组成字符 */
 const WORD_CHAR = /[\p{L}\p{N}]/u
 
+/** 一个 token：切出来的词 + 它在原文里的位置 */
+interface Token {
+  text: string
+  start: number
+  end: number
+}
+
 /**
- * 把文本切成「空格分隔的 token 流」。
+ * 把文本切成带位置的 token 流。
  *
  * - 中文逐字拆开（"液态玻璃" → "液 态 玻 璃"）
  * - 拉丁词整体保留并转小写（"Cloudflare Workers" → "cloudflare workers"）
  * - 其余字符（标点、空白）当分隔符丢掉
+ *
+ * 位置是给高亮用的 —— 命中判定知道了 token 落在哪，
+ * 把位置换算回字符区间就行，不用再拿原文猜一遍。
  */
-export function segmentText(text: string): string {
-  const tokens: string[] = []
+function tokenize(text: string): Token[] {
+  const tokens: Token[] = []
   let buffer = ''
+  let start = 0
 
   const flush = () => {
     if (buffer) {
-      tokens.push(buffer.toLowerCase())
+      tokens.push({ text: buffer.toLowerCase(), start, end: start + buffer.length })
       buffer = ''
     }
   }
 
-  for (const char of text) {
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
     if (CJK.test(char)) {
       flush()
-      tokens.push(char)
+      tokens.push({ text: char, start: i, end: i + 1 })
     } else if (WORD_CHAR.test(char)) {
+      if (!buffer) start = i
       buffer += char
     } else {
       flush()
@@ -44,7 +57,14 @@ export function segmentText(text: string): string {
   }
   flush()
 
-  return tokens.join(' ')
+  return tokens
+}
+
+/** token 流拼成的字符串（索引与查询共用） */
+export function segmentText(text: string): string {
+  return tokenize(text)
+    .map((token) => token.text)
+    .join(' ')
 }
 
 /**
@@ -127,22 +147,33 @@ function containsSequence(haystack: string[], needle: string[]): boolean {
  */
 export function matchText(text: string, terms: SearchTerm[]): boolean {
   if (terms.length === 0) return true
-  const tokens = segmentText(text).split(' ').filter(Boolean)
+  const tokens = tokenize(text).map((token) => token.text)
   return terms.every((term) => containsSequence(tokens, term.tokens))
 }
 
-/** 文本里所有命中区间（合并重叠） */
+/**
+ * 文本里所有命中区间（合并重叠）。
+ *
+ * 区间从**同一个 token 匹配**推出来 —— 高亮是匹配的结果，不是另一次查找：
+ * 按原文 indexOf 找，会把「折-射」里的折射判成没命中，
+ * 又把 Cloudflare 里的 Cloud 判成命中。
+ */
 function findRanges(text: string, terms: SearchTerm[]): [number, number][] {
-  const lower = text.toLowerCase()
+  const tokens = tokenize(text)
   const ranges: [number, number][] = []
 
   for (const term of terms) {
-    const needle = term.text.toLowerCase()
-    if (!needle) continue
-    let at = lower.indexOf(needle)
-    while (at !== -1) {
-      ranges.push([at, at + needle.length])
-      at = lower.indexOf(needle, at + needle.length)
+    if (term.tokens.length === 0) continue
+    for (let i = 0; i + term.tokens.length <= tokens.length; i++) {
+      let matched = true
+      for (let j = 0; j < term.tokens.length; j++) {
+        if (tokens[i + j].text !== term.tokens[j]) {
+          matched = false
+          break
+        }
+      }
+      if (!matched) continue
+      ranges.push([tokens[i].start, tokens[i + term.tokens.length - 1].end])
     }
   }
 
@@ -166,8 +197,8 @@ export interface HighlightPart {
 /**
  * 把文本切成「命中 / 未命中」的片段，供渲染时包 <mark>。
  *
- * 命中位置按词组的原文形式找（大小写不敏感）——
- * 匹配用切分后的 token，高亮用原文，两边对得上。
+ * 区间来自 token 匹配 —— 跟 matchText 同一套规则：
+ * 没在这个字段里命中的词组不会在这里留下高亮。
  */
 export function highlightParts(text: string, terms: SearchTerm[]): HighlightPart[] {
   const ranges = findRanges(text, terms)

@@ -19,6 +19,9 @@
   - **目录即语言**，语言不写在 frontmatter 里
   - 同一篇文章的不同语言版本**文件名必须一致**，系统据此判定互为翻译
   - 标签与分类用 **ASCII slug**（`design`、`css`），显示名走词典 `tag.<slug>` / `category.<slug>`
+  - **slug 规则只有一处**：`frontend/lib/slug.ts` 的 `SLUG_PATTERN` ——
+    后台提交（`backend/lib/admin/documents.ts`）与 frontmatter schema
+    （`frontend/content.config.ts`）都从那儿拿。手写文章绕过后台，schema 就是那道防线
   - 草稿 `draft: true` 与 `pubDate` 未到的文章，生产构建不输出（开发环境可见）
   - frontmatter schema 在 `frontend/content.config.ts`，字段不对**构建会失败**
 - **样式**：原生 CSS + `--ui-*` token 契约，零工具类依赖。
@@ -160,6 +163,7 @@
 - **i18n**：UI 文案一律走 `t(locale, key, params?)`，词典在 `frontend/i18n/ui.ts`，每条必须同时有 `zh` 和 `en`。
   `pnpm check:i18n` 三件事都查：词条完整（zh / en 都非空）、界面没有硬编码中文、
   **代码里用到的 key 都在词典里**（缺了就静默显示成 key 本身）。
+  ⚠️ 它只认 `t()` 调用里的 key —— 写在数据表里的 key（编辑器按钮表那种）抓不到，靠对应单测兜。
 - **站点名与笔名是两回事** —— `site.name` 是品牌名（og:site_name / RSS），
   导航栏那个 logo 现在是**作者头像**（`/avatar.png`），
   `site.author` 是笔名（标题后缀与署名）。
@@ -167,7 +171,7 @@
   公开仓库不带个人文字，个人那几处走**后台「设置」**（D1 `settings` → 构建期导出
   `frontend/i18n/overrides.ts`），别手写回 `config/site.json`。
   署名的地方都用笔名：页脚版权、文章页 JSON-LD 的 author、头像的 alt。
-- **站点常用文字在 `config/site.json`** —— 站点名 / 笔名 / 标语 / 首页大标题 / 关于页引言 / 邮箱，
+- **站点常用文字在 `config/site.json`** —— 站点名 / 笔名 / 标语 / 首页大标题 / 关于页引言 / 邮箱 / 页脚高度，
   单独一个配置文件（入库，一眼看就懂）。仓库里是默认值；个人文字在后台设置（D1），
   不进仓库。其余长尾文案在 `frontend/i18n/ui.ts` 的词典里。
   - 三层叠加，后者盖前者：**词典 → `config/site.json` → `frontend/i18n/overrides.ts`**（后台改的）
@@ -177,6 +181,11 @@
 - **后台的「设置」分区能改全站默认文字** —— 站点信息（`site.*`）与语言包里的每一条词条都能改。
   - 数据在 D1 的 `settings` 表（`backend/db/migrations/0002_settings.sql`），
     **只存改过的**：与默认值一样的不落库，「恢复默认」= 删那一行
+  - **页脚高度也走这条管线** —— `site.footerMinHeight` 是**数值**（px，0 = 不限），
+    但照样存成 zh/en 两份同值的文案设置：后台那个控件一次写两份，前台用
+    `frontend/lib/footer-height.ts` 读成像素数（坏了的值一律当不限）
+  - ⚠️ 数值设置**不进「界面文案」列表**（那里一个键有两列，会被拆成两份）——
+    只有「站点信息」区里那一个控件能改它
   - 构建期由 `backend/scripts/export-d1-posts.mjs` 写进 `frontend/i18n/overrides.ts`，
     `frontend/i18n/index.ts` 构建时把它叠在语言包上 —— **改文案要等下一次构建**
   - ⚠️ `frontend/i18n/overrides.ts` 是**生成的**，别手改；它入库是为了让 diff 里看得见改了什么
@@ -189,6 +198,9 @@
 - **DOM 契约**：跨 module 的 class 名 / data 属性名 / 层级刻度都收在 `frontend/lib/dom-contract.ts`
   （`CLASS` / `ATTR` / `Z`）。TS 侧引常量；CSS 与标记里仍是字面量 ——
   `test/dom-contract.test.ts` 跨查两边对不对得上。改名先改契约，再改两边。
+  - **契约测试双向守**：lib 层读到的 `data-*` 与 class 字面量也得登记 ——
+    真正会咬人的是「标记里有人用了契约外的名字」（改名只会静默失灵）。
+    反向检查的范围是 lib 层：组件内部自己写自己读的名字不算跨 module。
 - **持久化**：走 `frontend/lib/persist.ts` 的 `createStore({ key, version, clean, migrate })` ——
   序列化、版本、清洗只有一处。两个 adapter：`floating-bar-state.ts`（像素）与
   `widget-state.ts`（百分比）。落盘格式是 `{ version, data }`，旧格式靠 `migrate` 迁，
@@ -230,6 +242,8 @@
 - **站内搜索是纯静态的，不查数据库**：归档页 `/[lang]/archive/` 内联一份索引
   （标题、摘要、正文原文），浏览器端匹配 + 高亮，规则在 `frontend/lib/search.ts`。
   - **切分规则只有一处**：`segmentText` —— 中文逐字拆开、拉丁词整体转小写。
+    匹配与高亮吃**同一份 token**（切分时带上位置）—— 高亮是匹配的结果，不另找一遍：
+    按原文 indexOf 找会把「折-射」里的折射判成没命中，又把 Cloudflare 里的 Cloud 判成命中。
     为什么自己切：D1 的 FTS5 只有 `unicode61` / `trigram`，**都不切中文**
     （实测中文召回为零，`icu61` 根本不可用）。
   - **词组内要求连续**（`matchText`）：搜「折射」命中「液态玻璃的折射效果」，
@@ -245,6 +259,8 @@
   - 关键词写进 URL（`?q=`），结果能分享 / 收藏。
 - **本机跑 Cloudflare 工具要带可写的 `HOME`**：
   适配器在构建期起 workerd，`~/Library/Preferences` 不可写会直接失败。
+  ⚠️ 拉不到 D1 时导出脚本会写一份**空的** `overrides.ts`（个人文字当场没了）——
+  拉回来只能靠 `pnpm sync`；构建前先确认 overrides 里还有东西。
 
 ## 后台（自建 CMS）
 
@@ -261,10 +277,20 @@
   - **中英文对版**：正文卡右上角有「对版」开关 —— 左边是当前在写的那版，
     右边并排显示**同 slug 的另一种语言版本**（只读，markdown 源码），底下给一个「去编辑那一版」的链接。
     取另一版走 `GET /api/admin/documents?slug=&locale=`（不带参数还是原来的列表）
+  - **编辑器有 markdown 工具栏 + 自动预览**：
+    - 按钮表与纯文本改写函数都在 `frontend/lib/editor-tools.ts`（`EDITOR_TOOLS` +
+      `wrapSelection` / `prefixLines` / `insertLink` / `insertTable`），组件只管读写 textarea。
+      选区算错、光标落错肉眼看不出来 —— 所以有 `test/editor-tools.test.ts`，改按钮先改那张表
+    - 预览走 `POST /api/admin/preview`（服务端 marked）；正文停手 400ms 自动刷一次。
+      改完正文要自己 `dispatchEvent(new Event('input'))` 才会触发（脏标记与预览都听它）
+    - **「悬停显示」插的是 `<span class="spoiler">…</span>`（裸 HTML，不是 markdown 语法）** ——
+      站点与预览都渲染裸 HTML，共用 `frontend/styles/prose.css` 的 `.prose .spoiler`
   - 列表支持搜索（标题 / slug / 摘要）+ 状态筛选 + 语言筛选
   - 样式全在 `frontend/styles/admin.css` —— 只用 `--ui-*` token，
     层级刻度用 `--ui-z-*`（提示条是 `--ui-z-panel`）
 - **鉴权只有一处**：`backend/middleware.ts` 拦 `/<lang>/admin/*` 与 `/api/admin/*` ——
+    同一处还管**请求体上限**（看 `Content-Length`，超了 413）——
+    上限要卡在解析之前：读进来再判断等于没判断，内存已经花掉了。路由本身只管业务
   没登录的接口回 401 JSON，页面跳登录页。路由本身只管业务。
   - 口令哈希在 Worker secret `ADMIN_PASSWORD_HASH`（SHA-256），会话密钥 `SESSION_SECRET`，
     Cookie `meovo_session`（HttpOnly / Secure / SameSite=Lax / 7 天）。

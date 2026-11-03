@@ -9,7 +9,7 @@ import {
   sniffImageType,
 } from '../../../../../backend/lib/admin/media.ts'
 import { createMedia, listMedia, mediaBucket } from '../../../../../backend/lib/admin/db.ts'
-import { fail, json } from '../../../../../backend/lib/admin/api.ts'
+import { bodyTooLarge, fail, json } from '../../../../../backend/lib/admin/api.ts'
 
 export const GET: APIRoute = async () => {
   const media = await listMedia()
@@ -17,6 +17,10 @@ export const GET: APIRoute = async () => {
 }
 
 export const POST: APIRoute = async ({ request }) => {
+  // 文件上限要在 formData() 之前看 —— 那一步会把整个 multipart 读进内存
+  const tooLarge = bodyTooLarge(request, MAX_IMAGE_BYTES + 64 * 1024)
+  if (tooLarge) return tooLarge
+
   const form = await request.formData()
   const file = form.get('file')
   if (!(file instanceof File)) return fail('file_required', 400)

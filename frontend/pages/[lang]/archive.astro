@@ -281,7 +281,9 @@ const searchIndexJson = JSON.stringify(searchBodies).replace(/</g, '\\u003c')
         list.hidden = true
         status.hidden = true
         showOnlyHost(false)
-        desk.style.minHeight = savedMinHeight
+        // 只在确实接管过高度时才还回去 ——
+        // 没搜过就直接按 Esc，把行内高度清空会让桌面塌成 0（散开布局的卡片是绝对定位，不占文档流）
+        if (searching) desk.style.minHeight = savedMinHeight
         searching = false
         syncUrl('')
         return

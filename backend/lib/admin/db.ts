@@ -144,12 +144,16 @@ export async function updateDocument(
   id: string,
   values: DocumentValues,
   expectedUpdatedAt: string | null,
-): Promise<'ok' | 'conflict' | 'missing'> {
+): Promise<{ result: 'ok' | 'conflict' | 'missing'; updatedAt: string }> {
   const current = await getDocument(id)
-  if (!current) return 'missing'
+  if (!current) return { result: 'missing', updatedAt: '' }
   // 别人改过了就别覆盖 —— 后写覆盖先写会丢内容
-  if (expectedUpdatedAt && current.updated_at !== expectedUpdatedAt) return 'conflict'
+  if (expectedUpdatedAt && current.updated_at !== expectedUpdatedAt) {
+    return { result: 'conflict', updatedAt: current.updated_at }
+  }
 
+  // 新令牌写进去也返回出去 —— 客户端要靠它做下一次保存
+  const updatedAt = new Date().toISOString()
   const sql =
     'UPDATE documents SET slug = ?, locale = ?, title = ?, description = ?, body = ?, ' +
     'pub_date = ?, updated_date = ?, category = ?, tags = ?, series_id = ?, series_title = ?, ' +
@@ -169,20 +173,22 @@ export async function updateDocument(
       values.series_title,
       values.series_order,
       values.license,
-      new Date().toISOString(),
+      updatedAt,
       id,
     )
     .run()
-  return 'ok'
+  return { result: 'ok', updatedAt }
 }
 
-export async function setDocumentStatus(id: string, status: string): Promise<void> {
+export async function setDocumentStatus(id: string, status: string): Promise<string> {
   const now = new Date().toISOString()
   await env.DB.prepare(
     'UPDATE documents SET status = ?, published_at = ?, updated_at = ? WHERE id = ?',
   )
     .bind(status, status === 'published' ? now : null, now, id)
     .run()
+  // 发布/撤回也换令牌 —— 回传出去，客户端手里那份才不是过期的
+  return now
 }
 
 export async function deleteDocument(id: string): Promise<void> {

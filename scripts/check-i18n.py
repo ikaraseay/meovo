@@ -47,7 +47,10 @@ def strip_comments(text: str) -> str:
     """去掉 HTML 注释、JS 行注释与块注释，保留行结构"""
     text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r"//.*$", "", text, flags=re.M)
+    # 双斜杠不一定是注释：https:// 与 "//cdn" 里的不是 ——
+    # 前面是 : " ' / 时不当注释，否则带链接的行会被整行吃掉，
+    # 行上的界面文案就跟着隐形了（备案号就是这么漏过去的）
+    text = re.sub(r"(?<![:\"'/])//.*$", "", text, flags=re.M)
     return text
 
 

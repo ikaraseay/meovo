@@ -19,7 +19,7 @@ export const POST: APIRoute = async ({ params, request }) => {
 
   const body = await readJson(request)
   const published = body?.published !== false
-  await setDocumentStatus(document.id, published ? 'published' : 'draft')
+  const updatedAt = await setDocumentStatus(document.id, published ? 'published' : 'draft')
 
   // 发布与撤回都要重建 —— 发布是上线，撤回是下线，两者都只改了 status
   // 等一下钩子的回应（最多 3 秒）：构建是由 Cloudflare 那边跑的，这里只负责敲门
@@ -30,5 +30,6 @@ export const POST: APIRoute = async ({ params, request }) => {
     buildTriggered = false
   }
 
-  return json({ ok: true, status: published ? 'published' : 'draft', buildTriggered })
+  // 发布/撤回也换了令牌 —— 回传出去，客户端手里那份才不是过期的
+  return json({ ok: true, status: published ? 'published' : 'draft', buildTriggered, updatedAt })
 }

@@ -13,6 +13,9 @@ export function getStaticPaths() {
 
 const { locale } = Astro.props
 
+/** 终端提示符 —— 用户名取笔名 */
+const prompt = `${t(locale, 'site.author')}@astro`
+
 const posts = await getVisiblePosts()
 
 /** 按翻译组列出：同一篇文章的各语言版本算一条 */
@@ -37,7 +40,7 @@ const newest = items[0]
       <div class="term hero-term">
         <div class="term__bar">
           <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="term__path">yaesaraki@astro: ~</span>
+          <span class="term__path">{prompt}: ~</span>
         </div>
 
         <div class="term__body hero-body">
@@ -47,7 +50,7 @@ const newest = items[0]
 
           <div class="term__console">
             <p class="term__line">
-              <span class="term__user">yaesaraki@astro</span>
+              <span class="term__user">{prompt}</span>
               <span class="term__dim">$</span> whoami
             </p>
 

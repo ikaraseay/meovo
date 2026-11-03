@@ -5,6 +5,7 @@
  */
 import GlassWidget from './GlassWidget.astro'
 import { t, type Locale } from '../i18n'
+import { FOOTER_HEIGHT_KEY, parseFooterMinHeight } from '../lib/footer-height.ts'
 
 interface Props {
   locale: Locale
@@ -12,16 +13,23 @@ interface Props {
 
 const { locale } = Astro.props
 const year = new Date().getFullYear()
+/** 后台设的页脚卡片最小高度（px）—— 0 = 不限 */
+const minHeight = parseFooterMinHeight(t(locale, FOOTER_HEIGHT_KEY))
+/** 备案号 —— 默认值是占位（里面没有数字）；有数字才算真配过，链接也用它 */
+const icp = t(locale, 'site.icp')
+const icpNumber = icp.match(/\d+/)?.[0] ?? ''
 ---
 
-<GlassWidget id="footer" width="auto" full locale={locale}>
+<GlassWidget id="footer" width="auto" full locale={locale} minHeight={minHeight}>
   <div class="footer-inner">
     <p class="footer-copyright">
       {t(locale, 'footer.copyright', { year, name: t(locale, 'site.author') })}
     </p>
 
     <div class="footer-links">
-      <a href="https://icp.gov.moe/?keyword=20269919" target="_blank">萌ICP备20269919号</a>
+      {icpNumber && (
+        <a href={`https://icp.gov.moe/?keyword=${icpNumber}`} target="_blank">{icp}</a>
+      )}
       <span class="footer-note ui-text--muted">{t(locale, 'footer.builtWith')}</span>
     </div>
   </div>

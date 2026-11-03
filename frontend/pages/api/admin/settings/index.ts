@@ -50,6 +50,8 @@ export const PUT: APIRoute = async ({ request }) => {
   const defaults = defaultEntries()
   const errors: string[] = []
   let saved = 0
+  /** 恢复默认的行数 —— 删掉的行也是一次改动，站点同样要重建 */
+  let removed = 0
 
   for (const item of input) {
     const normalized = normalizeSetting(
@@ -63,6 +65,7 @@ export const PUT: APIRoute = async ({ request }) => {
     const { key, zh, en, unchanged } = normalized.value
     if (unchanged) {
       await deleteSetting(key)
+      removed += 1
       continue
     }
     await upsertSetting(key, serializeSettingValue({ zh, en }))
@@ -71,7 +74,8 @@ export const PUT: APIRoute = async ({ request }) => {
 
   if (errors.length > 0) return json({ error: 'validation_failed', errors }, 422)
 
-  // 文案改了 → 站点要重建才生效
-  const buildTriggered = saved > 0 ? await triggerBuild() : false
-  return json({ ok: true, saved, buildTriggered })
+  // 文案改了 → 站点要重建才生效（恢复默认也算改动）
+  const changed = saved + removed
+  const buildTriggered = changed > 0 ? await triggerBuild() : false
+  return json({ ok: true, saved: changed, buildTriggered })
 }

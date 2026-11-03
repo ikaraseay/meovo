@@ -83,6 +83,23 @@ test('部件 tint：色相变量在组件与样式层同名', () => {
   assert.ok(widget.includes('--ui-widget-hue'), 'GlassWidget 没内联部件色相')
 })
 
+test('契约要双向守：lib 层读的名字都得登记', () => {
+  // 真正会咬人的漂移：lib 读了一个没登记的名字 —— 改名只会静默失灵。
+  // 组件内部自己写自己读的名字不算跨 module（那是同一个 module）。
+  const attrs = new Set<string>(Object.values(ATTR))
+  const classes = new Set<string>(Object.values(CLASS))
+  for (const file of sources(new URL('../frontend/lib/', import.meta.url))) {
+    const source = read(file)
+    for (const match of source.matchAll(/\[(data-[a-z-]+)/g)) {
+      assert.ok(attrs.has(match[1]), `${file} 读了未登记的 data 属性：${match[1]}`)
+    }
+    for (const match of source.matchAll(/['"`]([.][\w-]+)/g)) {
+      const name = match[1].slice(1)
+      assert.ok(classes.has(name), `${file} 用了未登记的 class：${name}`)
+    }
+  }
+})
+
 test('首屏脚本里的 class 名跟契约一致', () => {
   // 内联脚本不能 import 模块 —— 里面是字面量，靠这条测试盯着
   const layout = read(new URL('../frontend/layouts/BaseLayout.astro', import.meta.url).pathname)

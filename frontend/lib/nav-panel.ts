@@ -133,7 +133,7 @@ export function initNavPanel(options: NavPanelOptions): NavPanelController {
   }
 
   window.addEventListener('pointerdown', (e) => {
-    const trigger = (e.target as Element).closest?.<HTMLAnchorElement>('[data-nav-trigger]')
+    const trigger = (e.target as Element).closest?.<HTMLAnchorElement>(`[${ATTR.navTrigger}]`)
     if (!trigger || e.button !== 0) return
     pressTrigger = trigger
     pressStart = { x: e.clientX, y: e.clientY }
@@ -173,7 +173,7 @@ export function initNavPanel(options: NavPanelOptions): NavPanelController {
   // 点外面收起
   document.addEventListener('click', (e) => {
     const target = e.target as Element
-    if (target.closest?.('[data-nav-panel]') || target.closest?.('[data-nav-trigger]')) return
+    if (target.closest?.(`[${ATTR.navPanel}]`) || target.closest?.(`[${ATTR.navTrigger}]`)) return
     close()
   })
 
@@ -190,7 +190,7 @@ export function initNavPanel(options: NavPanelOptions): NavPanelController {
       e.preventDefault()
       open(trigger)
       panel
-        .querySelector<HTMLElement>(`.nav-panel-items.${CLASS.active} [${ATTR.panelLink}]`)
+        .querySelector<HTMLElement>(`.${CLASS.navPanelItems}.${CLASS.active} [${ATTR.panelLink}]`)
         ?.focus()
     })
   }

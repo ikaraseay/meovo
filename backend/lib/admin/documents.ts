@@ -9,10 +9,8 @@
  */
 
 import { LICENSE_IDS } from '../../../frontend/lib/licenses.ts'
+import { SLUG_PATTERN } from '../../../frontend/lib/slug.ts'
 import { locales, type Locale } from '../../../frontend/i18n/index.ts'
-
-/** ASCII slug：小写字母 / 数字 / 连字符 */
-export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export type DocumentErrorCode =
   | 'title_required'

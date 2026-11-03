@@ -10,12 +10,23 @@
 
 import { defineMiddleware } from 'astro:middleware'
 import { SESSION_COOKIE, verifySession } from './lib/admin/session.ts'
+import { bodyTooLarge, MAX_BODY_BYTES, MAX_UPLOAD_BYTES } from './lib/admin/api.ts'
 
 const ADMIN_PAGE = /^\/(zh|en)\/admin(\/|$)/
 const ADMIN_API = /^\/api\/admin(\/|$)/
+/** 图库上传 —— 要装 5MB 的文件，其余接口都是小 JSON */
+const MEDIA_API = /^\/api\/admin\/media(\/|$)/
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const path = context.url.pathname
+
+  // 请求体上限 —— 在解析之前卡住（读进来再判断等于没判断，内存已经花掉了）
+  const tooLarge = bodyTooLarge(
+    context.request,
+    MEDIA_API.test(path) ? MAX_UPLOAD_BYTES : MAX_BODY_BYTES,
+  )
+  if (tooLarge) return tooLarge
+
   const isApi = ADMIN_API.test(path)
   const isPage = ADMIN_PAGE.test(path)
   if (!isApi && !isPage) return next()

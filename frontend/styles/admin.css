@@ -510,6 +510,20 @@
   resize: vertical;
 }
 
+/* 格式工具栏 —— 常用 markdown 动作 */
+.admin-editor__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-xs);
+}
+
+.admin-editor__tools .ui-btn {
+  min-width: 2.25rem;
+  padding-inline: var(--ui-space-sm);
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+}
+
+/* 预览用 .prose 排版 —— 跟文章页看到的一样（字号与行距交给 .prose） */
 .admin-preview {
   min-height: 26rem;
   max-height: 40rem;
@@ -518,7 +532,6 @@
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);
   background: var(--ui-surface-sunken);
-  font-size: 0.875rem;
 }
 
 /* 底部操作条 —— 编辑器与设置页共用 */
@@ -590,6 +603,11 @@
   border-block-start: 1px solid var(--ui-border-subtle);
 }
 
+/* 单控件的行：键名 + 一个控件 + 恢复默认（没有中英两列） */
+.admin-settings__info-row--single {
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+}
+
 .admin-settings__field {
   display: flex;
   flex-direction: column;
@@ -600,6 +618,12 @@
 .admin-settings__label {
   font-size: 0.75rem;
   letter-spacing: 0.02em;
+  color: var(--ui-text-muted);
+}
+
+/* 控件下面那行说明 */
+.admin-settings__hint {
+  font-size: 0.75rem;
   color: var(--ui-text-muted);
 }
 
@@ -617,7 +641,8 @@
 
 @media not (min-width: 1024px) {
   .admin-settings__row,
-  .admin-settings__info-row {
+  .admin-settings__info-row,
+  .admin-settings__info-row--single {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -8,6 +8,9 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { asciiArt, colorizeArt } from '../lib/ascii-art'
 import { t } from '../i18n'
+
+/** 终端提示符 —— 用户名取笔名（跟首页那台终端一致） */
+const prompt = `${t('zh', 'site.author')}@astro`
 ---
 
 <BaseLayout locale="zh" title={t('zh', 'error404.title')} noindex>
@@ -15,12 +18,12 @@ import { t } from '../i18n'
     <div class="term">
       <div class="term__bar">
         <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="term__path">yaesaraki@astro: ~</span>
+        <span class="term__path">{prompt}: ~</span>
       </div>
 
       <div class="term__body">
         <p class="term__line">
-          <span class="term__user">yaesaraki@astro</span>
+          <span class="term__user">{prompt}</span>
           <span class="term__dim">$</span> cat /404
         </p>
         <p class="term__line term__dim">cat: /404: No such file or directory</p>
@@ -28,7 +31,7 @@ import { t } from '../i18n'
         <pre class="term__art term__art--big" aria-hidden="true" set:html={colorizeArt(asciiArt)} />
 
         <p class="term__line">
-          <span class="term__user">yaesaraki@astro</span>
+          <span class="term__user">{prompt}</span>
           <span class="term__dim">$</span> ls /
         </p>
         <p class="term__line term__dim">about/ archive/ links/ posts/</p>

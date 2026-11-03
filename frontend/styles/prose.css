@@ -237,6 +237,34 @@ html.dark .code-block pre.astro-code span {
   padding-inline-start: var(--ui-space-md);
 }
 
+/* =========================================================
+   悬停显示 —— 技术博客常见：默认遮住，鼠标移上去才显形
+   ---------------------------------------------------------
+   正文里用 <span class="spoiler">…</span>；
+   站点与后台预览共用这一条（两边的正文容器都带 .prose）。
+   ========================================================= */
+.prose .spoiler {
+  color: transparent;
+  background: var(--ui-text-muted);
+  border-radius: 2px;
+  transition:
+    color var(--ui-transition-fast),
+    background-color var(--ui-transition-fast);
+}
+
+.prose .spoiler:hover {
+  color: inherit;
+  background: transparent;
+}
+
+/* 触屏没有 hover —— 直接显示，不然那段字永远看不见 */
+@media (hover: none) {
+  .prose .spoiler {
+    color: inherit;
+    background: transparent;
+  }
+}
+
 .toc-link {
   display: block;
   margin-inline-start: -1px;

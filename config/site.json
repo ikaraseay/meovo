@@ -3,6 +3,8 @@
   "site.author": { "zh": "你的笔名", "en": "Your pen name" },
   "site.tagline": { "zh": "写点代码，记点笔记", "en": "Notes on code and other things" },
   "site.email": { "zh": "you@example.com", "en": "you@example.com" },
+  "site.footerMinHeight": { "zh": "0", "en": "0" },
+  "site.icp": { "zh": "ICP 备案号待填写", "en": "ICP filing number pending" },
   "home.title": { "zh": "你好，世界", "en": "Hello, world" },
   "home.subtitle": {
     "zh": "喵喵",

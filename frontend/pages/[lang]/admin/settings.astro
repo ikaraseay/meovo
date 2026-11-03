@@ -57,6 +57,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
 <script>
   import { t } from '../../../i18n'
   import { api, errorText } from '../../../../backend/lib/admin/client'
+  import { FOOTER_HEIGHT_KEY, MAX_FOOTER_HEIGHT, parseFooterMinHeight } from '../../../lib/footer-height.ts'
 
   interface Entry {
     key: string
@@ -174,6 +175,60 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       )
       infoBox.appendChild(row)
     }
+    renderFooterHeight()
+  }
+
+  /** 页脚卡片最小高度 —— 数值设置：两份语言写同一个数，只有这一个控件能改它 */
+  function renderFooterHeight() {
+    if (!infoBox) return
+    const entry = entries.find((item) => item.key === FOOTER_HEIGHT_KEY)
+    if (!entry) return
+
+    const row = document.createElement('div')
+    row.className = 'admin-settings__info-row admin-settings__info-row--single'
+
+    const keyLabel = document.createElement('span')
+    keyLabel.className = 'admin-settings__key'
+    keyLabel.textContent = FOOTER_HEIGHT_KEY
+    row.appendChild(keyLabel)
+
+    const wrap = document.createElement('label')
+    wrap.className = 'admin-settings__field'
+    const caption = document.createElement('span')
+    caption.className = 'admin-settings__label'
+    caption.textContent = t(locale, 'admin.settings.footerHeight')
+    const input = document.createElement('input')
+    input.className = 'ui-input'
+    input.type = 'number'
+    input.min = '0'
+    input.max = String(MAX_FOOTER_HEIGHT)
+    input.step = '10'
+    input.value = current(entry).zh
+    input.addEventListener('input', () => {
+      const next = String(parseFooterMinHeight(input.value))
+      markDirty(entry, next, next)
+      renderList()
+    })
+    const hint = document.createElement('span')
+    hint.className = 'admin-settings__hint'
+    hint.textContent = t(locale, 'admin.settings.footerHeightHint')
+    wrap.appendChild(caption)
+    wrap.appendChild(input)
+    wrap.appendChild(hint)
+    row.appendChild(wrap)
+
+    const reset = document.createElement('button')
+    reset.className = 'ui-btn admin-settings__reset'
+    reset.type = 'button'
+    reset.textContent = t(locale, 'admin.settings.reset')
+    reset.addEventListener('click', () => {
+      markDirty(entry, entry.defaultZh, entry.defaultEn)
+      renderInfo()
+      renderList()
+    })
+    row.appendChild(reset)
+
+    infoBox.appendChild(row)
   }
 
   function renderList() {
@@ -183,6 +238,8 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     listBox.textContent = ''
 
     const visible = entries.filter((entry) => {
+      // 数值设置有自己的控件 —— 进了文案列表就会被拆成中英两份
+      if (entry.key === FOOTER_HEIGHT_KEY) return false
       if (moduleName && moduleOf(entry.key) !== moduleName) return false
       if (!term) return true
       const values = current(entry)

@@ -101,3 +101,27 @@ test('highlightParts：多处命中都标出来', () => {
   const parts = highlightParts('折射与折射', parseQuery('折射'))
   assert.equal(parts.filter((p) => p.hit).length, 2)
 })
+
+test('命中与高亮同一套规则：折-射效果搜折射，命中就一定要标出来', () => {
+  const terms = parseQuery('折射')
+  assert.equal(matchText('折-射效果', terms), true)
+  const hits = highlightParts('折-射效果', terms).filter((p) => p.hit)
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].text, '折-射')
+})
+
+test('命中与高亮同一套规则：Cloudflare 不该被 cloud 标黄', () => {
+  const terms = parseQuery('cloud')
+  assert.equal(matchText('Cloudflare Workers', terms), false)
+  assert.deepEqual(highlightParts('Cloudflare Workers', terms), [
+    { text: 'Cloudflare Workers', hit: false },
+  ])
+})
+
+test('命中与高亮同一套规则：正文命中、这个字段没命中的词组不留高亮', () => {
+  const terms = parseQuery('折射')
+  assert.equal(matchText('正文里有折射', terms), true)
+  assert.deepEqual(highlightParts('标题没有这个词', terms), [
+    { text: '标题没有这个词', hit: false },
+  ])
+})

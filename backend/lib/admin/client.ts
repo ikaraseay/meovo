@@ -41,6 +41,21 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T
 }
 
+/**
+ * 令牌（乐观锁的版本号）—— 客户端手里那份 updated_at。
+ *
+ * 服务端每次写入都换新令牌并在响应里回传；客户端收到就换掉手里那份 ——
+ * 否则同一页面第二次保存必然 409。
+ * 响应里没有令牌就沿用旧的：令牌弄丢了等于悄悄放弃并发检查。
+ */
+export function nextToken(
+  current: string | null,
+  payload: { updatedAt?: unknown } | null | undefined,
+): string {
+  const updatedAt = payload?.updatedAt
+  return typeof updatedAt === 'string' && updatedAt ? updatedAt : (current ?? '')
+}
+
 /** 错误代码 → 文案（词典里没有就退回代码本身） */
 export function errorText(locale: Locale, code: string): string {
   const key = 'admin.error.' + code

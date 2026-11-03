@@ -37,6 +37,8 @@ export const CLASS = {
   active: 'is-active',
   /** 二级面板展开 */
   open: 'is-open',
+  /** 二级面板的子项列表 */
+  navPanelItems: 'nav-panel-items',
   /** 可见 —— 镜片、菜单的「重置位置」按钮 */
   visible: 'is-visible',
   /** 正在按住 —— 触发器的按压反馈 */
@@ -61,6 +63,8 @@ export const ATTR = {
   widgetPin: 'data-widget-pin',
   /** 卡片的复原按钮 */
   widgetRestore: 'data-widget-restore',
+  /** 卡片的拖拽把手 */
+  widgetDrag: 'data-widget-drag',
   /** 卡片独占一行 */
   widgetFull: 'data-widget-full',
   /** 卡片所在区域（内容锚定模式：top / side / tail） */
@@ -71,6 +75,8 @@ export const ATTR = {
   navGroup: 'data-nav-group',
   /** 二级菜单的触发器 */
   navTrigger: 'data-nav-trigger',
+  /** 二级面板本体 */
+  navPanel: 'data-nav-panel',
   /** 二级面板的一组子项 */
   panelItems: 'data-panel-items',
   /** 二级面板的子项 */
@@ -98,6 +104,8 @@ export const ATTR = {
   adminFlash: 'data-admin-flash',
   /** 后台：页头的「立即构建」按钮 */
   adminBuild: 'data-admin-build',
+  /** 后台：编辑器的格式工具栏 */
+  adminTools: 'data-admin-tools',
   /** 后台：文档列表容器 */
   adminList: 'data-admin-list',
   /** 后台：文档编辑器表单 */

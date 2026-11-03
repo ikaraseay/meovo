@@ -393,7 +393,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   function wireDrag(entry: Entry) {
     entry.el.addEventListener('pointerdown', () => raise(entry.el))
 
-    const handle = entry.el.querySelector<HTMLElement>('[data-widget-drag]')
+    const handle = entry.el.querySelector<HTMLElement>(`[${ATTR.widgetDrag}]`)
     if (!handle) return
 
     let origLeft = 0

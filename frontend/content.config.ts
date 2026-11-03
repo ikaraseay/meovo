@@ -2,6 +2,7 @@ import { defineCollection } from 'astro:content'
 import { z } from 'astro/zod'
 import { glob } from 'astro/loaders'
 import { LICENSE_IDS } from './lib/licenses.ts'
+import { SLUG_PATTERN } from './lib/slug.ts'
 
 /**
  * 博客文章集合。
@@ -26,17 +27,22 @@ const postSchema = z.object({
   updatedDate: z.coerce.date().optional(),
   /** 草稿：生产构建不输出（开发环境可见） */
   draft: z.boolean().default(false),
-  /** 分类，一篇只能属于一个 */
-  category: z.string().optional(),
-  /** 标签，一篇可以有多个 */
-  tags: z.array(z.string()).default([]),
+  /** 分类，一篇只能属于一个 —— ASCII slug（后台同一条规则） */
+  category: z
+    .string()
+    .regex(SLUG_PATTERN, '分类必须是 ASCII slug（小写字母、数字、连字符）')
+    .optional(),
+  /** 标签，一篇可以有多个 —— 逐项都是 ASCII slug */
+  tags: z
+    .array(z.string().regex(SLUG_PATTERN, '标签必须是 ASCII slug（小写字母、数字、连字符）'))
+    .default([]),
   /** 许可协议 —— 不写就用全站默认（CC BY 4.0）；取值见 frontend/lib/licenses.ts */
   license: z.enum(LICENSE_IDS).default('cc-by'),
   /** 系列文章：同一 id 的文章属于一个系列 */
   series: z
     .object({
       /** 系列标识，ASCII slug，跨语言共用 —— 决定 /<lang>/series/<id>/ 这一页 */
-      id: z.string(),
+      id: z.string().regex(SLUG_PATTERN, '系列 id 必须是 ASCII slug（小写字母、数字、连字符）'),
       /** 系列标题，每个语言各写各的 */
       title: z.string(),
       /** 在系列里的序号，从 1 开始，不写就排在最后 */

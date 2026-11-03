@@ -115,8 +115,9 @@ export const GET: APIRoute = async ({ site, url }) => {
     for (const variant of variants) {
       const locale = getPostLocale(variant)
       paths[locale] = postPath(locale, getPostSlug(variant))
-      const updated = variant.data.updatedDate ?? variant.data.pubDate
-      lastmod = updated.toISOString()
+      const updated = (variant.data.updatedDate ?? variant.data.pubDate).toISOString()
+      // 组内取**最新**的那个 —— 遍历顺序是集合顺序，跟新旧无关
+      if (!lastmod || updated > lastmod) lastmod = updated
     }
     addPage(paths, lastmod)
   }

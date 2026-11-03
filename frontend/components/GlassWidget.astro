@@ -19,10 +19,12 @@ interface Props {
   zone?: 'top' | 'side' | 'tail'
   /** 默认就固定（首次进入没有存档时自动 pin，如思维导图、目录） */
   defaultPin?: boolean
+  /** 卡片最小高度（px）—— 内容少时留白；不给就不限 */
+  minHeight?: number
   locale: Locale
 }
 
-const { id, width = 'auto', full = false, zone, defaultPin = false, locale } = Astro.props
+const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, locale } = Astro.props
 
 /** 悦目的色相集合 —— 避开病态的黄绿，只取看着舒服的暖/冷色 */
 const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
@@ -40,12 +42,12 @@ const hue = hashHue(id)
 ---
 
 <section
-  class:list={['ui-widget', 'ui-card', `ui-widget--${width}`]}
+  class:list={['ui-widget', 'ui-card', `ui-widget--${width}`, { 'ui-widget--tall': minHeight > 0 }]}
   data-widget={id}
   data-widget-full={full ? '' : undefined}
   data-zone={zone || undefined}
   data-default-pin={defaultPin ? '' : undefined}
-  style={`--ui-widget-hue: ${hue}`}
+  style={`--ui-widget-hue: ${hue}${minHeight > 0 ? `; min-height: ${minHeight}px` : ''}`}
 >
   <header class="ui-widget__grip">
     <span
@@ -91,6 +93,18 @@ const hue = hashHue(id)
   }
   .ui-widget--xl {
     width: 720px;
+  }
+
+  /* 给了最小高度：卡片成一块有留白的版面 —— 抓手留在顶部，正文垂直居中 */
+  .ui-widget--tall {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ui-widget--tall .ui-widget__body {
+    flex: 1 1 auto;
+    display: grid;
+    align-content: center;
   }
 
   /* 窄桌面 / 移动端：别让固定宽度撑破视口 */

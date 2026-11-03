@@ -119,6 +119,12 @@ const isNew = docId === 'new'
       <div class="admin-editor" data-admin-editor-panes>
         <div class="admin-editor__pane">
           <span class="admin-field__label">{t(locale, 'admin.field.body')}</span>
+          <div
+            class="admin-editor__tools"
+            data-admin-tools
+            role="toolbar"
+            aria-label={t(locale, 'admin.editor.toolbar')}
+          ></div>
           <textarea class="ui-input admin-editor__body" name="body"></textarea>
         </div>
         <!-- 对版：同 slug 的另一种语言版本（只读参考） -->
@@ -133,7 +139,7 @@ const isNew = docId === 'new'
         </div>
         <div class="admin-editor__pane" data-admin-preview-pane>
           <span class="admin-field__label">{t(locale, 'admin.action.preview')}</span>
-          <div class="admin-preview" data-admin-preview></div>
+          <div class="admin-preview prose" data-admin-preview></div>
         </div>
       </div>
     </section>
@@ -167,8 +173,16 @@ const isNew = docId === 'new'
 <script>
   import { ATTR } from '../../../../lib/dom-contract'
   import { t } from '../../../../i18n'
-  import { api, errorText } from '../../../../../backend/lib/admin/client'
+  import { api, errorText, nextToken } from '../../../../../backend/lib/admin/client'
   import { parseFrontmatter } from '../../../../../backend/lib/admin/frontmatter'
+  import {
+    EDITOR_TOOLS,
+    wrapSelection,
+    prefixLines,
+    insertLink,
+    insertTable,
+    type EditResult,
+  } from '../../../../lib/editor-tools'
 
   interface DocumentRow {
     id: string
@@ -200,6 +214,7 @@ const isNew = docId === 'new'
   const form = document.querySelector<HTMLFormElement>('[' + ATTR.adminEditor + ']')
   const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
   const preview = document.querySelector<HTMLElement>('[' + ATTR.adminPreview + ']')
+  const toolsBox = document.querySelector<HTMLElement>('[' + ATTR.adminTools + ']')
   const picker = document.querySelector<HTMLElement>('[' + ATTR.adminMediaPicker + ']')
   const docId = form?.getAttribute('data-doc-id') ?? 'new'
   const statusTag = document.querySelector<HTMLElement>('[data-admin-status]')
@@ -384,19 +399,22 @@ const isNew = docId === 'new'
         location.href = '/' + locale + '/admin/documents/' + created.id
         return true
       }
-      const saved = await api<{ buildTriggered?: boolean }>('/api/admin/documents/' + docId, {
+      const saved = await api<{ buildTriggered?: boolean; updatedAt?: string }>('/api/admin/documents/' + docId, {
         method: 'PUT',
         body: JSON.stringify(payload),
       })
+      // 令牌换新的 —— 服务端每次写入都换，不换的话第二次保存必然 409
+      updatedAt = nextToken(updatedAt, saved)
       dirty = false
       if (publish) {
-        const result = await api<{ buildTriggered?: boolean }>(
+        const result = await api<{ buildTriggered?: boolean; updatedAt?: string }>(
           '/api/admin/documents/' + docId + '/publish',
           {
             method: 'POST',
             body: JSON.stringify({ published: true }),
           },
         )
+        updatedAt = nextToken(updatedAt, result)
         status = 'published'
         say(
           t(
@@ -434,21 +452,24 @@ const isNew = docId === 'new'
     await save(false)
   })
 
-  form?.addEventListener('input', () => {
+  form?.addEventListener('input', (event) => {
     dirty = true
+    // 正文改了 → 停手就刷新预览
+    if (event.target === bodyField()) schedulePreview()
   })
 
   publishButton?.addEventListener('click', async () => {
     if (status === 'published') {
       // 撤回 —— 只改状态，正文不动
       try {
-        const result = await api<{ buildTriggered?: boolean }>(
+        const result = await api<{ buildTriggered?: boolean; updatedAt?: string }>(
           '/api/admin/documents/' + docId + '/publish',
           {
             method: 'POST',
             body: JSON.stringify({ published: false }),
           },
         )
+        updatedAt = nextToken(updatedAt, result)
         status = 'draft'
         dirty = false
         say(
@@ -476,28 +497,118 @@ const isNew = docId === 'new'
     }
   })
 
+  /* ---------------- 格式工具栏 ---------------- */
+
+  function bodyField(): HTMLTextAreaElement | null {
+    return field('body') as HTMLTextAreaElement | null
+  }
+
+  /** 改完正文要自己触发一次 input —— 脏标记与自动预览都听它 */
+  function bodyChanged() {
+    bodyField()?.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  /** 把算好的结果写回正文，并把选区挪到新位置 */
+  function applyEdit(edit: EditResult) {
+    const body = bodyField()
+    if (!body) return
+    body.value = edit.value
+    body.focus()
+    body.setSelectionRange(edit.start, edit.end)
+    bodyChanged()
+  }
+
+  /** 包住选区；没选中就插空的，光标落在中间 */
+  function applyWrap(before: string, after: string) {
+    const body = bodyField()
+    if (!body) return
+    applyEdit(wrapSelection(body.value, body.selectionStart, body.selectionEnd, before, after))
+  }
+
+  /** 行首加前缀（标题 / 引用 / 列表） */
+  function applyPrefix(prefix: string) {
+    const body = bodyField()
+    if (!body) return
+    applyEdit(prefixLines(body.value, body.selectionStart, body.selectionEnd, prefix))
+  }
+
+  /** 链接 / 图片：问一句地址 */
+  function applyLink(image: boolean) {
+    const body = bodyField()
+    if (!body) return
+    const label = t(locale, image ? 'admin.editor.image' : 'admin.editor.link')
+    const url = window.prompt(label, 'https://')
+    if (!url) return
+    applyEdit(insertLink(body.value, body.selectionStart, body.selectionEnd, url, image))
+  }
+
+  /** 表格：塞一个空模板，光标落在第一格 */
+  function applyTable() {
+    const body = bodyField()
+    if (!body) return
+    applyEdit(insertTable(body.value, body.selectionStart))
+  }
+
+  function renderTools() {
+    if (!toolsBox) return
+    toolsBox.textContent = ''
+    for (const tool of EDITOR_TOOLS) {
+      const button = document.createElement('button')
+      button.className = 'ui-btn'
+      button.type = 'button'
+      button.textContent = tool.label
+      const label = t(locale, tool.title)
+      button.title = label
+      button.setAttribute('aria-label', label)
+      button.addEventListener('click', () => {
+        if (tool.kind === 'link') applyLink(false)
+        else if (tool.kind === 'image') applyLink(true)
+        else if (tool.kind === 'table') applyTable()
+        else if (tool.prefix) applyPrefix(tool.prefix)
+        else applyWrap(tool.before ?? '', tool.after ?? '')
+      })
+      toolsBox.appendChild(button)
+    }
+  }
+
+  /* ---------------- 预览：停手就刷新 ---------------- */
+
+  /** 预览请求的序号 —— 慢的旧响应不许盖掉新的 */
+  let previewSeq = 0
+  let previewTimer = 0
+
+  async function refreshPreview() {
+    const seq = ++previewSeq
+    try {
+      const data = await api<{ html: string }>('/api/admin/preview', {
+        method: 'POST',
+        body: JSON.stringify({ markdown: field('body')?.value ?? '' }),
+      })
+      if (seq !== previewSeq) return
+      if (preview) preview.innerHTML = data.html
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  /** 正文改完停 400ms 就刷新一次预览 */
+  function schedulePreview() {
+    window.clearTimeout(previewTimer)
+    previewTimer = window.setTimeout(() => void refreshPreview(), 400)
+  }
+
   document
     .querySelector<HTMLButtonElement>('[data-admin-preview-button]')
-    ?.addEventListener('click', async () => {
-      try {
-        const data = await api<{ html: string }>('/api/admin/preview', {
-          method: 'POST',
-          body: JSON.stringify({ markdown: field('body')?.value ?? '' }),
-        })
-        if (preview) preview.innerHTML = data.html
-      } catch (error) {
-        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
-      }
-    })
+    ?.addEventListener('click', () => void refreshPreview())
 
   function insertAtCursor(text: string) {
-    const body = field('body') as HTMLTextAreaElement | null
+    const body = bodyField()
     if (!body) return
     const start = body.selectionStart ?? body.value.length
     const end = body.selectionEnd ?? body.value.length
     body.value = body.value.slice(0, start) + text + body.value.slice(end)
     body.focus()
-    dirty = true
+    bodyChanged()
   }
 
   document
@@ -555,7 +666,7 @@ const isNew = docId === 'new'
       if (!field('slug')?.value) {
         setField('slug', title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-'))
       }
-      dirty = true
+      bodyChanged()
       say(t(locale, 'admin.hint.imported'))
     })
 
@@ -568,6 +679,7 @@ const isNew = docId === 'new'
       const data = await api<{ document: DocumentRow }>('/api/admin/documents/' + docId)
       fill(data.document)
       renderStatus()
+      void refreshPreview()
     } catch (error) {
       say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
     }
@@ -580,5 +692,6 @@ const isNew = docId === 'new'
     event.returnValue = ''
   })
 
+  renderTools()
   void load()
 </script>

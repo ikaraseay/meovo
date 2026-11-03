@@ -36,7 +36,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   if (taken) return fail('slug_taken', 409)
 
   const expected = typeof body.updatedAt === 'string' ? body.updatedAt : null
-  const result = await updateDocument(
+  const { result, updatedAt } = await updateDocument(
     id,
     {
       slug: values.slug,
@@ -60,7 +60,8 @@ export const PUT: APIRoute = async ({ params, request }) => {
 
   // 已发布的文档改完正文要重建才看得见；草稿站上还没有它，不用构建
   const buildTriggered = existing.status === 'published' ? await triggerBuild() : false
-  return json({ ok: true, buildTriggered })
+  // 新令牌回传 —— 客户端不换掉手里那份，下一次保存必然 409
+  return json({ ok: true, buildTriggered, updatedAt })
 }
 
 export const DELETE: APIRoute = async ({ params }) => {
