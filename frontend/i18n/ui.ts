@@ -48,6 +48,8 @@ export const ui = {
 
   // 悬浮状态栏
   'nav.reset': { zh: '重置位置', en: 'Reset position' },
+  /** 导航栏字标 —— 品牌短名 */
+  'nav.wordmark': { zh: 'Meo', en: 'Meo' },
   'widget.drag': { zh: '拖动这个部件', en: 'Drag this widget' },
   'desk.pin': { zh: '固定 / 取消固定', en: 'Pin / unpin' },
   'desk.restore': { zh: '复原到默认位置', en: 'Restore default position' },
@@ -57,13 +59,7 @@ export const ui = {
   'settings.close': { zh: '关闭', en: 'Close' },
   // 相对字号 —— 全站一起缩（相对浏览器的默认字号）
   'settings.relativeSize': { zh: '相对字号', en: 'Relative size' },
-  'settings.sizeSmall': { zh: '小', en: 'Small' },
-  'settings.sizeMedium': { zh: '标准', en: 'Standard' },
-  'settings.sizeLarge': { zh: '大', en: 'Large' },
   'settings.lineHeight': { zh: '行距', en: 'Line height' },
-  'settings.heightCompact': { zh: '紧凑', en: 'Compact' },
-  'settings.heightStandard': { zh: '标准', en: 'Standard' },
-  'settings.heightRelaxed': { zh: '宽松', en: 'Relaxed' },
 
   // 对比度
   'settings.contrast': { zh: '对比度', en: 'Contrast' },
@@ -71,10 +67,6 @@ export const ui = {
   'settings.contrastHigh': { zh: '高对比', en: 'High' },
 
   // 动效
-  'settings.motion': { zh: '动效', en: 'Motion' },
-  'settings.motionFull': { zh: '完整', en: 'Full' },
-  'settings.motionReduced': { zh: '减弱', en: 'Reduced' },
-  'settings.motionAuto': { zh: '自动', en: 'Auto' },
 
   // 无障碍
   'settings.accessibility': { zh: '无障碍', en: 'Accessibility' },

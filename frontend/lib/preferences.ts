@@ -14,8 +14,6 @@ export type ThemeMode = 'light' | 'dark'
 /** 用户选的模式 —— 没选（默认）就是跟着系统 */
 export type ModeChoice = ThemeMode | 'system'
 
-/** 动效档：跟随系统 / 减弱 / 完整（完整能顶掉系统的「减弱动态效果」） */
-export type MotionChoice = 'auto' | 'reduced' | 'full'
 /** 对比度档：标准 / 高对比 */
 export type ContrastChoice = 'standard' | 'high'
 /** 链接下划线：默认（只有正文带）/ 始终显示 */
@@ -31,7 +29,6 @@ export interface Preferences {
   rootScale: string
   /** 正文行距（字符串，直接写进 --ui-prose-lh） */
   proseLh: string
-  motion: MotionChoice
   contrast: ContrastChoice
   links: LinksChoice
   targets: TargetsChoice
@@ -58,7 +55,6 @@ export const PREFS_KEYS = {
   /** 全站相对字号 */
   rootScale: 'root-scale',
   proseLh: 'prose-lh',
-  motion: 'motion',
   contrast: 'contrast',
   links: 'links',
   targets: 'targets',
@@ -74,8 +70,6 @@ export type PrefKey = Exclude<keyof typeof PREFS_KEYS, 'legacyScale'>
  */
 export const PREF_CLASSES = {
   contrastHigh: CLASS.contrastHigh,
-  motionReduced: CLASS.motionReduced,
-  motionFull: CLASS.motionFull,
   linksAlways: CLASS.linksAlways,
   targetsLarge: CLASS.targetsLarge,
   focusStrong: CLASS.focusStrong,
@@ -90,8 +84,6 @@ function defaultStore(): PreferenceStore | null {
 }
 
 const isMode = (v: unknown): v is ThemeMode => v === 'light' || v === 'dark'
-const isMotion = (v: unknown): v is MotionChoice =>
-  v === 'auto' || v === 'reduced' || v === 'full'
 const isContrast = (v: unknown): v is ContrastChoice => v === 'standard' || v === 'high'
 const isLinks = (v: unknown): v is LinksChoice => v === 'auto' || v === 'always'
 const isTargets = (v: unknown): v is TargetsChoice => v === 'normal' || v === 'large'
@@ -139,7 +131,6 @@ export function readPreferences(store: PreferenceStore | null = defaultStore()):
 
   let rootScale = ''
   let proseLh = ''
-  let motion: MotionChoice = 'auto'
   let contrast: ContrastChoice = 'standard'
   let links: LinksChoice = 'auto'
   let targets: TargetsChoice = 'normal'
@@ -149,8 +140,6 @@ export function readPreferences(store: PreferenceStore | null = defaultStore()):
     rootScale =
       store?.getItem(PREFS_KEYS.rootScale) || store?.getItem(PREFS_KEYS.legacyScale) || ''
     proseLh = store?.getItem(PREFS_KEYS.proseLh) ?? ''
-    const m = store?.getItem(PREFS_KEYS.motion)
-    if (isMotion(m)) motion = m
     const c = store?.getItem(PREFS_KEYS.contrast)
     if (isContrast(c)) contrast = c
     const l = store?.getItem(PREFS_KEYS.links)
@@ -163,7 +152,7 @@ export function readPreferences(store: PreferenceStore | null = defaultStore()):
     // 读不了就用 CSS 默认值
   }
 
-  return { mode, rootScale, proseLh, motion, contrast, links, targets, focus }
+  return { mode, rootScale, proseLh, contrast, links, targets, focus }
 }
 
 /**
@@ -175,8 +164,6 @@ export function readPreferences(store: PreferenceStore | null = defaultStore()):
 export function applyPreferences(root: PreferenceRoot, prefs: Preferences): void {
   root.classList.toggle(CLASS.dark, prefs.mode === 'dark')
   root.classList.toggle(CLASS.contrastHigh, prefs.contrast === 'high')
-  root.classList.toggle(CLASS.motionReduced, prefs.motion === 'reduced')
-  root.classList.toggle(CLASS.motionFull, prefs.motion === 'full')
   root.classList.toggle(CLASS.linksAlways, prefs.links === 'always')
   root.classList.toggle(CLASS.targetsLarge, prefs.targets === 'large')
   root.classList.toggle(CLASS.focusStrong, prefs.focus === 'strong')

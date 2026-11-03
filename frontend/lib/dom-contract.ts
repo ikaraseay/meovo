@@ -31,10 +31,6 @@ export const CLASS = {
   dark: 'dark',
   /** 高对比档 —— 抬次要文字与描边的对比 */
   contrastHigh: 'contrast-high',
-  /** 减弱动效 —— 用户显式选的 */
-  motionReduced: 'motion-reduced',
-  /** 完整动效 —— 覆盖系统的「减弱动态效果」 */
-  motionFull: 'motion-full',
   /** 链接一律带下划线 */
   linksAlways: 'links-always',
   /** 更大的点击目标 */

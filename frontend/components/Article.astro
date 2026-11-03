@@ -61,19 +61,8 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     </div>
   </GlassWidget>
 
-  <!-- 正文：正常文档流，位置永远不变；卡片绝对定位在四周，不占它的空间 -->
-  <article class="post-content" data-desk-content>
-    {isFallback && <TranslationNotice locale={locale} post={post} />}
-
-    <div
-      class="prose"
-      data-copy-label={t(locale, 'post.copyCode')}
-      data-copied-label={t(locale, 'post.copied')}
-    >
-      <slot />
-    </div>
-  </article>
-
+  <!-- 目录与结构图：桌面排在正文右侧栏；窄屏放不下就落到标题卡下面 ——
+       所以 DOM 顺序 = 窄屏的视觉顺序（标题 → 目录 → 结构图 → 正文） -->
   {
     tocItems.length > 0 && (
       <GlassWidget id="article-toc" zone="side" width="sm" defaultPin locale={locale}>
@@ -105,6 +94,19 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       </GlassWidget>
     )
   }
+
+  <!-- 正文：正常文档流，位置永远不变；卡片绝对定位在四周，不占它的空间 -->
+  <article class="post-content" data-desk-content>
+    {isFallback && <TranslationNotice locale={locale} post={post} />}
+
+    <div
+      class="prose"
+      data-copy-label={t(locale, 'post.copyCode')}
+      data-copied-label={t(locale, 'post.copied')}
+    >
+      <slot />
+    </div>
+  </article>
 
   <!-- 协议卡：正文后面 —— 跟上下篇一样是可拖走的玻璃部件，只是位置固定在文末这一段 -->
   <GlassWidget id="article-license" zone="tail" width="lg" locale={locale}>

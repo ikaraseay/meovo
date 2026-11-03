@@ -74,14 +74,7 @@ const navItems: NavItem[] = [
 <!-- 桌面端：可拖拽的悬浮菜单 -->
 <div class="floating-menu ui-nav-surface" data-float-menu>
   <span class="drag-handle" data-float-drag>
-    <img
-      class="logo"
-      src="/avatar.png"
-      width="24"
-      height="24"
-      alt={t(locale, 'site.author')}
-      decoding="async"
-    />
+    <span class="logo">{t(locale, 'nav.wordmark')}</span>
   </span>
 
   <button
@@ -278,33 +271,38 @@ const navItems: NavItem[] = [
 
     <!-- 相对字号：全站一起缩（根字号），不是只缩正文 -->
     <div class="settings-section">
-      <p class="section-label">{t(locale, 'settings.relativeSize')}</p>
-      <div class="options-grid options-grid--tight">
-        <button type="button" class="ui-choice option-step" data-root-scale="0.9">
-          {t(locale, 'settings.sizeSmall')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-root-scale="1">
-          {t(locale, 'settings.sizeMedium')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-root-scale="1.12">
-          {t(locale, 'settings.sizeLarge')}
-        </button>
-      </div>
+      <p class="section-label">
+        <span>{t(locale, 'settings.relativeSize')}</span>
+        <span class="range-value" data-root-scale-value>100%</span>
+      </p>
+      <input
+        type="range"
+        class="ui-range"
+        min="0.8"
+        max="1.4"
+        step="0.05"
+        value="1"
+        data-root-scale-range
+        aria-label={t(locale, 'settings.relativeSize')}
+      />
     </div>
 
+    <!-- 行距：只管正文 -->
     <div class="settings-section">
-      <p class="section-label">{t(locale, 'settings.lineHeight')}</p>
-      <div class="options-grid options-grid--tight">
-        <button type="button" class="ui-choice option-step" data-prose-lh="1.65">
-          {t(locale, 'settings.heightCompact')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-prose-lh="1.85">
-          {t(locale, 'settings.heightStandard')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-prose-lh="2.05">
-          {t(locale, 'settings.heightRelaxed')}
-        </button>
-      </div>
+      <p class="section-label">
+        <span>{t(locale, 'settings.lineHeight')}</span>
+        <span class="range-value" data-prose-lh-value>1.85</span>
+      </p>
+      <input
+        type="range"
+        class="ui-range"
+        min="1.4"
+        max="2.3"
+        step="0.05"
+        value="1.85"
+        data-prose-lh-range
+        aria-label={t(locale, 'settings.lineHeight')}
+      />
     </div>
 
     <div class="settings-section">
@@ -315,22 +313,6 @@ const navItems: NavItem[] = [
         </button>
         <button type="button" class="ui-choice option-step" data-contrast="high">
           {t(locale, 'settings.contrastHigh')}
-        </button>
-      </div>
-    </div>
-
-    <!-- 动效：完整 / 减弱 / 跟随系统（完整能顶掉系统的「减弱动态效果」） -->
-    <div class="settings-section">
-      <p class="section-label">{t(locale, 'settings.motion')}</p>
-      <div class="options-grid options-grid--tight">
-        <button type="button" class="ui-choice option-step" data-motion="full">
-          {t(locale, 'settings.motionFull')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-motion="reduced">
-          {t(locale, 'settings.motionReduced')}
-        </button>
-        <button type="button" class="ui-choice option-step" data-motion="auto">
-          {t(locale, 'settings.motionAuto')}
         </button>
       </div>
     </div>
@@ -836,13 +818,52 @@ const navItems: NavItem[] = [
     sync()
   }
 
-  bindChoice('[data-root-scale]', 'rootScale', 'rootScale', () => currentVar('--ui-root-scale'))
-  bindChoice('[data-prose-lh]', 'proseLh', 'proseLh', () => currentVar('--ui-prose-lh'))
+  /**
+   * 滑块：字号与行距连续可调，拖动时实时生效 —— 看着字变大才知道调到哪儿了。
+   * 值直接写进 CSS 变量（--ui-root-scale / --ui-prose-lh）。
+   */
+  function bindRange(
+    selector: string,
+    valueSelector: string,
+    key: PrefKey,
+    prop: string,
+    format: (v: number) => string,
+  ) {
+    const input = document.querySelector<HTMLInputElement>(selector)
+    const output = document.querySelector<HTMLElement>(valueSelector)
+    if (!input) return
+    const sync = () => {
+      const v = Number(currentVar(prop))
+      if (Number.isFinite(v)) input.value = String(v)
+      if (output) output.textContent = format(Number(input.value))
+    }
+    input.addEventListener('input', () => {
+      setPref(key, input.value)
+      applyPreferences(html, readPreferences())
+      if (output) output.textContent = format(Number(input.value))
+      // 字号变了弹窗大小也跟着变 —— 位置重新夹回视口
+      placePopup()
+    })
+    sync()
+  }
+
+  bindRange(
+    '[data-root-scale-range]',
+    '[data-root-scale-value]',
+    'rootScale',
+    '--ui-root-scale',
+    (v) => `${Math.round(v * 100)}%`,
+  )
+  bindRange(
+    '[data-prose-lh-range]',
+    '[data-prose-lh-value]',
+    'proseLh',
+    '--ui-prose-lh',
+    (v) => v.toFixed(2),
+  )
+
   bindChoice('[data-contrast]', 'contrast', 'contrast', () =>
     has(CLASS.contrastHigh) ? 'high' : 'standard',
-  )
-  bindChoice('[data-motion]', 'motion', 'motion', () =>
-    has(CLASS.motionReduced) ? 'reduced' : has(CLASS.motionFull) ? 'full' : 'auto',
   )
 
   /* ---------- 无障碍开关（aria-pressed 的开关按钮） ---------- */
@@ -931,12 +952,16 @@ const navItems: NavItem[] = [
   }
 
   /* 标题栏的图标 —— 就是作者头像（像素画，别插值） */
+  /* 字标 —— 品牌短名，不是头像 */
   .logo {
-    width: 24px;
-    height: 24px;
     display: block;
-    border-radius: var(--ui-radius-sm);
-    image-rendering: pixelated;
+    font-family: var(--ui-font-mono);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ui-text);
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .reset-btn {
@@ -993,13 +1018,6 @@ const navItems: NavItem[] = [
     transition:
       color var(--ui-transition-fast),
       background var(--ui-transition-fast);
-  }
-
-  /* 「大点击区」档 —— 导航链接是全站最小的目标（37px），
-     这里抬到 44px 的下限；抽屉里的条目同理 */
-  :global(html.targets-large) .menu-link,
-  :global(html.targets-large) .drawer-item {
-    min-height: var(--ui-target-min-size);
   }
 
   .menu-link:hover {
@@ -1336,6 +1354,10 @@ const navItems: NavItem[] = [
   }
 
   .section-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--ui-space-sm);
     margin: 0 0 var(--ui-space-sm);
     padding-left: 4px;
     color: var(--ui-text-muted);
@@ -1348,6 +1370,19 @@ const navItems: NavItem[] = [
   .options-grid {
     display: flex;
     gap: var(--ui-space-sm);
+  }
+
+  /* 滑块旁的当前值 */
+  .range-value {
+    color: var(--ui-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 原生 range 加个 accent-color 就跟主题一个色 —— 不必自己画轨道和滑块 */
+  .ui-range {
+    width: 100%;
+    accent-color: var(--ui-accent);
+    cursor: pointer;
   }
 
   /* 字号 / 行距这种三选一 —— 按钮压扁一点，弹窗才放得下 */

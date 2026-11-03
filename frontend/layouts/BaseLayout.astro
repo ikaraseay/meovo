@@ -179,10 +179,8 @@ const webSiteLd = {
         if (rootScale) root.style.setProperty('--ui-root-scale', rootScale)
         if (lineHeight) root.style.setProperty('--ui-prose-lh', lineHeight)
 
-        // 对比度 / 动效 / 下划线 / 点击目标 —— 有/无用 class
+        // 对比度 / 下划线 / 点击目标 / 焦点环 —— 有/无用 class
         root.classList.toggle(prefClasses.contrastHigh, get(prefKeys.contrast) === 'high')
-        root.classList.toggle(prefClasses.motionReduced, get(prefKeys.motion) === 'reduced')
-        root.classList.toggle(prefClasses.motionFull, get(prefKeys.motion) === 'full')
         root.classList.toggle(prefClasses.linksAlways, get(prefKeys.links) === 'always')
         root.classList.toggle(prefClasses.targetsLarge, get(prefKeys.targets) === 'large')
         root.classList.toggle(prefClasses.focusStrong, get(prefKeys.focus) === 'strong')
@@ -226,9 +224,26 @@ const webSiteLd = {
     <a class="skip-link" href="#main">{t(locale, 'a11y.skipToContent')}</a>
     {chrome && <FloatingBar locale={locale} />}
 
-    <!-- 加载遮罩：桌面布局完成前盖住，摆好再撤掉 -->
+    <!-- 加载遮罩：桌面布局完成前盖住，摆好再撤掉 —— 一台终端，跟 404 页同一套 -->
     <div class="page-loader" aria-hidden="true">
-      <span class="page-loader__ring"></span>
+      <div class="term page-loader__term">
+        <div class="term__bar">
+          <span class="term__dots"><i></i><i></i><i></i></span>
+          <span class="term__path">{authorName}@astro: ~</span>
+        </div>
+        <div class="term__body">
+          <p class="term__line">
+            <span class="term__user">{authorName}@astro</span>
+            <span class="term__dim">$</span> cat /index.md
+          </p>
+          <p class="term__line term__dim">loading…</p>
+          <p class="term__title">
+            <span class="term__prompt" aria-hidden="true">&gt;</span>
+            {siteName}
+            <span class="term__cursor" aria-hidden="true"></span>
+          </p>
+        </div>
+      </div>
     </div>
     <main id="main" class="site-main">
       <div class:list={['container', { 'container--wide': wide }]}>

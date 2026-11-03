@@ -57,18 +57,16 @@ test('相对字号：新 key 优先，老的 prose-scale 只作兜底', () => {
   assert.equal(readPreferences(fakeStore({ 'root-scale': '1.12', 'prose-scale': '0.9' })).rootScale, '1.12')
 })
 
-test('对比度 / 动效 / 无障碍开关：坏值一律退回默认', () => {
+test('对比度 / 无障碍开关：坏值一律退回默认', () => {
   const prefs = readPreferences(
     fakeStore({
       contrast: 'nonsense',
-      motion: 'nope',
       links: 'x',
       targets: 'y',
       focus: 'z',
     }),
   )
   assert.equal(prefs.contrast, 'standard')
-  assert.equal(prefs.motion, 'auto')
   assert.equal(prefs.links, 'auto')
   assert.equal(prefs.targets, 'normal')
   assert.equal(prefs.focus, 'auto')
@@ -80,14 +78,12 @@ test('applyPreferences 落到根元素', () => {
     mode: 'dark',
     rootScale: '1.12',
     proseLh: '2.05',
-    motion: 'reduced',
     contrast: 'high',
     links: 'always',
     targets: 'large',
     focus: 'strong',
   })
   assert.ok(root.classes.has('dark'))
-  assert.ok(root.classes.has('motion-reduced'))
   assert.ok(root.classes.has('contrast-high'))
   assert.ok(root.classes.has('links-always'))
   assert.ok(root.classes.has('targets-large'))
@@ -103,7 +99,6 @@ test('applyPreferences：light 时移除 dark，空值不覆盖', () => {
     mode: 'light',
     rootScale: '',
     proseLh: '',
-    motion: 'auto',
     contrast: 'standard',
     links: 'auto',
     targets: 'normal',

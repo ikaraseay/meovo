@@ -204,20 +204,26 @@ html.dark .code-block pre.astro-code span {
   font-size: 0.8125rem;
 }
 
+/* 窄屏才出现的折叠头 —— 卡本身已经有一圈边框，
+   按钮再带一层就是两层套着的描边（重叠）。改成跟结构图那行一样的素行。 */
 .toc-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--ui-space-sm);
   width: 100%;
-  padding: var(--ui-space-sm) var(--ui-space-md);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-surface-active);
+  padding: var(--ui-space-sm) 0;
+  border: none;
+  background: transparent;
   color: var(--ui-text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
+  transition: color var(--ui-transition-fast);
+}
+
+.toc-toggle:hover {
+  color: var(--ui-text);
 }
 
 .toc-toggle svg {

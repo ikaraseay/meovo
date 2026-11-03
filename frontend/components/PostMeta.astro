@@ -78,8 +78,9 @@ const dateFormat = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', 
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-sm);
+    /* 分隔线下面不垫 margin —— 它是这张卡最后一条线，
+       再留一段空带只是死白，白白撑高标题卡 */
     padding-block-end: var(--ui-space-lg);
-    margin-block-end: var(--ui-space-lg);
     border-block-end: 1px solid var(--ui-border);
     font-size: 0.875rem;
     color: var(--ui-text-muted);

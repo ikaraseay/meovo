@@ -360,61 +360,74 @@ html[data-theme='liquid-glass'].dark {
 /* ============================================================
    高对比档
    ------------------------------------------------------------
-   用户在设置里选的第二档。把次要文字、描边与表面都抬一档：
-     · 次要文字从 4.9 / 4.8 抬到 7.1 / 6.0
-     · 强调色再压深一档（#8f2810，6.96:1）
-     · 表面更实 —— 半透明叠多了对比度就不稳
+   用户在设置里选的第二档 —— 要的是**一眼能看出来**，不是「稍微深一点」：
+     · 表面全改不透明 —— 半透明叠多了对比度就不稳
+     · 描边加粗加黑 —— 卡片边界一眼能分
+     · 次要文字压到接近正文（浅色 8:1+，深色 12:1+）
    选择器带 :not(.dark) 是为了压住深色那一组（同特异度时后者会赢）。
    ============================================================ */
 html[data-theme='liquid-glass']:not(.dark).contrast-high {
-  --ui-text: #1a120c;
-  --ui-text-secondary: #463a30;
-  --ui-text-muted: #57493d;
-  --ui-text-faint: #625448;
-  --ui-text-accent: #8f2810;
+  --ui-text: #100b07;
+  --ui-text-secondary: #33291f;
+  --ui-text-muted: #3f352b;
+  --ui-text-faint: #4b4036;
+  --ui-text-accent: #7a1e08;
 
-  --ui-border: rgba(70, 40, 20, 0.4);
-  --ui-border-subtle: rgba(70, 40, 20, 0.26);
-  --ui-border-accent: rgba(143, 40, 16, 0.7);
+  --ui-border: rgba(40, 22, 10, 0.75);
+  --ui-border-subtle: rgba(40, 22, 10, 0.5);
+  --ui-border-accent: rgba(122, 30, 8, 0.95);
 
-  --ui-surface: rgba(255, 255, 255, 0.9);
-  --ui-surface-raised: rgba(255, 255, 255, 0.96);
-  --ui-surface-hover: rgba(255, 255, 255, 0.86);
-  --ui-surface-active: rgba(255, 255, 255, 0.7);
+  --ui-surface: #ffffff;
+  --ui-surface-raised: #ffffff;
+  --ui-surface-sunken: #efe7db;
+  --ui-surface-hover: #f6f0e6;
+  --ui-surface-active: #ece4d7;
 
-  --ui-card-bg: rgba(255, 255, 255, 0.88);
-  --ui-card-border: rgba(255, 255, 255, 0.95);
+  --ui-card-bg: #ffffff;
+  --ui-card-border: rgba(40, 22, 10, 0.6);
 
-  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.82);
-  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.95);
+  --ui-btn-secondary-bg: #ffffff;
+  --ui-btn-secondary-hover: #f2ebdf;
 
-  --ui-focus-ring-color: #8f2810;
+  --ui-nav-bg: #ffffff;
+  --ui-nav-border: rgba(40, 22, 10, 0.6);
+
+  --ui-focus-ring-color: #7a1e08;
   --ui-focus-ring-width: 3px;
   --ui-focus-ring-offset: 3px;
 }
 
 html[data-theme='liquid-glass'].dark.contrast-high {
-  --ui-text-secondary: #e6ddd2;
-  --ui-text-muted: #cfc6bb;
-  --ui-text-faint: rgba(246, 241, 234, 0.85);
-  --ui-text-accent: #ffb59c;
+  --ui-text: #ffffff;
+  --ui-text-secondary: #f2ebe2;
+  --ui-text-muted: #e2d9cd;
+  --ui-text-faint: rgba(255, 255, 255, 0.95);
+  --ui-text-accent: #ffc4ae;
 
-  --ui-border: rgba(255, 255, 255, 0.34);
-  --ui-border-subtle: rgba(255, 255, 255, 0.22);
-  --ui-border-accent: rgba(255, 181, 156, 0.7);
+  --ui-border: rgba(255, 255, 255, 0.62);
+  --ui-border-subtle: rgba(255, 255, 255, 0.42);
+  --ui-border-accent: rgba(255, 196, 174, 0.9);
 
-  --ui-surface: rgba(24, 24, 34, 0.88);
-  --ui-surface-raised: rgba(30, 30, 42, 0.94);
-  --ui-surface-hover: rgba(255, 255, 255, 0.14);
-  --ui-surface-active: rgba(255, 255, 255, 0.18);
+  --ui-surface: #12121a;
+  --ui-surface-raised: #1b1b25;
+  --ui-surface-hover: rgba(255, 255, 255, 0.18);
+  --ui-surface-active: rgba(255, 255, 255, 0.24);
 
-  --ui-card-bg: rgba(26, 26, 38, 0.9);
-  --ui-card-border: rgba(255, 255, 255, 0.28);
+  --ui-card-bg: #16161f;
+  --ui-card-border: rgba(255, 255, 255, 0.5);
 
-  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.14);
-  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.22);
+  --ui-btn-secondary-bg: rgba(255, 255, 255, 0.2);
+  --ui-btn-secondary-hover: rgba(255, 255, 255, 0.32);
 
-  --ui-focus-ring-color: #ffb59c;
+  --ui-nav-bg: #16161f;
+  --ui-nav-border: rgba(255, 255, 255, 0.55);
+
+  --ui-focus-ring-color: #ffc4ae;
   --ui-focus-ring-width: 3px;
   --ui-focus-ring-offset: 3px;
+}
+
+/* 高对比档：卡片的彩色 tint 收掉 —— 颜色不承担信息，只添噪 */
+html[data-theme='liquid-glass'].contrast-high .ui-widget {
+  background-image: none;
 }

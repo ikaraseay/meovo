@@ -190,6 +190,12 @@ html.js [data-desk].desk--ready .ui-widget {
     flex-direction: column;
     gap: var(--ui-space-2xl);
   }
+
+  /* 目录与结构图紧跟标题卡 —— 它们是「进正文前」要看的东西，
+     隔一整个 gap 就跟标题分成两块不相干的卡片了 */
+  .desk > [data-zone='side'] {
+    margin-block-start: calc(var(--ui-space-lg) - var(--ui-space-2xl));
+  }
 }
 
 /* =========================================================
@@ -219,19 +225,14 @@ html.js:not(.page-ready) .page-loader {
   pointer-events: auto;
 }
 
-.page-loader__ring {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 3px solid var(--ui-border);
-  border-top-color: var(--ui-accent);
-  animation: loader-spin 0.8s linear infinite;
+/* 加载屏就是一台终端 —— 跟 404 页共用 .term 那套外观与配色 */
+.page-loader__term {
+  width: min(30rem, calc(100vw - 2 * var(--ui-space-lg)));
 }
 
-@keyframes loader-spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* 高对比档：极光色斑收掉 —— 彩色背景会拉低文字对比 */
+html.contrast-high .ui-aurora {
+  display: none;
 }
 
 /* =========================================================
@@ -321,10 +322,17 @@ a:hover {
    首屏脚本在渲染前挂上，不会闪。
    ========================================================= */
 
-/* 强化焦点环 —— 键盘导航要一眼看得见焦点在哪 */
+/* 强化焦点环 —— 键盘导航要一眼看得见焦点在哪。
+   !important 是故意的：组件里把 outline 关掉的地方（输入框）也得把焦点环还回来 ——
+   焦点是安全底线，不能被局部样式吃掉。 */
 html.focus-strong {
-  --ui-focus-ring-width: 3px;
+  --ui-focus-ring-width: 4px;
   --ui-focus-ring-offset: 3px;
+}
+
+html.focus-strong :focus-visible {
+  outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color) !important;
+  outline-offset: var(--ui-focus-ring-offset) !important;
 }
 
 /* 始终显示链接下划线 —— 链接不能只靠颜色区分。
@@ -334,9 +342,23 @@ html.links-always a:not(.ui-btn):not(.ui-choice) {
   text-underline-offset: 0.2em;
 }
 
-/* 更大的点击目标 —— 抬到 44px（常见的触达尺寸下限） */
+/* 更大的点击目标 —— 抬到 44px（常见的触达尺寸下限）。
+   全站真正偏小的目标都算进来：导航链接、目录条目、标签、输入框、跳转链接。
+   桌面侧栏那条目录也一起抬 —— 挨得近的条目本来就难点。 */
 html.targets-large {
   --ui-target-min-size: 44px;
+}
+
+html.targets-large :is(
+    .menu-link,
+    .drawer-item,
+    .toc-link,
+    .toc-toggle,
+    .ui-chip,
+    .ui-input,
+    .skip-link
+  ) {
+  min-height: var(--ui-target-min-size);
 }
 
 /* =========================================================

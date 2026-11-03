@@ -113,22 +113,16 @@
 /* =========================================================
    降低动效：时长刻度归零
    ---------------------------------------------------------
-   判定与「CSS 动画一并停掉」在 styles/motion.css —— 这里是结构层，
-   只管刻度。「完整动效」（html.motion-full）能顶掉系统那一条，
-   但顶不掉用户自己在设置里选的「减弱」。
+   只听系统的「减弱动态效果」—— 设置里不再给动效档位，
+   系统说什么就是什么。判定与「CSS 动画一并停掉」在 styles/motion.css，
+   这里是结构层，只管刻度。
    ========================================================= */
 @media (prefers-reduced-motion: reduce) {
-  html:not(.motion-full) {
+  html {
     --ui-duration-fast: 1ms;
     --ui-duration-base: 1ms;
     --ui-duration-slow: 1ms;
   }
-}
-
-html.motion-reduced {
-  --ui-duration-fast: 1ms;
-  --ui-duration-base: 1ms;
-  --ui-duration-slow: 1ms;
 }
 
 /* =========================================================

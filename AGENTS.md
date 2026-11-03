@@ -66,9 +66,10 @@
   - 改 `--ui-nav-blur` 的 blur 会连折射一起抹平（blur 作用在位移之后）
 - **动效系统**：三层，一处主人 —— 刻度（`tokens.css` 的 `--ui-motion-*`）、
   原语（`frontend/styles/motion.css` 的 `.ui-anim-fade-up` / `.ui-anim-fade-in` /
-  `.ui-anim-pop` / `.ui-anim-stagger`）、归零（系统 `prefers-reduced-motion` +
-  用户显式选的「减弱」两套 `!important` 重置）。页面只编排原语，**别再各写各的 `@keyframes`**。
-  - **「完整」能顶掉系统那一条**，但顶不掉用户自己选的「减弱」—— 用户说的比系统设置更算数
+  `.ui-anim-pop` / `.ui-anim-stagger`）、归零（**只听系统** `prefers-reduced-motion`
+  一套 `!important` 重置）。页面只编排原语，**别再各写各的 `@keyframes`**。
+  - **设置里没有动效档**（2026-11-03 删）—— 系统的 `prefers-reduced-motion` 是唯一事实来源，
+    站内不再给「顶掉系统」的口子；真要加回来，先想清楚跟系统冲突时听谁的
   - 原语用 `translate` / `scale` **独立属性**，别用 `transform` —— 会被卡片的倾斜占掉，两者打架
   - 桌面卡片入场是**逐张错峰淡入**（`--ui-stagger-index` 由 `draggable.ts` 写），
     容器不再整体淡入
@@ -79,6 +80,12 @@
   明暗切换写在 `prose.css` 的 `html.dark` 规则里
 - **文章页**：chrome（标题卡 / 目录 / 结构图 / 协议卡 / 上下篇 / 页脚）+ 目录折叠 / 滚动高亮 /
   代码块复制按钮，都在 `frontend/components/Article.astro` —— 页面只管路由与数据，正文走插槽
+  - **窄屏下目录与结构图排在标题卡下面** —— 靠 **DOM 顺序** 实现：窄屏卡片退回文档流，
+    DOM 顺序 = 视觉顺序。桌面是绝对定位 + zone，落位由 `desk-layout.ts` 算，与 DOM 顺序无关
+  - 窄屏上目录卡紧跟标题卡（`global.css` 里 side 区卡片 `margin-block-start` 收紧一档）——
+    它们是「进正文前」要看的东西，隔一整个 gap 就跟标题分成两块不相干的卡片了
+  - 窄屏的目录折叠头**不要自带边框**（`prose.css` 的 `.toc-toggle`）：卡本身已经有一圈，
+    再套一层就是两层套着的描边 —— 跟结构图那行 `<summary>` 保持同一种素行样式
 - **协议卡**：文章页正文后面的可拖拽玻璃部件（`zone="tail"`，排在上下篇之前），
   内容在 `frontend/components/PostLicense.astro`。协议取值来自 frontmatter `license`，
   `frontend/lib/licenses.ts` 是唯一事实来源（`LICENSE_IDS` 同时供 schema 派生），缺省 CC BY 4.0；
@@ -109,7 +116,7 @@
   - 终端的色是**独立一套 token**（`--ui-term-*`）—— **浅色档是纸色、深色档是墨色**，
     两套都写在主题文件里（浅色块 / `.dark` 块）；别把它塞进 `--ui-card-*`（那是玻璃卡的表面）
   - 首页**没有「关于我」卡**了 —— 头像与名字都并进终端面板里（原来那张 profile 卡跟它打架）
-- **用户偏好（相对字号 / 行距 / 对比度 / 动效 / 无障碍）**：存在 localStorage，
+- **用户偏好（相对字号 / 行距 / 对比度 / 无障碍）**：存在 localStorage，
   **key 的唯一主人在 `frontend/lib/preferences.ts`**（`PREFS_KEYS`），
   **class 名的唯一主人在 `PREF_CLASSES`**（值取自 `dom-contract.ts` 的 `CLASS`）。
   `BaseLayout.astro` 的首屏内联脚本不能 import 模块，用 `define:vars` 把两张表注入进去 ——
@@ -118,11 +125,25 @@
   - **相对字号改根字号** —— `html { font-size: calc(100% * var(--ui-root-scale, 1)) }`，
     全站一起缩；`--ui-space-*` 全部 rem，跟着根字号走。行距单独一档（`--ui-prose-lh`），
     不跟字号绑。老的 `prose-scale` key 只作读侧兜底（迁到 `root-scale`），不主动写回
-  - **对比度两档** —— 标准档本身必须过 WCAG AA 4.5:1，高对比档在此之上再抬次要文字 /
-    描边 / 表面不透明度。取值由 `test/contrast.test.ts` 守着 —— 改主题色会有人喊
+  - **字号与行距是滑块，不是三档按钮** —— 原生 `<input type="range">` +
+    `accent-color`，拖动即写 `setPref` 并重排。刻度在 `FloatingBar.astro` 的
+    `bindRange()` 里（字号 0.8~1.4、行距 1.4~2.3，步长 0.05）——
+    别改回三选一，三档调不出舒服的结果
+  - **对比度两档** —— 标准档本身必须过 WCAG AA 4.5:1；高对比档要**一眼看得出**
+    （2026-11-03 改造）：表面全改不透明 + 去极光色斑 + 去卡片彩色 tint +
+    描边加黑 + 次要文字压深。取值由 `test/contrast.test.ts` 守着 —— 改主题色会有人喊
   - **无障碍三开关** —— 强化焦点环（`--ui-focus-ring-width` / `-offset`）、
     始终显示链接下划线、更大的点击目标（`--ui-target-min-size` 下限 44px）。
     全部是 `<html>` 上的 class，首屏前挂上，不闪
+    - **强化焦点环带 `!important`** —— 局部的 `outline: none`（如 `.ui-input:focus-visible`）
+      会把环吃掉；焦点是安全底线，强制档要压过所有局部写法（4px / offset 3px）
+    - **大点击区的覆盖范围由 `global.css` 一条规则持有** ——
+      `:is(.menu-link, .drawer-item, .toc-link, .toc-toggle, .ui-chip, .ui-input, .skip-link)`，
+      别再在组件的 scoped 样式里各写各的
+- **加载屏就是 404 那台终端** —— `BaseLayout.astro` 的 `.page-loader` 里放一台 `.term`
+  （标题栏三点 + `$ cat /index.md` + `loading…` + `> 站点名 ▌`），
+  跟 `frontend/pages/404.astro` 共用 `.term` 那套外观与 `--ui-term-*` 配色。
+  遮罩在 `html.js:not(.page-ready)` 时可见，布局摆好（双 rAF）后加 `.page-ready` 淡出
 - **404 页**是 `frontend/pages/404.astro` —— 一台终端（`cat /404` → No such file +
   字符画猫 + `ls /`），中英文都摆出来（404 没有语言上下文）
 - **SEO**：canonical / hreflang / OG / Twitter / JSON-LD 都在 `BaseLayout.astro` 里统一输出；
@@ -201,7 +222,7 @@
   **代码里用到的 key 都在词典里**（缺了就静默显示成 key 本身）。
   ⚠️ 它只认 `t()` 调用里的 key —— 写在数据表里的 key（编辑器按钮表那种）抓不到，靠对应单测兜。
 - **站点名与笔名是两回事** —— `site.name` 是品牌名（og:site_name / RSS），
-  导航栏那个 logo 现在是**作者头像**（`/avatar.png`），
+  导航栏那个 logo 是**字标**（`nav.wordmark`，中英都是 "Meo"；2026-11-03 从头像图改的），
   `site.author` 是笔名（标题后缀与署名）。
   ⚠️ 仓库里的 `config/site.json` 只放**默认值**（Meovo / 你的笔名 / you@example.com）：
   公开仓库不带个人文字，个人那几处走**后台「设置」**（D1 `settings` → 构建期导出
