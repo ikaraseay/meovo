@@ -2,7 +2,7 @@
 /**
  * 玻璃部件 —— 可拖拽的毛玻璃卡片。
  * ---------------------------------------------------------
- * 抓手是一条白色小横条（拖拽移动）+ 一个小圆钮（旋转切换固定）。
+ * 抓手是一条白色小横条（拖拽移动）+ 三个小按钮（复原 / 展开 / 固定）。
  * 每张卡片带一个随机的 tint（由 id 哈希到一个悦目色相，稳定可复现），
  * 浅到「感觉得出来一点就好」；组件只内联色相，浅/深两套配方在 tokens.css。
  */
@@ -21,10 +21,12 @@ interface Props {
   defaultPin?: boolean
   /** 卡片最小高度（px）—— 内容少时留白；不给就不限 */
   minHeight?: number
+  /** 卡片最大高度（px）—— 超出可滚动；不给就不限 */
+  maxHeight?: number
   locale: Locale
 }
 
-const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, locale } = Astro.props
+const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, maxHeight = 0, locale } = Astro.props
 
 /** 悦目的色相集合 —— 避开病态的黄绿，只取看着舒服的暖/冷色 */
 const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
@@ -47,7 +49,7 @@ const hue = hashHue(id)
   data-widget-full={full ? '' : undefined}
   data-zone={zone || undefined}
   data-default-pin={defaultPin ? '' : undefined}
-  style={`--ui-widget-hue: ${hue}${minHeight > 0 ? `; min-height: ${minHeight}px` : ''}`}
+  style={`--ui-widget-hue: ${hue}${minHeight > 0 ? `; min-height: ${minHeight}px` : ''}${maxHeight > 0 ? `; max-height: ${maxHeight}px` : ''}`}
 >
   <header class="ui-widget__grip">
     <span
@@ -63,7 +65,30 @@ const hue = hashHue(id)
       aria-label={t(locale, 'desk.restore')}
       title={t(locale, 'desk.restore')}
     >
-      ↺
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="ui-widget__expand"
+      data-widget-expand
+      aria-label={t(locale, 'widget.expand')}
+      title={t(locale, 'widget.expand')}
+    >
+      <svg class="icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h6v6"/>
+        <path d="M9 21H3v-6"/>
+        <path d="M21 3l-7 7"/>
+        <path d="M3 21l7-7"/>
+      </svg>
+      <svg class="icon-collapse" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+        <path d="M4 14h6v6"/>
+        <path d="M20 10h-6V4"/>
+        <path d="M14 10l7-7"/>
+        <path d="M3 21l7-7"/>
+      </svg>
     </button>
     <button
       type="button"
@@ -73,7 +98,10 @@ const hue = hashHue(id)
       title={t(locale, 'desk.pin')}
       aria-pressed="false"
     >
-      📌
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 17v5"/>
+        <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
+      </svg>
     </button>
   </header>
   <div class="ui-widget__body">
@@ -124,5 +152,62 @@ const hue = hashHue(id)
     .ui-widget--xl {
       width: 100%;
     }
+  }
+
+  /* 抓手按钮 —— 统一尺寸与间距 */
+  .ui-widget__grip button {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--ui-text-muted);
+    border-radius: var(--ui-radius-sm);
+    cursor: pointer;
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .ui-widget__grip button:hover {
+    color: var(--ui-text);
+    background: var(--ui-surface-hover);
+  }
+
+  .ui-widget__grip button:focus-visible {
+    outline: 2px solid var(--ui-focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* 展开态 —— 覆盖大半屏幕，可滚动 */
+  .ui-widget.is-expanded {
+    position: fixed !important;
+    top: 5vh !important;
+    left: 5vw !important;
+    width: 90vw !important;
+    height: 90vh !important;
+    max-height: none !important;
+    z-index: var(--ui-z-expanded) !important;
+    transition:
+      top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ui-widget.is-expanded .ui-widget__body {
+    overflow-y: auto;
+    max-height: calc(90vh - 48px);
+  }
+
+  /* 展开按钮的图标切换 */
+  .ui-widget.is-expanded .ui-widget__expand .icon-expand {
+    display: none;
+  }
+
+  .ui-widget.is-expanded .ui-widget__expand .icon-collapse {
+    display: block;
   }
 </style>

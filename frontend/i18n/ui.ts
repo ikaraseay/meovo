@@ -51,6 +51,7 @@ export const ui = {
   /** 导航栏字标 —— 品牌短名 */
   'nav.wordmark': { zh: 'Meo', en: 'Meo' },
   'widget.drag': { zh: '拖动这个部件', en: 'Drag this widget' },
+  'widget.expand': { zh: '展开 / 收起', en: 'Expand / collapse' },
   'desk.pin': { zh: '固定 / 取消固定', en: 'Pin / unpin' },
   'desk.restore': { zh: '复原到默认位置', en: 'Restore default position' },
   'layout.reset': { zh: '重置布局', en: 'Reset layout' },

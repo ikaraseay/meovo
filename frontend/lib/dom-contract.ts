@@ -67,6 +67,8 @@ export const CLASS = {
   imgZoomable: 'img-zoomable',
   /** 放大层里正在拖动 */
   isPanning: 'is-panning',
+  /** 卡片展开态 —— 覆盖大半屏幕 */
+  expanded: 'is-expanded',
 } as const
 
 /** data 属性名 */
@@ -81,6 +83,8 @@ export const ATTR = {
   widget: 'data-widget',
   /** 卡片的图钉（固定 / 取消固定） */
   widgetPin: 'data-widget-pin',
+  /** 卡片的展开按钮 */
+  widgetExpand: 'data-widget-expand',
   /** 卡片的复原按钮 */
   widgetRestore: 'data-widget-restore',
   /** 卡片的拖拽把手 */
@@ -169,6 +173,8 @@ export const Z = {
   fab: 10001,
   /** 设置弹窗 */
   popup: 10002,
+  /** 展开的卡片 */
+  expanded: 10003,
   /** 加载遮罩 —— 盖住一切 */
   loader: 10010,
 } as const

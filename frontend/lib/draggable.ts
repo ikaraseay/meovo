@@ -525,11 +525,32 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     })
   }
 
+  function wireExpand(entry: Entry) {
+    const btn = entry.el.querySelector<HTMLElement>(`[${ATTR.widgetExpand}]`)
+    if (!btn) return
+    btn.addEventListener('click', (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      toggleExpand(entry)
+    })
+  }
+
+  function toggleExpand(entry: Entry) {
+    const el = entry.el
+    const isExpanded = el.classList.contains(CLASS.expanded)
+    if (isExpanded) {
+      el.classList.remove(CLASS.expanded)
+    } else {
+      el.classList.add(CLASS.expanded)
+    }
+  }
+
   desk.classList.add(CLASS.layingOut)
   apply()
   entries.forEach(wireDrag)
   entries.forEach(wirePin)
   entries.forEach(wireRestore)
+  entries.forEach(wireExpand)
   void desk.offsetHeight
   desk.classList.remove(CLASS.layingOut)
   // 错峰进场 —— 索引写进 --ui-stagger-index，样式层按它推迟动画
