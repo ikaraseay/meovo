@@ -24,38 +24,37 @@ const date = post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')
     <h3 class="post-row-title">
       <a href={href}>{post.data.title}</a>
     </h3>
-    <p class="post-row-summary">{post.data.description}</p>
-  </div>
-
-  <div class="post-row-meta">
-    {
-      post.data.category && (
-        <a class="ui-chip" href={categoryPath(locale, post.data.category)}>
-          {getCategoryLabel(locale, post.data.category)}
-        </a>
-      )
-    }
-    {
-      post.data.tags.map((tag) => (
-        <a class="ui-chip" href={tagPath(locale, tag)}>
-          {getTagLabel(locale, tag)}
-        </a>
-      ))
-    }
-    {
-      isFallback && (
-        <span class="ui-chip ui-chip--warn">
-          {t(locale, 'post.noTranslationShort', { locale: localeLabel(locale, locale) })}
-        </span>
-      )
-    }
+    {post.data.description && <p class="post-row-summary">{post.data.description}</p>}
+    <div class="post-row-meta">
+      {
+        post.data.category && (
+          <a class="ui-chip" href={categoryPath(locale, post.data.category)}>
+            {getCategoryLabel(locale, post.data.category)}
+          </a>
+        )
+      }
+      {
+        post.data.tags.map((tag) => (
+          <a class="ui-chip" href={tagPath(locale, tag)}>
+            {getTagLabel(locale, tag)}
+          </a>
+        ))
+      }
+      {
+        isFallback && (
+          <span class="ui-chip ui-chip--warn">
+            {t(locale, 'post.noTranslationShort', { locale: localeLabel(locale, locale) })}
+          </span>
+        )
+      }
+    </div>
   </div>
 </article>
 
 <style>
   .post-row {
     display: grid;
-    grid-template-columns: 110px minmax(0, 1fr) auto;
+    grid-template-columns: 110px minmax(0, 1fr);
     column-gap: var(--ui-space-lg);
     align-items: start;
     padding-block: var(--ui-space-lg);
@@ -69,9 +68,16 @@ const date = post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')
     color: var(--ui-text-muted);
   }
 
+  .post-row-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+    min-width: 0;
+  }
+
   .post-row-title {
     font-size: 1.25rem;
-    margin-block-end: var(--ui-space-xs);
+    margin: 0;
   }
 
   .post-row-title a {
@@ -86,14 +92,15 @@ const date = post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')
   .post-row-summary {
     font-size: 0.9375rem;
     color: var(--ui-text-secondary);
+    margin: 0;
   }
 
   .post-row-meta {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--ui-space-xs);
     flex-wrap: wrap;
-    padding-block-start: 0.35rem;
+    margin-block-start: var(--ui-space-xs);
   }
 
   .post-row-meta a.ui-chip {
@@ -120,8 +127,8 @@ const date = post.data.pubDate.toISOString().slice(0, 10).replace(/-/g, '.')
       row-gap: var(--ui-space-xs);
     }
 
-    .post-row-meta {
-      padding-block-start: 0;
+    .post-row-date {
+      font-size: 0.6875rem;
     }
   }
 </style>
