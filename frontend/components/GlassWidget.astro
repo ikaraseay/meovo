@@ -23,10 +23,12 @@ interface Props {
   minHeight?: number
   /** 卡片最大高度（px）—— 超出可滚动；不给就不限 */
   maxHeight?: number
+  /** 不限高度（英雄卡等特殊卡片用） */
+  noLimit?: boolean
   locale: Locale
 }
 
-const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, maxHeight = 0, locale } = Astro.props
+const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, maxHeight = 0, noLimit = false, locale } = Astro.props
 
 /** 悦目的色相集合 —— 避开病态的黄绿，只取看着舒服的暖/冷色 */
 const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
@@ -44,7 +46,7 @@ const hue = hashHue(id)
 ---
 
 <section
-  class:list={['ui-widget', 'ui-card', `ui-widget--${width}`, { 'ui-widget--tall': minHeight > 0 }]}
+  class:list={['ui-widget', 'ui-card', `ui-widget--${width}`, { 'ui-widget--tall': minHeight > 0, 'ui-widget--no-limit': noLimit }]}
   data-widget={id}
   data-widget-full={full ? '' : undefined}
   data-zone={zone || undefined}
@@ -78,16 +80,16 @@ const hue = hashHue(id)
       title={t(locale, 'widget.expand')}
     >
       <svg class="icon-expand" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M15 3h6v6"/>
-        <path d="M9 21H3v-6"/>
-        <path d="M21 3l-7 7"/>
-        <path d="M3 21l7-7"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <polyline points="9 21 3 21 3 15"/>
+        <line x1="21" y1="3" x2="14" y2="10"/>
+        <line x1="3" y1="21" x2="10" y2="14"/>
       </svg>
-      <svg class="icon-collapse" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-        <path d="M4 14h6v6"/>
-        <path d="M20 10h-6V4"/>
-        <path d="M14 10l7-7"/>
-        <path d="M3 21l7-7"/>
+      <svg class="icon-collapse" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="4 14 10 14 10 20"/>
+        <polyline points="20 10 14 10 14 4"/>
+        <line x1="14" y1="10" x2="21" y2="3"/>
+        <line x1="3" y1="21" x2="10" y2="14"/>
       </svg>
     </button>
     <button
@@ -154,34 +156,29 @@ const hue = hashHue(id)
     }
   }
 
-  /* 抓手按钮 —— 统一尺寸与间距 */
-  .ui-widget__grip button {
-    width: 28px;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--ui-text-muted);
-    border-radius: var(--ui-radius-sm);
-    cursor: pointer;
+  /* 展开按钮的图标切换 —— 默认显示展开图标 */
+  .ui-widget__expand .icon-collapse {
+    display: none;
+  }
+
+  .ui-widget__expand .icon-expand {
+    display: block;
+  }
+
+  /* 卡片整体过渡 —— 只在展开/收起时平滑，拖拽时关掉避免卡顿 */
+  .ui-widget {
     transition:
-      color var(--ui-transition-fast),
-      background var(--ui-transition-fast);
+      top 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .ui-widget__grip button:hover {
-    color: var(--ui-text);
-    background: var(--ui-surface-hover);
+  .ui-widget.is-dragging {
+    transition: none !important;
   }
 
-  .ui-widget__grip button:focus-visible {
-    outline: 2px solid var(--ui-focus-ring);
-    outline-offset: 2px;
-  }
-
-  /* 展开态 —— 覆盖大半屏幕，可滚动 */
+  /* 展开态 —— 覆盖大半屏幕，内容可滚动 */
   .ui-widget.is-expanded {
     position: fixed !important;
     top: 5vh !important;
@@ -190,19 +187,15 @@ const hue = hashHue(id)
     height: 90vh !important;
     max-height: none !important;
     z-index: var(--ui-z-expanded) !important;
-    transition:
-      top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .ui-widget.is-expanded .ui-widget__body {
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: calc(90vh - 48px);
   }
 
-  /* 展开按钮的图标切换 */
+  /* 展开态切换图标 */
   .ui-widget.is-expanded .ui-widget__expand .icon-expand {
     display: none;
   }

@@ -69,6 +69,10 @@ export const CLASS = {
   isPanning: 'is-panning',
   /** 卡片展开态 —— 覆盖大半屏幕 */
   expanded: 'is-expanded',
+  /** 卡片内容可滚动 */
+  scrollable: 'ui-widget--scrollable',
+  /** 卡片正文容器 */
+  widgetBody: 'ui-widget__body',
 } as const
 
 /** data 属性名 */

@@ -1,6 +1,10 @@
 ---
 /**
- * 文本协议卡片的内容 —— 版权声明 + 许可协议。
+ * 文章协议卡片 ——  attribution 风格布局。
+ * ---------------------------------------------------------
+ * 布局参考 CC 归属卡：标题 + 链接 + 三栏元信息（作者 / 发布日期 / 协议），
+ * 右侧叠一层大号 CC 水印作装饰。
+ *
  * 外层玻璃壳（可拖拽部件）由 Article.astro 给，这里只管内容。
  */
 import { t, type Locale } from '../i18n'
@@ -21,82 +25,171 @@ const openLicense = post.data.license !== 'all-rights'
 
 /** 版权年份取发布年 —— 文章的版权从发布那年算 */
 const year = post.data.pubDate.getFullYear()
+
+/** 文章绝对地址 —— 用于归属卡里的链接 */
+const postUrl = new URL(
+  `/${getPostLocale(post)}/posts/${getPostSlug(post)}/`,
+  Astro.site ?? Astro.url,
+).href
+
+const dateFormat = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  timeZone: 'UTC',
+})
 ---
 
 <div class="post-license">
-  <p class="post-license-title">{t(locale, 'post.license.title')}</p>
-  <p class="post-license-meta">
-    <span>{t(locale, 'footer.copyright', { year, name: t(locale, 'site.author') })}</span>
+  <!-- 右侧 CC 水印 —— 纯装饰，不挡文字 -->
+  <div class="post-license__watermark" aria-hidden="true">CC</div>
+
+  <div class="post-license__content">
+    <h3 class="post-license__title">{post.data.title}</h3>
+    <a class="post-license__url" href={postUrl} target="_blank" rel="noopener noreferrer">
+      {postUrl}
+    </a>
+
+    <dl class="post-license__meta">
+      <div class="post-license__col">
+        <dt>{t(locale, 'post.license.author')}</dt>
+        <dd>{t(locale, 'site.author')}</dd>
+      </div>
+      <div class="post-license__col">
+        <dt>{t(locale, 'post.license.published')}</dt>
+        <dd>{dateFormat.format(post.data.pubDate)}</dd>
+      </div>
+      <div class="post-license__col">
+        <dt>{t(locale, 'post.license.license')}</dt>
+        <dd>
+          {
+            license.url ? (
+              <a href={license.url} target="_blank" rel="noopener noreferrer">
+                {t(locale, license.nameKey)}
+              </a>
+            ) : (
+              <span>{t(locale, license.nameKey)}</span>
+            )
+          }
+        </dd>
+      </div>
+    </dl>
+
     {
-      license.url ? (
-        <a
-          class="post-license-name"
-          href={license.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {t(locale, license.nameKey)}
-        </a>
-      ) : (
-        <span class="post-license-name">{t(locale, license.nameKey)}</span>
+      openLicense && (
+        <p class="post-license__raw">
+          <a
+            href={`/${getPostLocale(post)}/raw/${getPostSlug(post)}.md`}
+            target="_blank"
+            rel="noopener"
+          >
+            {t(locale, 'post.license.raw')}
+          </a>
+        </p>
       )
     }
-  </p>
-  <p class="post-license-note">{t(locale, license.noteKey)}</p>
-  {
-    openLicense && (
-      <p class="post-license-raw">
-        <a
-          href={`/${getPostLocale(post)}/raw/${getPostSlug(post)}.md`}
-          target="_blank"
-          rel="noopener"
-        >
-          {t(locale, 'post.license.raw')}
-        </a>
-      </p>
-    )
-  }
+  </div>
 </div>
 
 <style>
   .post-license {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-xs);
-    font-size: 0.875rem;
+    position: relative;
+    overflow: hidden;
   }
 
-  .post-license-title {
-    color: var(--ui-text-secondary);
+  /* 右侧 CC 水印 —— 大号、淡色、纯装饰 */
+  .post-license__watermark {
+    position: absolute;
+    right: -0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8rem;
+    font-weight: 700;
+    color: var(--ui-text-muted);
+    opacity: 0.08;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1;
+    font-family: serif;
+  }
+
+  .post-license__content {
+    position: relative;
+  }
+
+  .post-license__title {
+    margin: 0 0 var(--ui-space-xs);
+    font-size: 1rem;
     font-weight: 600;
+    color: var(--ui-text);
   }
 
-  .post-license-meta {
-    display: flex;
+  .post-license__url {
+    display: block;
+    margin-bottom: var(--ui-space-sm);
+    font-size: 0.8125rem;
+    color: var(--ui-text-accent);
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .post-license__url:hover {
+    text-decoration: underline;
+  }
+
+  .post-license__meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--ui-space-md);
-    flex-wrap: wrap;
-    color: var(--ui-text-muted);
+    margin: 0 0 var(--ui-space-sm);
   }
 
-  .post-license-name {
+  .post-license__col dt {
+    margin-bottom: var(--ui-space-xs);
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+    font-weight: 500;
+  }
+
+  .post-license__col dd {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--ui-text);
+  }
+
+  .post-license__col dd a {
     color: var(--ui-text-accent);
     text-decoration: none;
   }
 
-  a.post-license-name:hover {
+  .post-license__col dd a:hover {
     text-decoration: underline;
   }
 
-  .post-license-note {
-    color: var(--ui-text-muted);
+  .post-license__raw {
+    margin: 0;
+    font-size: 0.8125rem;
   }
 
-  .post-license-raw a {
+  .post-license__raw a {
     color: var(--ui-text-accent);
     text-decoration: none;
   }
 
-  .post-license-raw a:hover {
+  .post-license__raw a:hover {
     text-decoration: underline;
+  }
+
+  /* 窄屏：三栏变单栏 */
+  @media not (min-width: 1024px) {
+    .post-license__meta {
+      grid-template-columns: 1fr;
+      gap: var(--ui-space-sm);
+    }
+
+    .post-license__watermark {
+      font-size: 5rem;
+      right: -0.25rem;
+    }
   }
 </style>

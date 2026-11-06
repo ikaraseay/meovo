@@ -408,6 +408,15 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     saved = readWidgetPositions()
     for (const e of keepPinned) persist(e)
     zCounter = 0
+    // 收起展开的卡片并清理监听
+    if (expandedEntry) {
+      expandedEntry.el.classList.remove(CLASS.expanded)
+      if (outsideClickListener) {
+        document.removeEventListener('click', outsideClickListener)
+        outsideClickListener = null
+      }
+      expandedEntry = null
+    }
     apply()
   }
 
@@ -473,6 +482,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         // 拖拽中卡片保持水平（撤下倾斜），松手再按默认落位复原
         entry.el.classList.remove(CLASS.tilted)
         entry.el.style.removeProperty('--ui-widget-tilt')
+        // 拖拽时关掉过渡，避免位置变化被动画导致卡顿
+        entry.el.classList.add('is-dragging')
       },
       onMove: (s) => {
         const p = clampToViewport(
@@ -494,8 +505,11 @@ export function initDesk(desk: HTMLElement): DeskController | null {
           const deskRect = desk.getBoundingClientRect()
           entry.x = left - deskRect.left
           entry.y = top - deskRect.top
-            placeAbsolute(entry)
+          placeAbsolute(entry)
         }
+        // 位置摆好后再恢复过渡 —— 避免 position 切换触发回弹动画
+        void entry.el.offsetHeight
+        entry.el.classList.remove('is-dragging')
         persist(entry)
       },
     })
@@ -525,6 +539,10 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     })
   }
 
+  /** 当前展开的卡片 —— 用于点击外部收起 */
+  let expandedEntry: Entry | null = null
+  let outsideClickListener: ((e: MouseEvent) => void) | null = null
+
   function wireExpand(entry: Entry) {
     const btn = entry.el.querySelector<HTMLElement>(`[${ATTR.widgetExpand}]`)
     if (!btn) return
@@ -540,8 +558,49 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     const isExpanded = el.classList.contains(CLASS.expanded)
     if (isExpanded) {
       el.classList.remove(CLASS.expanded)
+      // 收起时移除外部点击监听
+      if (outsideClickListener) {
+        document.removeEventListener('click', outsideClickListener)
+        outsideClickListener = null
+      }
+      expandedEntry = null
     } else {
       el.classList.add(CLASS.expanded)
+      expandedEntry = entry
+      // 展开时添加外部点击监听
+      outsideClickListener = (e: MouseEvent) => {
+        if (!el.contains(e.target as Node)) {
+          toggleExpand(entry)
+        }
+      }
+      document.addEventListener('click', outsideClickListener)
+    }
+    // 展开/收起后重新检测溢出
+    checkOverflow(entry)
+  }
+
+  /** 检测卡片内容是否溢出，添加滚动提示渐变 */
+  function checkOverflow(entry: Entry) {
+    const el = entry.el
+    const body = el.querySelector<HTMLElement>(`.${CLASS.widgetBody}`)
+    if (!body) return
+
+    // 展开态不显示渐变
+    if (el.classList.contains(CLASS.expanded)) {
+      el.classList.remove(CLASS.scrollable)
+      return
+    }
+
+    // 比较内容高度与卡片限制高度
+    const style = getComputedStyle(el)
+    const maxHeight = parseFloat(style.maxHeight)
+    const bodyHeight = body.scrollHeight
+
+    if (!isNaN(maxHeight) && bodyHeight > maxHeight - 48) {
+      // 48px 是 grip 区域高度
+      el.classList.add(CLASS.scrollable)
+    } else {
+      el.classList.remove(CLASS.scrollable)
     }
   }
 
@@ -555,6 +614,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   desk.classList.remove(CLASS.layingOut)
   // 错峰进场 —— 索引写进 --ui-stagger-index，样式层按它推迟动画
   entries.forEach((entry, i) => entry.el.style.setProperty('--ui-stagger-index', String(i)))
+  // 检测所有卡片的溢出状态
+  entries.forEach(checkOverflow)
   desk.classList.add(CLASS.deskReady)
 
   /**
@@ -570,6 +631,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       apply()
       void desk.offsetHeight
       desk.classList.remove(CLASS.layingOut)
+      // 重排后重新检测溢出
+      entries.forEach(checkOverflow)
     }, 150)
   }
 

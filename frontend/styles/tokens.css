@@ -150,6 +150,7 @@
   border-radius: var(--ui-card-radius);
   box-shadow: var(--ui-card-shadow);
   color: var(--ui-text);
+  overflow: hidden;
   transition:
     box-shadow var(--ui-transition-normal),
     transform var(--ui-duration-base) var(--ui-card-ease),
@@ -322,10 +323,10 @@ html[data-theme='liquid-glass'].dark .ui-widget {
   opacity: 1;
 }
 
-/* 图钉：右上角，点击切换固定。未固定时悬停卡片才露出来 */
+/* 图钉：复原左边，悬停才露出来 */
 .ui-widget__pin {
   position: absolute;
-  right: 12px;
+  right: 60px;
   top: 50%;
   transform: translateY(-50%) scale(0.85);
   display: flex;
@@ -357,9 +358,68 @@ html[data-theme='liquid-glass'].dark .ui-widget {
   transform: translateY(-50%) rotate(-20deg) scale(1);
 }
 
+/* 展开按钮：右上角，悬停才露出来 */
+.ui-widget__expand {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--ui-transition-fast),
+    transform var(--ui-duration-base) var(--ui-ease-spring);
+}
+
+.ui-widget:hover .ui-widget__expand {
+  opacity: 0.8;
+  transform: translateY(-50%) scale(1);
+}
+
+.ui-widget__expand:hover {
+  color: var(--ui-text-accent);
+  opacity: 1;
+}
+
 /* 部件正文 */
 .ui-widget__body {
   padding: var(--ui-space-xs) var(--ui-space-md) var(--ui-space-md);
+}
+
+/* 默认限制卡片高度 —— 只限特别高的卡（如归档列表），英雄卡等特殊卡不受限 */
+.ui-widget {
+  max-height: 700px;
+}
+
+/* 不限高度的特殊卡片（英雄卡等） */
+.ui-widget--no-limit {
+  max-height: none;
+}
+
+/* 内容溢出时：底部渐变提示可滚动 */
+.ui-widget--scrollable .ui-widget__body {
+  position: relative;
+}
+
+.ui-widget--scrollable .ui-widget__body::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, var(--ui-card-bg));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--ui-transition-normal);
+}
+
+.ui-widget--scrollable:not(.is-expanded) .ui-widget__body::after {
+  opacity: 1;
 }
 
 /* 桌面撒开时的轻微倾斜 —— 只在默认布局里加，拖过就撤掉 */
