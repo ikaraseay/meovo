@@ -40,7 +40,7 @@ interface NavItem {
 
 /**
  * 三栏：首页 / 归档 / 关于。
- * 标签、分类、系列收在「归档」下面，友链收在「关于」下面。
+ * 标签、分类、系列收在「归档」下面。
  * 移动端抽屉不做子菜单 —— 子项从归档页与关于页里点进去。
  */
 const navItems: NavItem[] = [
@@ -61,11 +61,7 @@ const navItems: NavItem[] = [
     label: t(locale, 'nav.about'),
     href: `/${locale}/about/`,
     icon: 'about',
-    matches: [`/${locale}/about`, `/${locale}/links`],
-    children: [
-      { label: t(locale, 'about.title'), href: `/${locale}/about/` },
-      { label: t(locale, 'links.title'), href: `/${locale}/links/` },
-    ],
+    matches: [`/${locale}/about`],
   },
 ]
 

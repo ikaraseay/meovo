@@ -140,6 +140,12 @@ export const ATTR = {
   adminComments: 'data-admin-comments',
   /** 后台：项目列表容器 */
   adminProjects: 'data-admin-projects',
+  /** 友链行 */
+  linkRow: 'data-link-row',
+  /** 友链地址（探测用） */
+  linkUrl: 'data-link-url',
+  /** 友链手动状态（ok / down / unknown） */
+  linkStatus: 'data-link-status',
 } as const
 
 /**

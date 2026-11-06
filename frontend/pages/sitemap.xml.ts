@@ -13,7 +13,6 @@ import {
   categoryPath,
   seriesPath,
   aboutPath,
-  linksPath,
   postPath,
 } from '../lib/posts'
 
@@ -88,7 +87,6 @@ export const GET: APIRoute = async ({ site, url }) => {
     (locale: Locale) => `/${locale}/`,
     (locale: Locale) => archivePath(locale),
     (locale: Locale) => aboutPath(locale),
-    (locale: Locale) => linksPath(locale),
   ]
 
   for (const route of fixedRoutes) {

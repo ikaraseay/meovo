@@ -43,8 +43,3 @@ export function seriesPath(locale: Locale, id: string): string {
 export function aboutPath(locale: Locale): string {
   return `/${locale}/about/`
 }
-
-/** 友链页 URL */
-export function linksPath(locale: Locale): string {
-  return `/${locale}/links/`
-}

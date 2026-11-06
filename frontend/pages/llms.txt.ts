@@ -39,8 +39,6 @@ export const GET: APIRoute = async ({ site }) => {
   lines.push(`- [Archive (English)](${new URL('/en/archive/', base).href})`)
   lines.push(`- [About (Chinese)](${new URL('/zh/about/', base).href})`)
   lines.push(`- [About (English)](${new URL('/en/about/', base).href})`)
-  lines.push(`- [Links (Chinese)](${new URL('/zh/links/', base).href})`)
-  lines.push(`- [Links (English)](${new URL('/en/links/', base).href})`)
   lines.push('')
   lines.push('## Articles')
   lines.push('')

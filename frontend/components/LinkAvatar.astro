@@ -1,0 +1,104 @@
+---
+/**
+ * 友链头像 —— 优先用 favicon，失败则用站点标题首字做文字头像。
+ * ---------------------------------------------------------
+ * 头像来源优先级：
+ *   1. link.avatar（手动指定）
+ *   2. Google favicon 服务（按域名取）
+ *   3. 文字头像（站点名首字 + 色相哈希）
+ *
+ * 运行时探测：img 加载失败时自动降级到文字头像。
+ */
+import type { FriendLink } from '../data/links'
+
+interface Props {
+  link: FriendLink
+  size?: number
+}
+
+const { link, size = 32 } = Astro.props
+
+/** 悦目的色相集合 —— 与 GlassWidget 的 TINT_HUES 同源 */
+const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
+
+/** 字符串哈希 → 0..N-1，同一名字永远同一个色相 */
+function hashHue(key: string): number {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return TINT_HUES[h % TINT_HUES.length]
+}
+
+const hue = hashHue(link.name)
+const initial = link.name.trim().charAt(0) || '?'
+
+/** 从 URL 提取域名给 favicon 服务用 */
+function getDomain(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
+const domain = getDomain(link.url)
+const faviconUrl = link.avatar || (domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : '')
+---
+
+<div class="link-avatar" style={`--avatar-hue: ${hue}; --avatar-size: ${size}px`}>
+  {faviconUrl ? (
+    <img
+      class="link-avatar__img"
+      src={faviconUrl}
+      width={size}
+      height={size}
+      alt={link.name}
+      loading="lazy"
+      decoding="async"
+      onerror={`this.style.display='none'; this.nextElementSibling.style.display='flex';`}
+    />
+  ) : null}
+  <span class="link-avatar__fallback" style={faviconUrl ? 'display:none' : ''}>
+    {initial}
+  </span>
+</div>
+
+<style>
+  .link-avatar {
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: hsl(var(--avatar-hue) 60% 92%);
+    overflow: hidden;
+  }
+
+  :host-context(.dark) .link-avatar,
+  html.dark .link-avatar {
+    background: hsl(var(--avatar-hue) 40% 20%);
+  }
+
+  .link-avatar__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .link-avatar__fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--avatar-size) * 0.5);
+    font-weight: 600;
+    color: hsl(var(--avatar-hue) 70% 35%);
+  }
+
+  :host-context(.dark) .link-avatar__fallback,
+  html.dark .link-avatar__fallback {
+    color: hsl(var(--avatar-hue) 60% 75%);
+  }
+</style>

@@ -42,7 +42,6 @@ export {
   categoryPath,
   seriesPath,
   aboutPath,
-  linksPath,
 } from './urls.ts'
 
 export { readingTime } from './reading-time.ts'

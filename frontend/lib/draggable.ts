@@ -110,7 +110,9 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   function placeAbsolute(entry: Entry) {
     const el = entry.el
     el.style.position = 'absolute'
-    el.style.width = `${entry.w}px`
+    // 隐藏的卡片量不到尺寸（entry.w = 0）—— 不设内联宽度，让 CSS 兜底
+    if (entry.w > 0) el.style.width = `${entry.w}px`
+    else el.style.width = ''
     el.style.left = `${entry.x}px`
     el.style.top = `${entry.y}px`
     const tilted = Boolean(entry.baseTilt) && !entry.pinned
@@ -123,7 +125,9 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   function placePinned(entry: Entry) {
     const el = entry.el
     el.style.position = 'fixed'
-    el.style.width = `${entry.w}px`
+    // 隐藏的卡片量不到尺寸（entry.w = 0）—— 不设内联宽度，让 CSS 兜底
+    if (entry.w > 0) el.style.width = `${entry.w}px`
+    else el.style.width = ''
     el.style.left = `${entry.x}px`
     el.style.top = `${entry.y}px`
     el.classList.remove(CLASS.tilted)
