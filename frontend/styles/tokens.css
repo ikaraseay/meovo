@@ -389,12 +389,6 @@ html[data-theme='liquid-glass'].dark .ui-widget {
   padding: var(--ui-space-xs) var(--ui-space-md) var(--ui-space-md);
 }
 
-/* 默认限制卡片高度 —— 只限特别高的卡（如归档列表），英雄卡等特殊卡不受限 */
-.ui-widget__body {
-  max-height: 652px; /* 700px - 48px grip 高度 */
-  overflow-y: auto;
-}
-
 /* 不限高度的特殊卡片（英雄卡等） */
 .ui-widget--no-limit .ui-widget__body {
   max-height: none;
