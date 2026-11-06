@@ -150,7 +150,7 @@
   border-radius: var(--ui-card-radius);
   box-shadow: var(--ui-card-shadow);
   color: var(--ui-text);
-  overflow: hidden;
+  overflow: clip;
   transition:
     box-shadow var(--ui-transition-normal),
     transform var(--ui-duration-base) var(--ui-card-ease),
