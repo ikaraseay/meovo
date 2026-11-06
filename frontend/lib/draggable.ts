@@ -591,13 +591,12 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       return
     }
 
-    // 比较内容高度与卡片限制高度
-    const style = getComputedStyle(el)
+    // 比较内容高度与正文区限制高度
+    const style = getComputedStyle(body)
     const maxHeight = parseFloat(style.maxHeight)
     const bodyHeight = body.scrollHeight
 
-    if (!isNaN(maxHeight) && bodyHeight > maxHeight - 48) {
-      // 48px 是 grip 区域高度
+    if (!isNaN(maxHeight) && bodyHeight > maxHeight) {
       el.classList.add(CLASS.scrollable)
     } else {
       el.classList.remove(CLASS.scrollable)

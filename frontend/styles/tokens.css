@@ -150,7 +150,6 @@
   border-radius: var(--ui-card-radius);
   box-shadow: var(--ui-card-shadow);
   color: var(--ui-text);
-  overflow: clip;
   transition:
     box-shadow var(--ui-transition-normal),
     transform var(--ui-duration-base) var(--ui-card-ease),
@@ -391,13 +390,15 @@ html[data-theme='liquid-glass'].dark .ui-widget {
 }
 
 /* 默认限制卡片高度 —— 只限特别高的卡（如归档列表），英雄卡等特殊卡不受限 */
-.ui-widget {
-  max-height: 700px;
+.ui-widget__body {
+  max-height: 652px; /* 700px - 48px grip 高度 */
+  overflow-y: auto;
 }
 
 /* 不限高度的特殊卡片（英雄卡等） */
-.ui-widget--no-limit {
+.ui-widget--no-limit .ui-widget__body {
   max-height: none;
+  overflow-y: visible;
 }
 
 /* 内容溢出时：底部渐变提示可滚动 */
