@@ -202,7 +202,7 @@ pnpm check:i18n       # 语言包完整性 + 硬编码文案扫描
 pnpm check:seo        # canonical / hreflang / sitemap / RSS 一致性
 pnpm sync             # 从 D1 拉最新内容到本地
 pnpm clean            # 清掉本地的内容副本（本地不留文章）
-pnpm ops              # 运维脚本：doctor / config / env / login / status
+pnpm ops              # 运维脚本：doctor / status / secrets / config / env / check / deploy / login / logout
 pnpm run deploy       # 部署到 Cloudflare Workers
 ```
 
