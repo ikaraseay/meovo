@@ -72,6 +72,10 @@ for (const file of files) {
     hits.push(file + '（凭据文件本身）')
     continue
   }
+  // 文档文件允许包含站点域名（README、llms.txt 等是公开文档，不是配置）
+  if (/(^|\/)(README|llms|llms-full)\.(md|txt)$/.test(file) || /(^|\/)llms.*\.ts$/.test(file)) {
+    continue
+  }
   let content = ''
   try {
     content = execFileSync('git', ['show', ':' + file], { cwd: ROOT, encoding: 'utf8' })
