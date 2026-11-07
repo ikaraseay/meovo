@@ -39,7 +39,7 @@ bash scripts/ops.sh config check        # 只校验配置
 bash scripts/ops.sh config set D1_DATABASE_ID <id>   # 顺手同步进 cloudflare/wrangler.jsonc
 bash scripts/ops.sh config set SITE_URL <url>        # 顺手同步进 astro.config.mjs
 bash scripts/ops.sh env                 # 把后台凭据写进 cloudflare/.dev.vars
-bash scripts/ops.sh login / logout      # Cloudflare 账号
+bash scripts/ops.sh login / logout      # 可选：不使用 Token 时的 wrangler 登录
 bash scripts/ops.sh status              # 配置 + 站点可达 + 最近部署
 ```
 
@@ -51,24 +51,25 @@ bash scripts/ops.sh status              # 配置 + 站点可达 + 最近部署
 - `config.env` 的 `SITE_URL` 与 `astro.config.mjs` 的 `site` 必须一致
   （canonical / hreflang / sitemap / RSS 都靠它拼绝对地址）。
 
-⚠️ **线上 secret 不写进 `config.env`** —— 用 `pnpm wrangler secret put`。
-`config.env` 里的 `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` 只是本地开发用的副本。
+**运行时变量与密钥也收在 `config.env`** —— `bash scripts/ops.sh secrets` 会一次性写入 Worker
+（`wrangler secret bulk`），不需要逐个 `wrangler secret put`。空值自动跳过。
+凭据优先使用 `config.env` 的账户级 `CLOUDFLARE_API_TOKEN`，不需要 `wrangler login`。
 
 ## 首次上线（要在 Cloudflare 上做的）
 
 ```bash
-wrangler d1 create meovo-content          # 把返回的 database_id 填进 cloudflare/wrangler.jsonc
-bash scripts/ops.sh config set D1_DATABASE_ID <id>   # 同上（两边一起改，别只改一处）
+# 先在 config.env 填 CLOUDFLARE_ACCOUNT_ID 与 CLOUDFLARE_API_TOKEN（账户级）
+wrangler d1 create meovo-content                 # 把返回的 database_id 填进 config.env
+bash scripts/ops.sh config set D1_DATABASE_ID <id>   # 顺手同步进 cloudflare/wrangler.jsonc
 wrangler r2 bucket create meovo-media
 wrangler d1 migrations apply meovo-content --remote --config cloudflare/wrangler.jsonc
-wrangler secret put ADMIN_PASSWORD_HASH   # 口令的 SHA-256（十六进制）
-wrangler secret put SESSION_SECRET        # 随机长串
+bash scripts/ops.sh secrets                # 所有运行时变量和密钥一次写入
 ```
 
 建完资源后跑一次 `bash scripts/ops.sh doctor` —— 它会告诉你还差什么。
 
-GitHub secret：`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`
-（导出脚本要读 D1；`D1_DATABASE_ID` 可选，默认从本目录的 cloudflare/wrangler.jsonc 提取）。
+GitHub 上不需要任何 Cloudflare 凭证：CI 只做检查，不部署；部署由 Workers Builds 或本地
+`bash scripts/ops.sh deploy` 用同一个账户级 Token 完成。
 
 改过绑定要重跑 `pnpm types` —— `worker-configuration.d.ts` 不入库。
 

@@ -217,15 +217,18 @@
     判定「放得下」用**桌面的右缘**（与布局那侧同一把尺），固定 / 取消固定结果一致
 - **部署**：Cloudflare **Workers**（适配器 v14 已移除 Pages 支持）。构建 `pnpm build` → `dist/client`（静态资源）+ `dist/server`（Worker）；Node 钉在 `.node-version`，
   pnpm 钉在 `package.json` 的 `packageManager`（Workers Builds 的镜像会读这个字段装对应版本）。
-  - **部署只有一条路径：Cloudflare Workers Builds 直连 GitHub** —— push 自动构建 + 部署。
-    GitHub Actions 里不放部署（也就没有 `CLOUDFLARE_API_TOKEN` 之类的凭证），
-    `.github/workflows/ci.yml` 只跑 check / test / build / check:i18n / check:seo。
-  - **仓库里只有占位符**：`cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 的 Worker 名 / 库名 /
-    库 id / 桶名 / 域名都是占位符，真值在 `config.env`（不入库）—— 构建前由
-    `scripts/apply-config.mjs` 填回。Cloudflare 构建是从仓库检出的，所以真值要配成
-    **Build variables**：`WORKER_NAME` / `SITE_URL` / `D1_DATABASE_NAME` / `D1_DATABASE_ID` /
-    `R2_BUCKET_NAME` / `CLOUDFLARE_ACCOUNT_ID`。这些不是凭据；
-    `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL` 只放 Worker secret。
+  - **部署有两条等价路径，共用一个账户级 Token**：Cloudflare Workers Builds 直连 GitHub
+    （push 自动构建 + 部署）、本地 `bash scripts/ops.sh deploy`。GitHub Actions 只跑
+    check / test / build / check:i18n / check:seo，不部署、不放凭据。
+  - **唯一凭据是 `config.env` 里的账户级 `CLOUDFLARE_API_TOKEN`**（Workers Scripts Edit、
+    D1 Read/Edit、R2 Edit、Account Settings Read），不需要用户级 Token、不需要 `wrangler login`。
+    Builds API 只接受用户级 Token，所以构建配置 / Build Token / Deploy Hook 在 Dashboard
+    一次性设置。
+  - **不再需要 Build variables**：真值在 `config.env`（不入库），构建前由
+    `scripts/apply-config.mjs` 填回；Builds 环境没有 `config.env` 时保留仓库里
+    `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 的现有值。
+    运行时变量和密钥（含 `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`）
+    全部由 `bash scripts/ops.sh secrets` 从 `config.env` 写入 Worker。
   - **构建 token 要带 D1 权限**：构建时 wrangler 用的是 Worker
     Settings → Builds → API token 那支 token；默认自动生成的只有 Workers Scripts / KV / R2 / Routes，
     **没有 D1** —— 而 `pnpm build` 的第一步就是从 D1 导出内容。不换 token 的话导出会失败
@@ -399,8 +402,8 @@
   - **本地拉取线上最新 = `pnpm sync`**（同 export:posts）：
     ① 远端文章 → `frontend/content/generated/`；② 远端文案 → `frontend/i18n/overrides.ts`；
     ③ 远端项目 → **本地 D1**（项目是运行时读库的，不同步本地就看不到后台的改动）
-  - 凭证：有 `CLOUDFLARE_API_TOKEN` 走 REST；没有就**借 wrangler 的登录态**
-    （`wrangler d1 execute --remote`）—— 本机 `wrangler login` 过就能拉，不必额外配 token
+  - 凭证：优先用 `config.env` 的账户级 `CLOUDFLARE_API_TOKEN` 走 REST；
+    没有才退回 wrangler 登录态（`wrangler d1 execute --remote`）
   - **提交前的守卫**（`.githooks/pre-commit` → `backend/scripts/check-remote-updates.mjs`）：
     提交前拿线上 D1 与本地快照（`frontend/content/generated/.manifest.json` 里记着
     文章 slug+updated_at / 文案 / 项目）比对，**线上有更新就拦住提交**，让人先 `pnpm sync`。
@@ -420,11 +423,12 @@
   - `pnpm clean` —— 把本地的内容副本清掉（本地不留文章）
   - `pnpm check` / `pnpm test` / `pnpm dev` 前会自动补空壳（`--ensure`），
     所以新克隆的仓库不用先拉内容也能跑检查
-- **构建是手动的一步（Deploy Hook）**：Worker secret 里放 `DEPLOY_HOOK_URL`
-  （Cloudflare Workers Builds 的 Deploy Hook，`Settings → Builds → Deploy Hooks` 建），
-  后台页头的「构建上线」敲一下 → 构建 → 上线。
+- **构建是手动的一步（Deploy Hook）**：`DEPLOY_HOOK_URL` 填在 `config.env`，
+  `ops.sh secrets` 写入 Worker secret（Cloudflare Workers Builds 的 Deploy Hook，
+  `Settings → Builds → Deploy Hooks` 建），后台页头的「构建上线」敲一下 → 构建 → 上线。
   ⚠️ **保存不触发构建** —— 发布 / 改稿 / 撤回 / 删除 / 改文案 / 改项目都只改 D1，
-  要上线自己敲那一次钩子。钩子 URL 本身就是一个凭证（谁拿到都能触发构建），只放 Worker secret。
+  要上线自己敲那一次钩子。钩子 URL 本身就是一个凭证（谁拿到都能触发构建），只放
+  `config.env` 与 Worker secret，两者都不入库。
 - **项目**：关于页那张「项目」卡片 —— 名称 / 简介 / 地址，后台 `/<lang>/admin/projects` 可增删改
   - 表在 `backend/db/migrations/0004_projects.sql`；校验在 `backend/lib/admin/projects.ts`（纯函数）
   - **构建期导出**到 `frontend/data/projects.ts`（生成的文件，跟 overrides.ts 一个道理），
@@ -473,11 +477,11 @@
   - `config show|get|set|unset|edit|check` —— 配置的查看与修改（保留注释与其它行）
   - `env` —— 把 `config.env` 的后台凭据写进 `cloudflare/.dev.vars`
     （wrangler 只认配置同目录的那个）
-  - `login` / `logout` —— Cloudflare 账号
+  - `login` / `logout` —— 可选的 wrangler 登录（有账户级 Token 时不需要）
   - `status` —— 当前配置 + 站点可达 + 最近部署
-- **线上 secret 走 Worker secret**，不写进 `config.env`：
-  `pnpm wrangler secret put ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`。
-  `config.env` 里那两个是本地开发用的副本；`DEPLOY_HOOK_URL` 不进本地 —— 本机发布会误触发线上构建。
+- **运行时变量与密钥统一从 `config.env` 上传**：`bash scripts/ops.sh secrets`
+  （`wrangler secret bulk`），包括 `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`。
+  改任何值都改 `config.env` 后重跑，不要逐个 `wrangler secret put`。
 - **进程里已有的环境变量优先于 `config.env`** —— `process.loadEnvFile` 不覆盖已有值，
   CI 注入的 secret 因此压得住本地配置。
 

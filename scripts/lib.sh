@@ -120,10 +120,30 @@ wrangler() {
 }
 
 require_login() {
+  # 只保留一个凭据：config.env 里的账户级 Token 优先，wrangler login 作为后备。
+  local token="${CLOUDFLARE_API_TOKEN:-$(config_get CLOUDFLARE_API_TOKEN)}"
+  local account="${CLOUDFLARE_ACCOUNT_ID:-$(config_get CLOUDFLARE_ACCOUNT_ID)}"
+  if [ -n "$token" ]; then
+    export CLOUDFLARE_API_TOKEN="$token"
+    [ -n "$account" ] && export CLOUDFLARE_ACCOUNT_ID="$account"
+    local verify_url="https://api.cloudflare.com/client/v4/user/tokens/verify"
+    case "$token" in
+      cfat_*)
+        [ -n "$account" ] || die "账号级 Token 需要 config.env 里的 CLOUDFLARE_ACCOUNT_ID"
+        verify_url="https://api.cloudflare.com/client/v4/accounts/$account/tokens/verify"
+        ;;
+    esac
+    local code
+    code="$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "Authorization: Bearer $token" "$verify_url" 2>/dev/null || true)"
+    [ "$code" = "200" ] \
+      || die "CLOUDFLARE_API_TOKEN 无效或与账号不匹配（HTTP ${code:-无响应}）"
+    return 0
+  fi
   local who
   who="$(wrangler whoami 2>/dev/null)" || true
   printf '%s' "$who" | grep -qi "account" \
-    || die "还没登录 Cloudflare：bash scripts/ops.sh login"
+    || die "还没配置凭据：在 config.env 填 CLOUDFLARE_API_TOKEN，或 bash scripts/ops.sh login"
 }
 
 # 取 HTTP 状态码。本机 DNS 被过滤/缓存时 curl 会返回 000，但站点其实是好的 ——

@@ -53,6 +53,11 @@ config_check() {
   check_one "D1_DATABASE_ID" "${D1_DATABASE_ID:-}" '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' '跑 pnpm wrangler d1 create meovo-content，把 id 填进来'
   check_one "R2_BUCKET_NAME" "${R2_BUCKET_NAME:-}" '^[a-z0-9-]+$' '只能是小写字母、数字、连字符'
   check_one "CLOUDFLARE_ACCOUNT_ID" "${CLOUDFLARE_ACCOUNT_ID:-}" '^[0-9a-f]{32}$' 'wrangler whoami 里的 Account ID'
+  if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    check_one "CLOUDFLARE_API_TOKEN" "$CLOUDFLARE_API_TOKEN" '^[A-Za-z0-9_-]{20,}$' '在 Manage Account → Account API Tokens 创建账户级 Token'
+  else
+    note "CLOUDFLARE_API_TOKEN 未设置，将使用 wrangler 登录态"
+  fi
   if [ "${D1_DATABASE_ID:-}" = "00000000-0000-0000-0000-000000000000" ]; then
     warn "D1_DATABASE_ID 还是占位符 → 站点会连到不存在的库"
     PROBLEMS=$((PROBLEMS + 1))
@@ -283,11 +288,24 @@ cmd_doctor() {
     mark_ok "D1 id 与 wrangler.jsonc 一致"
   fi
 
-  step "Cloudflare 登录"
-  if wrangler whoami 2>/dev/null | grep -qi "account"; then
-    mark_ok "已登录"
+  step "Cloudflare 凭据"
+  if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    local verify_url="https://api.cloudflare.com/client/v4/user/tokens/verify"
+    case "$CLOUDFLARE_API_TOKEN" in
+      cfat_*) verify_url="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify" ;;
+    esac
+    local code
+    code="$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$verify_url" 2>/dev/null || true)"
+    if [ "$code" = "200" ]; then
+      mark_ok "CLOUDFLARE_API_TOKEN 有效（部署 / D1 / R2 / secrets 共用）"
+    else
+      mark_fail "CLOUDFLARE_API_TOKEN 无效或与账号不匹配（HTTP ${code:-无响应}）"
+    fi
+  elif wrangler whoami 2>/dev/null | grep -qi "account"; then
+    mark_ok "wrangler 登录态可用"
   else
-    mark_fail "未登录：bash scripts/ops.sh login"
+    mark_fail "没有凭据：在 config.env 填 CLOUDFLARE_API_TOKEN，或 bash scripts/ops.sh login"
   fi
 
   step "Worker secret"

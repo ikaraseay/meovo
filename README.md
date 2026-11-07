@@ -168,7 +168,7 @@ flowchart TB
 | Node.js | ≥ 22.23（`.node-version` 写的 22.23.4） |
 | pnpm | 12+（`package.json` 的 `packageManager` 钉版本） |
 | Cloudflare 账号 | D1 / R2 / Workers（免费额度足够个人博客） |
-| wrangler CLI | 已登录（`pnpm wrangler login`） |
+| wrangler CLI | 安装即可；凭据用 `config.env` 里的账户级 Token |
 
 <a id="installation"></a>
 
@@ -179,12 +179,12 @@ git clone https://github.com/ikaraseay/meovo.git
 cd meovo
 
 pnpm install
-cp config.env.example config.env    # 填站点地址 / 库 id / 桶名（注释里写了怎么拿）
+cp config.env.example config.env    # 填站点地址 / 库 id / 桶名 / 账户级 Token（注释里写了怎么拿）
 pnpm sync                          # 从 D1 拉内容（文章 / 文案 / 项目）到本地
 pnpm dev                           # 开发服务器
 ```
 
-`pnpm sync` 需要能访问 D1：有 `CLOUDFLARE_API_TOKEN` 就走 REST，没有就借 wrangler 的登录态（`wrangler login` 过即可）。
+`pnpm sync` 和工作区脚本都优先使用 `config.env` 里的 `CLOUDFLARE_API_TOKEN`（账户级），不需要 `wrangler login`。
 
 `config.env` 是**唯一**要改环境值的地方（不入库）。仓库里的 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 放的是占位符，构建前由 `scripts/apply-config.mjs` 把真值填回去。
 
@@ -212,7 +212,12 @@ pnpm run deploy       # 部署到 Cloudflare Workers
 
 ## 生产部署
 
-部署只有一条路径：**[Cloudflare Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)** 直连 GitHub 仓库 —— push 自动构建 + 部署；内容改动走 Deploy Hook。
+部署有两条等价路径，共用**一个账户级 Token**：
+
+- **Cloudflare Workers Builds** 直连 GitHub 仓库 —— push 自动构建 + 部署，内容改动走 Deploy Hook；
+- **本地直传** —— `bash scripts/ops.sh deploy`，用同一个 Token 构建并部署。
+
+不需要用户级 Token，也不需要 `wrangler login`。构建配置（连接仓库 / Build Token / Deploy Hook）在 Dashboard 做一次性设置，因为 Builds API 只接受用户级 Token。
 
 ### 1. Cloudflare 资源准备
 
@@ -241,28 +246,45 @@ Dashboard → Worker → **Settings → Builds → Connect to Git**：
 | Root directory | `/` |
 | Build command | `pnpm install --frozen-lockfile && pnpm build` |
 | Deploy command | `pnpm run deploy` |
-| Build variables | `WORKER_NAME` · `SITE_URL` · `D1_DATABASE_NAME` · `D1_DATABASE_ID` · `R2_BUCKET_NAME` · `CLOUDFLARE_ACCOUNT_ID` |
 
-**构建 token 要带 D1 权限**：Worker Settings → Builds → API token 那支 token 默认只有 Workers Scripts / KV / R2 / Routes，**没有 D1** —— 而 `pnpm build` 的第一步就是从 D1 导出内容。不换 token 的话导出会失败（Workers Builds 注入 `WORKERS_CI=1`，导出脚本据此把「必须导出成功」打开）。
+**不需要填 Build variables**：构建前 `apply-config` 会从 `config.env` 填配置；Builds 环境没有 `config.env` 时保留仓库里 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 的现有值。运行时变量和密钥统一由 `ops.sh secrets` 写入 Worker。
 
-### 3. Worker Secrets
+**Build Token 要带 D1 权限**：Worker Settings → Builds → API token 默认只有 Workers Scripts / KV / R2 / Routes，**没有 D1**，而 `pnpm build` 的第一步就是从 D1 导出内容。在 Builds → API token 选择或创建一个带 **D1 Read** 的 Token（面板自动管理的用户级 Token，不需要你保存）。
+
+### 3. Worker 变量与密钥
+
+所有运行时变量和密钥只维护 `config.env`，一条命令写入 Worker：
 
 ```bash
-# 后台口令（SHA-256）
-pnpm wrangler secret put ADMIN_PASSWORD_HASH --config cloudflare/wrangler.jsonc
-
-# 会话密钥
-pnpm wrangler secret put SESSION_SECRET --config cloudflare/wrangler.jsonc
-
-# Deploy Hook（可选，用于后台触发构建）
-pnpm wrangler secret put DEPLOY_HOOK_URL --config cloudflare/wrangler.jsonc
+bash scripts/ops.sh secrets
 ```
+
+会同步 `WORKER_NAME`、`SITE_URL`、`D1_DATABASE_NAME`、`D1_DATABASE_ID`、`R2_BUCKET_NAME`、`CLOUDFLARE_ACCOUNT_ID`、`ADMIN_PASSWORD_HASH`、`SESSION_SECRET`、`DEPLOY_HOOK_URL`（空值自动跳过）。不要手工逐个 `wrangler secret put`；以后改任何值，改 `config.env` 后重跑这一条即可。
 
 ### 4. 后台改内容怎么触发构建
 
-D1 不在 git 里，push 永远不会发生。去 **Settings → Builds → Deploy Hooks** 建一个 hook（branch = `main`），把 URL 存成 Worker secret。这样就不需要把任何 Cloudflare 凭证放进 GitHub（GitHub 上只有代码）。
+D1 不在 git 里，push 永远不会发生。去 **Settings → Builds → Deploy Hooks** 建一个 hook（branch = `main`），把 URL 填进 `config.env` 的 `DEPLOY_HOOK_URL`，再执行：
 
-`.github/workflows/ci.yml` 只跑检查，不部署、不需要 secret。不想接 Git 的话，`pnpm sync && pnpm build && pnpm run deploy` 手动走一遍也一样。
+```bash
+bash scripts/ops.sh secrets
+```
+
+后台「发布 / 保存」就会调用这个 Hook。Hook URL 本身就是密钥，调用端无需认证；这样 GitHub 和仓库里都不需要放任何 Cloudflare 凭证。
+
+`.github/workflows/ci.yml` 只跑检查，不部署、不需要 secret。不想接 Git 的话，`bash scripts/ops.sh deploy` 用同一个账户级 Token 本地构建并部署。
+
+### 5. 凭据（一个账户级 Token）
+
+在 **Manage Account → Account API Tokens** 创建唯一凭据 `CLOUDFLARE_API_TOKEN`，权限：
+
+| 范围 | 权限 | 级别 |
+|---|---|---|
+| Account | Workers Scripts | Edit |
+| Account | D1 | Read（执行迁移时 Edit） |
+| Account | Workers R2 Storage | Edit |
+| Account | Account Settings | Read |
+
+脚本用 `/accounts/{account_id}/tokens/verify` 校验它；`bash scripts/ops.sh doctor` 应显示「Token 有效」。不需要任何 `User` 权限，也不需要 `wrangler login`。
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
