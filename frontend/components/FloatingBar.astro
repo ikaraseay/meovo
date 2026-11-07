@@ -68,7 +68,10 @@ const navItems: NavItem[] = [
 ---
 
 <!-- 桌面端：可拖拽的悬浮菜单 -->
-<div class="floating-menu ui-nav-surface" data-float-menu>
+<div class="floating-menu" data-float-menu>
+  <!-- 玻璃表面单独一层：squircle 的 clip-path 会裁掉挂在栏体外的「复原」按钮，
+       底板划出来之后裁切只作用于玻璃本身，按钮留在裁切之外。 -->
+  <div class="floating-menu-surface ui-nav-surface" aria-hidden="true"></div>
   <span class="drag-handle" data-float-drag>
     <span class="logo">{t(locale, 'nav.wordmark')}</span>
   </span>
@@ -978,7 +981,16 @@ const navItems: NavItem[] = [
     -webkit-user-select: none;
   }
 
+  /* 玻璃底板 —— 栏体本身不裁切，左上角的「复原」按钮要能露在外面 */
+  .floating-menu-surface {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: var(--ui-nav-radius-full);
+  }
+
   .drag-handle {
+    position: relative;
     display: inline-flex;
     align-items: center;
     padding: var(--ui-space-xs) var(--ui-space-sm);
@@ -1040,6 +1052,7 @@ const navItems: NavItem[] = [
   }
 
   .menu-links {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--ui-space-xs);
