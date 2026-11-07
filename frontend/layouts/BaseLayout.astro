@@ -266,7 +266,10 @@ const webSiteLd = {
     <script>
       import { initDesk } from '../lib/draggable'
       import { ATTR } from '../lib/dom-contract'
+      import { initSquircles } from '../lib/squircle'
       const desks = [...document.querySelectorAll<HTMLElement>(`[${ATTR.desk}]`)].map(initDesk)
+      // 曲率圆角：给所有 .ui-card 装上 squircle 裁切
+      initSquircles()
       // 「重置布局」—— 卡片回到默认落位（悬浮栏那边复位它自己的四个面）
       document
         .querySelector<HTMLElement>(`[${ATTR.layoutReset}]`)

@@ -392,6 +392,7 @@ const navItems: NavItem[] = [
     clampPoint,
     defaultMenuX as menuDefaultX,
   } from '../lib/floating-bar-layout'
+  import { refreshSquircle } from '../lib/squircle'
 
   // 用户摆出来的位置属于用户 —— 跨页面、跨刷新都得还在
   const saved = readFloatingBarState()
@@ -619,6 +620,8 @@ const navItems: NavItem[] = [
     // 同一时刻只有一个覆盖层 —— 弹窗和二级面板互斥
     navPanel?.close()
     popup.hidden = false
+    // 弹窗从隐藏变为显示，需要刷新 squircle 效果
+    refreshSquircle(popup)
     if (popupAuto) {
       // 自动落点：视口中间，避开栏体 —— 两块玻璃叠在一起会糊成一片
       popupX = window.innerWidth / 2 - 140

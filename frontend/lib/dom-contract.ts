@@ -73,6 +73,10 @@ export const CLASS = {
   scrollable: 'ui-widget--scrollable',
   /** 卡片正文容器 */
   widgetBody: 'ui-widget__body',
+  /** 卡片原语 —— 全站统一的卡片外观 */
+  card: 'ui-card',
+  /** 导航栏表面 —— 悬浮栏 / 二级面板 / 设置弹窗等 */
+  navSurface: 'ui-nav-surface',
 } as const
 
 /** data 属性名 */
