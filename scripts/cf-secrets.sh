@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 上传密钥 / 变量到 Cloudflare Worker（Wrangler）
+# 上传**运行时密钥**到 Cloudflare Worker（Wrangler）
 #
 #   bash scripts/cf-secrets.sh              从 config.env 批量写入
 #   bash scripts/cf-secrets.sh --dry-run    只列出会写哪些键（不上传）
 #   bash scripts/cf-secrets.sh --list       列出云端已有的 secrets
 #   bash scripts/cf-secrets.sh --only KEY   只写某一项
+#
+# 只传 Worker 运行时要用的三项：ADMIN_PASSWORD_HASH / SESSION_SECRET / DEPLOY_HOOK_URL。
+# 部署标识（SITE_URL / WORKER_NAME / D1 / R2 / 账号 id）只在构建期用，
+# 它们是 Cloudflare Builds 的环境变量，不是 Worker secret。
 #
 # 真源是项目根目录的 config.env（已忽略，不入库）。空值自动跳过；
 # 用 wrangler secret bulk 一次写入，只产生一个部署版本。
@@ -70,4 +74,4 @@ else
   die "上传失败，检查 wrangler 输出与登录状态"
 fi
 
-note "提示：Workers Builds 的 Build variables 只在构建期可见，运行时读不到"
+note "部署标识只在构建期用（Cloudflare Builds 环境变量），不属于 Worker 运行时 secret"

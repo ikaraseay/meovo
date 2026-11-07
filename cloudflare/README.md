@@ -51,8 +51,10 @@ bash scripts/ops.sh status              # 配置 + 站点可达 + 最近部署
 - `config.env` 的 `SITE_URL` 与 `astro.config.mjs` 的 `site` 必须一致
   （canonical / hreflang / sitemap / RSS 都靠它拼绝对地址）。
 
-**运行时变量与密钥也收在 `config.env`** —— `bash scripts/ops.sh secrets` 会一次性写入 Worker
+**运行时要用的三个密钥也收在 `config.env`**（`ADMIN_PASSWORD_HASH` / `SESSION_SECRET` /
+`DEPLOY_HOOK_URL`）—— `bash scripts/ops.sh secrets` 会一次性写入 Worker
 （`wrangler secret bulk`），不需要逐个 `wrangler secret put`。空值自动跳过。
+部署标识只用于构建，不写进 Worker 运行时。
 凭据优先使用 `config.env` 的账户级 `CLOUDFLARE_API_TOKEN`，不需要 `wrangler login`。
 
 ## 首次上线（要在 Cloudflare 上做的）

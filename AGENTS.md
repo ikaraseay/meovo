@@ -486,9 +486,11 @@
     （wrangler 只认配置同目录的那个）
   - `login` / `logout` —— 可选的 wrangler 登录（有账户级 Token 时不需要）
   - `status` —— 当前配置 + 站点可达 + 最近部署
-- **运行时变量与密钥统一从 `config.env` 上传**：`bash scripts/ops.sh secrets`
-  （`wrangler secret bulk`），包括 `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`。
+- **运行时密钥只有三个**：`ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`。
+  `bash scripts/ops.sh secrets`（`wrangler secret bulk`）从 `config.env` 一次性写入，
   改任何值都改 `config.env` 后重跑，不要逐个 `wrangler secret put`。
+  ⚠️ 部署标识（`SITE_URL` / `WORKER_NAME` / D1 / R2 / 账号 id）只在构建期用，
+  **不要上传成 Worker 运行时 secret** —— 它们在 Cloudflare Builds 的环境变量里。
 - **进程里已有的环境变量优先于 `config.env`** —— `process.loadEnvFile` 不覆盖已有值，
   CI 注入的 secret 因此压得住本地配置。
 

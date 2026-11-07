@@ -255,15 +255,17 @@ Dashboard → Worker → **Settings → Builds → Connect to Git**：
 
 **Build Token 要带 D1 权限**：Worker Settings → Builds → API token 默认只有 Workers Scripts / KV / R2 / Routes，**没有 D1**，而 `pnpm build` 的第一步就是从 D1 导出内容。在 Builds → API token 选择或创建一个带 **D1 Read** 的 Token（面板自动管理的用户级 Token，不需要你保存）。
 
-### 3. Worker 变量与密钥
+### 3. Worker 运行时密钥
 
-所有运行时变量和密钥只维护 `config.env`，一条命令写入 Worker：
+Worker 运行时只需要三个密钥，全部维护在 `config.env`，一条命令写入：
 
 ```bash
 bash scripts/ops.sh secrets
 ```
 
-会同步 `WORKER_NAME`、`SITE_URL`、`D1_DATABASE_NAME`、`D1_DATABASE_ID`、`R2_BUCKET_NAME`、`CLOUDFLARE_ACCOUNT_ID`、`ADMIN_PASSWORD_HASH`、`SESSION_SECRET`、`DEPLOY_HOOK_URL`（空值自动跳过）。不要手工逐个 `wrangler secret put`；以后改任何值，改 `config.env` 后重跑这一条即可。
+会同步 `ADMIN_PASSWORD_HASH`、`SESSION_SECRET`、`DEPLOY_HOOK_URL`（空值自动跳过）。不要手工逐个 `wrangler secret put`；以后改任何值，改 `config.env` 后重跑这一条即可。
+
+部署标识（`SITE_URL` / `WORKER_NAME` / D1 / R2 / 账号 id）**只在构建期使用**，不要写进 Worker 运行时；它们前面已经配在 Cloudflare Builds 的环境变量里。
 
 ### 4. 后台改内容怎么触发构建
 
