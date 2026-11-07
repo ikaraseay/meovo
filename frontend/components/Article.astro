@@ -289,6 +289,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
 <style>
   /* 正文：正常文档流，固定一个适合阅读的宽度，居中显示；卡片绝对定位在四周，互不占位 */
   .post-content {
+    position: relative;
     width: min(760px, 100%);
     margin-inline: auto;
   }
