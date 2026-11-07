@@ -243,6 +243,10 @@
     ⚠️ `cloudflare/public/_redirects` 里**不能再留 `/` 的 301** —— 静态规则先于 Worker 生效，
     留着就永远只到 /zh/
   - **CI** 在 `.github/workflows/ci.yml` —— check / test / build / check:i18n / check:seo
+  - **Node 版本每周自动跟**：`.github/workflows/update-node.yml` 查 nodejs.org 的最新 LTS
+    （只取 LTS），有新版就开 PR（分支 `chore/node-version`）改 `.node-version` / `engines.node` / README。
+    用 `GITHUB_TOKEN`，依赖仓库设置「Allow GitHub Actions to create and approve pull requests」；
+    token 推的分支不会触发 CI，所以 workflow 会再 `gh workflow run` 派发一次
 - **i18n**：UI 文案一律走 `t(locale, key, params?)`，词典在 `frontend/i18n/ui.ts`，每条必须同时有 `zh` 和 `en`。
   `pnpm check:i18n` 三件事都查：词条完整（zh / en 都非空）、界面没有硬编码中文、
   **代码里用到的 key 都在词典里**（缺了就静默显示成 key 本身）。

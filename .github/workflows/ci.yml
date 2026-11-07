@@ -8,6 +8,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # update-node.yml 用 GITHUB_TOKEN 推的分支不会触发 pull_request，
+  # 由它派发一次（workflow_dispatch 是 GITHUB_TOKEN 的例外）
+  workflow_dispatch:
 
 jobs:
   check:

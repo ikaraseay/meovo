@@ -1,0 +1,137 @@
+# 定时检查 Node.js 最新 LTS：有新版就开 PR 改 .node-version / engines / README。
+# Dependabot / Renovate 都不管 .node-version，所以自己盯 nodejs.org。
+# 用 GITHUB_TOKEN 开 PR —— 不引入额外凭证；仓库需要允许 Actions 创建 PR
+# （Settings → Actions → General → Allow GitHub Actions to create and approve pull requests）。
+name: Update Node
+
+on:
+  schedule:
+    # 每周一 02:00 UTC（北京时间周一 10:00）
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  # 触发 CI —— GITHUB_TOKEN 推的分支不会自动触发 pull_request 事件
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 查最新 LTS 并改文件
+        id: bump
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const { spawnSync } = require('node:child_process')
+
+          const out = (...lines) =>
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n')
+
+          // 只比 major.minor.patch 的数字序
+          const cmp = (a, b) => {
+            const pa = a.split('.').map(Number)
+            const pb = b.split('.').map(Number)
+            for (let i = 0; i < 3; i++) {
+              const d = (pa[i] || 0) - (pb[i] || 0)
+              if (d) return d
+            }
+            return 0
+          }
+
+          async function main() {
+            const res = await fetch('https://nodejs.org/dist/index.json')
+            if (!res.ok) throw new Error(`nodejs.org 返回 ${res.status}`)
+            const releases = await res.json()
+            // 只取 LTS —— 奇数版本（Current）与 alpha 不进 PR
+            const latest = releases.find((r) => r.lts && !r.version.includes('-'))
+            if (!latest) throw new Error('没有找到 LTS 版本')
+
+            const version = latest.version.replace(/^v/, '')
+            const current = fs.readFileSync('.node-version', 'utf8').trim()
+            console.log(`当前 ${current} → 最新 LTS ${version}`)
+
+            if (cmp(version, current) <= 0) {
+              out('changed=false')
+              return
+            }
+
+            const majorMinor = version.split('.').slice(0, 2).join('.')
+            fs.writeFileSync('.node-version', `${version}\n`)
+
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+            pkg.engines = { ...pkg.engines, node: `>=${version}` }
+            fs.writeFileSync('package.json', `${JSON.stringify(pkg, null, 2)}\n`)
+
+            const readme = fs.readFileSync('README.md', 'utf8')
+            const row = /\| Node\.js \| ≥ [^|\n]*\|/
+            if (!row.test(readme)) throw new Error('README 里没找到 Node.js 版本行')
+            fs.writeFileSync(
+              'README.md',
+              readme.replace(
+                row,
+                `| Node.js | ≥ ${majorMinor}（\`.node-version\` 写的 ${version}） |`,
+              ),
+            )
+
+            // 以实际 diff 为准：比如只有 README 漂了也照样开 PR
+            const changed = spawnSync('git', ['diff', '--quiet']).status !== 0
+            out(`changed=${changed}`, `version=${version}`, `current=${current}`)
+          }
+
+          main().catch((err) => {
+            console.error(err)
+            process.exit(1)
+          })
+          NODE
+
+      - name: 提交并开 PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          CURRENT: ${{ steps.bump.outputs.current }}
+        run: |
+          BRANCH=chore/node-version
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B "$BRANCH"
+          git add .node-version package.json README.md
+          git commit -m "chore(deps): 升级 Node.js 到 ${VERSION}"
+          git push --force origin "$BRANCH"
+
+          BODY="$(cat <<'EOF'
+          Node.js 最新 LTS 是 **__VERSION__**，仓库当前钉的是 **__CURRENT__**。
+
+          - `.node-version` → `__VERSION__`
+          - `package.json` 的 `engines.node` → `>=__VERSION__`
+          - README 前置条件同步
+
+          来源：[nodejs.org/dist/index.json](https://nodejs.org/dist/index.json)，只取 LTS。
+          由 `update-node.yml` 自动生成，合并前请确认 CI 结果。
+          EOF
+          )"
+          BODY="${BODY//__VERSION__/$VERSION}"
+          BODY="${BODY//__CURRENT__/$CURRENT}"
+
+          if [ -n "$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number')" ]; then
+            gh pr edit "$BRANCH" \
+              --title "chore(deps): 升级 Node.js 到 ${VERSION}" \
+              --body "$BODY"
+          else
+            gh pr create --head "$BRANCH" --base main \
+              --title "chore(deps): 升级 Node.js 到 ${VERSION}" \
+              --body "$BODY"
+          fi
+
+      # GITHUB_TOKEN 建的分支不会触发 pull_request 事件 —— 手动派发一次，
+      # PR 上才看得到 check / test / build 的结果
+      - name: 触发 CI
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref chore/node-version
