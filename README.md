@@ -165,7 +165,7 @@ flowchart TB
 
 | 项 | 要求 |
 |---|---|
-| Node.js | ≥ 22.23（`.node-version` 写的 22.23.4） |
+| Node.js | ≥ 26.13（`.node-version` 写的 26.13.0） |
 | pnpm | 12+（`package.json` 的 `packageManager` 钉版本） |
 | Cloudflare 账号 | D1 / R2 / Workers（免费额度足够个人博客） |
 | wrangler CLI | 安装即可；凭据用 `config.env` 里的账户级 Token |
