@@ -23,8 +23,10 @@ const pathCache = new Map<string, string>()
 
 /** 已装 squircle 的元素 —— removeSquircle() 用 */
 const applied = new WeakSet<HTMLElement>()
+/** 可遍历的已装元素集合 —— 主题切换时批量刷新用 */
+const appliedList = new Set<HTMLElement>()
 /** 元素的 ResizeObserver 和 update 函数 —— refreshSquircle() 用 */
-const observers = new WeakMap<HTMLElement, { ro: ResizeObserver; update: () => void }>()
+const observers = new WeakMap<HTMLElement, { ro: ResizeObserver; update: (force?: boolean) => void }>()
 
 /**
  * 生成 squircle 的 SVG path 字符串。
@@ -71,19 +73,16 @@ function squirclePath(w: number, h: number, r: number): string {
 export function applySquircle(el: HTMLElement, radius?: number): void {
   if (applied.has(el)) return
   applied.add(el)
+  appliedList.add(el)
 
-  const shadow = readShadow(el)
   let lastW = 0
   let lastH = 0
 
-  const update = () => {
+  const update = (force = false) => {
     const rect = el.getBoundingClientRect()
-    // 使用 offsetWidth/Height 而不是 rect，因为 transform 会影响 rect 的尺寸
     const w = el.offsetWidth || Math.round(rect.width)
     const h = el.offsetHeight || Math.round(rect.height)
-    // 尺寸为 0 时不应用（元素可能隐藏），等 ResizeObserver 触发再算
     if (!w || !h) {
-      // 清除之前的效果，避免残留
       if (lastW || lastH) {
         el.style.clipPath = ''
         el.style.boxShadow = ''
@@ -93,22 +92,24 @@ export function applySquircle(el: HTMLElement, radius?: number): void {
       }
       return
     }
-    // 尺寸没变就不重算
-    if (w === lastW && h === lastH) return
+    const sizeChanged = w !== lastW || h !== lastH
+    if (!sizeChanged && !force) return
     lastW = w
     lastH = h
 
-    const r = radius ?? readRadius(el)
-    const path = squirclePath(w, h, r)
-    el.style.clipPath = `path('${path}')`
-    // 移除 box-shadow（会被 clip-path 裁剪但可能残留），用 drop-shadow 替代
-    el.style.boxShadow = 'none'
+    const shadow = readShadow(el)
+    if (sizeChanged) {
+      const r = radius ?? readRadius(el)
+      const path = squirclePath(w, h, r)
+      el.style.clipPath = `path('${path}')`
+      el.style.boxShadow = 'none'
+    }
     el.style.filter = buildFilter(shadow)
   }
 
   update()
 
-  const ro = new ResizeObserver(update)
+  const ro = new ResizeObserver(() => update())
   ro.observe(el)
   observers.set(el, { ro, update })
 }
@@ -120,8 +121,7 @@ export function applySquircle(el: HTMLElement, radius?: number): void {
 export function refreshSquircle(el: HTMLElement): void {
   const entry = observers.get(el)
   if (entry) {
-    // 直接调用 update 强制刷新
-    entry.update()
+    entry.update(true)
   }
 }
 
@@ -130,6 +130,7 @@ export function removeSquircle(el: HTMLElement): void {
   el.style.clipPath = ''
   el.style.filter = ''
   applied.delete(el)
+  appliedList.delete(el)
 }
 
 /** 读元素的 box-shadow，转成 drop-shadow 参数（只处理外部阴影，inset 无法用 drop-shadow 模拟） */
@@ -231,4 +232,19 @@ export function initSquircles(): void {
   document.querySelectorAll<HTMLElement>(`.${CLASS.card}, .${CLASS.navSurface}`).forEach((el) => {
     mo.observe(el, { attributes: true, attributeFilter: ['hidden'] })
   })
+
+  // 监听主题切换（<html> 的 class 变化，.dark 类切换明暗模式）
+  // 主题变了阴影颜色跟着变，需要强制刷新所有元素的 drop-shadow
+  const themeMo = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        for (const el of appliedList) {
+          const entry = observers.get(el)
+          entry?.update(true)
+        }
+        break
+      }
+    }
+  })
+  themeMo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 }
