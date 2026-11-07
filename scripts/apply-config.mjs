@@ -37,117 +37,7 @@ function loadEnv() {
   return values
 }
 
-/**
- * Workers Builds 的干净检出里没有 config.env。
- * 用构建注入的 WORKERS_CI_BUILD_UUID 反查：构建 → Worker 脚本 → 绑定 / 域名。
- * 全程只用构建 Token，不需要在 Dashboard 手工配置任何变量。
- */
-async function resolveFromBuild() {
-  if (process.env.WORKERS_CI !== '1') return {}
-  const token = process.env.CLOUDFLARE_API_TOKEN
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID
-  const build = process.env.WORKERS_CI_BUILD_UUID
-  if (!token || !account || !build) return {}
-
-  const api = async (path) => {
-    const response = await fetch('https://api.cloudflare.com/client/v4' + path, {
-      headers: { authorization: 'Bearer ' + token },
-    })
-    const payload = await response.json()
-    if (!response.ok || !payload.success) {
-      throw new Error(path + ' → HTTP ' + response.status)
-    }
-    return payload.result
-  }
-
-  let script = null
-  try {
-    const buildInfo = await api('/accounts/' + account + '/builds/builds/' + build)
-    const scriptTag = buildInfo?.trigger?.external_script_id
-    if (scriptTag) {
-      const scripts = await api('/accounts/' + account + '/workers/scripts')
-      script = (scripts ?? []).find((item) => item.tag === scriptTag) ?? null
-    }
-  } catch {
-    // 构建 Token 通常没有 Builds API 的读权限 —— 退回按绑定特征找当前 Worker
-  }
-
-  if (!script) {
-    const scripts = await api('/accounts/' + account + '/workers/scripts')
-    const candidates = []
-    for (const item of scripts ?? []) {
-      try {
-        const settings = await api('/accounts/' + account + '/workers/scripts/' + item.id + '/settings')
-        const bindings = settings?.bindings ?? []
-        const hasDb = bindings.some((binding) => binding.type === 'd1' && binding.name === 'DB')
-        const hasMedia = bindings.some(
-          (binding) => binding.type === 'r2_bucket' && binding.name === 'MEDIA',
-        )
-        if (hasDb && hasMedia) candidates.push(item)
-      } catch {
-        // 读不到某个脚本的绑定就跳过它
-      }
-    }
-    if (candidates.length !== 1) {
-      throw new Error(
-        '无法唯一定位 Worker（可见 ' +
-          (scripts ?? []).map((item) => item.id).join('/') +
-          '，候选 ' +
-          candidates.length +
-          ' 个）',
-      )
-    }
-    script = candidates[0]
-  }
-  if (!script?.id) return {}
-
-  const settings = await api('/accounts/' + account + '/workers/scripts/' + script.id + '/settings')
-  const bindings = settings?.bindings ?? []
-  const d1 = bindings.find((item) => item.type === 'd1' && item.name === 'DB')
-  const r2 = bindings.find((item) => item.type === 'r2_bucket' && item.name === 'MEDIA')
-
-  let databaseName = ''
-  if (d1?.database_id) {
-    try {
-      databaseName = (await api('/accounts/' + account + '/d1/database/' + d1.database_id))?.name ?? ''
-    } catch {
-      // 名字只用于配置回写，拿不到就沿用占位符
-    }
-  }
-
-  let site = ''
-  try {
-    const domains = await api('/accounts/' + account + '/workers/domains')
-    const domain = (domains ?? []).find(
-      (item) => item.service === script.id && item.environment === 'production',
-    )
-    if (domain?.hostname) site = 'https://' + domain.hostname
-  } catch {
-    // 域名拿不到时保持占位符，构建会因 canonical 不对而显眼地坏掉
-  }
-
-  return {
-    WORKER_NAME: script.id,
-    D1_DATABASE_ID: d1?.database_id ?? '',
-    D1_DATABASE_NAME: databaseName,
-    R2_BUCKET_NAME: r2?.bucket_name ?? '',
-    SITE_URL: site,
-  }
-}
-
 const env = loadEnv()
-const REQUIRED_KEYS = ['SITE_URL', 'WORKER_NAME', 'D1_DATABASE_ID', 'D1_DATABASE_NAME', 'R2_BUCKET_NAME']
-if (REQUIRED_KEYS.some((key) => !env[key])) {
-  try {
-    const resolved = await resolveFromBuild()
-    for (const key of REQUIRED_KEYS) {
-      if (!env[key] && resolved[key]) env[key] = resolved[key]
-    }
-    if (resolved.SITE_URL) console.log('[apply] 已从 Cloudflare 构建上下文解析部署标识')
-  } catch (error) {
-    console.warn('[apply] 构建上下文解析失败：' + error.message)
-  }
-}
 const host = (env.SITE_URL ?? '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
 
 /**
@@ -199,6 +89,6 @@ touched = patch(ASTRO, astroEdits) || touched
 
 console.log(
   touched
-    ? '[apply] 已把部署标识填回 wrangler.jsonc / astro.config.mjs'
-    : '[apply] 没有可填的部署标识 —— 沿用配置文件里已有的值',
+    ? '[apply] 已把 config.env / 环境变量的真值填回 wrangler.jsonc / astro.config.mjs'
+    : '[apply] 没有可填的真值 —— 沿用配置文件里已有的值（CI 干净检出就是这种）',
 )
