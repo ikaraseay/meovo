@@ -60,12 +60,45 @@ async function resolveFromBuild() {
     return payload.result
   }
 
-  const buildInfo = await api('/accounts/' + account + '/builds/builds/' + build)
-  const scriptTag = buildInfo?.trigger?.external_script_id
-  if (!scriptTag) return {}
+  let script = null
+  try {
+    const buildInfo = await api('/accounts/' + account + '/builds/builds/' + build)
+    const scriptTag = buildInfo?.trigger?.external_script_id
+    if (scriptTag) {
+      const scripts = await api('/accounts/' + account + '/workers/scripts')
+      script = (scripts ?? []).find((item) => item.tag === scriptTag) ?? null
+    }
+  } catch {
+    // 构建 Token 通常没有 Builds API 的读权限 —— 退回按绑定特征找当前 Worker
+  }
 
-  const scripts = await api('/accounts/' + account + '/workers/scripts')
-  const script = (scripts ?? []).find((item) => item.tag === scriptTag)
+  if (!script) {
+    const scripts = await api('/accounts/' + account + '/workers/scripts')
+    const candidates = []
+    for (const item of scripts ?? []) {
+      try {
+        const settings = await api('/accounts/' + account + '/workers/scripts/' + item.id + '/settings')
+        const bindings = settings?.bindings ?? []
+        const hasDb = bindings.some((binding) => binding.type === 'd1' && binding.name === 'DB')
+        const hasMedia = bindings.some(
+          (binding) => binding.type === 'r2_bucket' && binding.name === 'MEDIA',
+        )
+        if (hasDb && hasMedia) candidates.push(item)
+      } catch {
+        // 读不到某个脚本的绑定就跳过它
+      }
+    }
+    if (candidates.length !== 1) {
+      throw new Error(
+        '无法唯一定位 Worker（可见 ' +
+          (scripts ?? []).map((item) => item.id).join('/') +
+          '，候选 ' +
+          candidates.length +
+          ' 个）',
+      )
+    }
+    script = candidates[0]
+  }
   if (!script?.id) return {}
 
   const settings = await api('/accounts/' + account + '/workers/scripts/' + script.id + '/settings')
