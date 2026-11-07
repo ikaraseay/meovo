@@ -55,7 +55,7 @@ test('config check：配齐了就没问题', () => {
 })
 
 test('config check：占位的 D1 id 会被标出来', () => {
-  // 模板里现在是真实的 id（这项目只有一个库），所以这里自己造一份占位的
+  // 造一份占位配置，验证占位 id 会被标出来
   const file = join(TMP, 'placeholder.env')
   rmSync(TMP, { recursive: true, force: true })
   mkdirSync(TMP, { recursive: true })

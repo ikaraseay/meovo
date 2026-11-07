@@ -224,11 +224,14 @@
     D1 Read/Edit、R2 Edit、Account Settings Read），不需要用户级 Token、不需要 `wrangler login`。
     Builds API 只接受用户级 Token，所以构建配置 / Build Token / Deploy Hook 在 Dashboard
     一次性设置。
-  - **不再需要 Build variables**：真值在 `config.env`（不入库），构建前由
-    `scripts/apply-config.mjs` 填回；Builds 环境没有 `config.env` 时保留仓库里
-    `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 的现有值。
+  - **Builds 侧需要 6 个构建期变量**（仓库里只有占位符，干净检出没有 `config.env`）：
+    在 Worker → Settings → Builds → Environment variables 配置
+    `SITE_URL` / `WORKER_NAME` / `D1_DATABASE_NAME` / `D1_DATABASE_ID` /
+    `R2_BUCKET_NAME` / `CLOUDFLARE_ACCOUNT_ID`，构建前由 `scripts/apply-config.mjs`
+    填回 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs`。它们是部署标识而不是凭据，
+    可以勾选加密保存；本地开发由 `config.env` 提供同一组值。
     运行时变量和密钥（含 `ADMIN_PASSWORD_HASH` / `SESSION_SECRET` / `DEPLOY_HOOK_URL`）
-    全部由 `bash scripts/ops.sh secrets` 从 `config.env` 写入 Worker。
+    仍由 `bash scripts/ops.sh secrets` 从 `config.env` 写入 Worker —— 构建期读不到运行时 secret。
   - **构建 token 要带 D1 权限**：构建时 wrangler 用的是 Worker
     Settings → Builds → API token 那支 token；默认自动生成的只有 Workers Scripts / KV / R2 / Routes，
     **没有 D1** —— 而 `pnpm build` 的第一步就是从 D1 导出内容。不换 token 的话导出会失败

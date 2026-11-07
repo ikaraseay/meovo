@@ -247,7 +247,11 @@ Dashboard → Worker → **Settings → Builds → Connect to Git**：
 | Build command | `pnpm install --frozen-lockfile && pnpm build` |
 | Deploy command | `pnpm run deploy` |
 
-**不需要填 Build variables**：构建前 `apply-config` 会从 `config.env` 填配置；Builds 环境没有 `config.env` 时保留仓库里 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 的现有值。运行时变量和密钥统一由 `ops.sh secrets` 写入 Worker。
+**构建期变量**：仓库里的 `cloudflare/wrangler.jsonc` 与 `astro.config.mjs` 只有占位符，干净检出没有 `config.env`。请在 **Settings → Builds → Environment variables** 配置下面 6 项（可勾选加密保存）：
+
+`SITE_URL` · `WORKER_NAME` · `D1_DATABASE_NAME` · `D1_DATABASE_ID` · `R2_BUCKET_NAME` · `CLOUDFLARE_ACCOUNT_ID`
+
+`scripts/apply-config.mjs` 会在构建前把它们填回配置；这些只是部署标识，不是凭据。运行时变量和密钥仍统一由 `ops.sh secrets` 写入 Worker。
 
 **Build Token 要带 D1 权限**：Worker Settings → Builds → API token 默认只有 Workers Scripts / KV / R2 / Routes，**没有 D1**，而 `pnpm build` 的第一步就是从 D1 导出内容。在 Builds → API token 选择或创建一个带 **D1 Read** 的 Token（面板自动管理的用户级 Token，不需要你保存）。
 
