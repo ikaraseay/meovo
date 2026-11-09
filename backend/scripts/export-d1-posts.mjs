@@ -429,8 +429,8 @@ function writeSummariesFile(data) {
     `/**
  * 文章段落摘要 —— **生成的，别手改**。
  *
- * 由 backend/scripts/export-d1-posts.mjs 在构建前调用 Cloudflare AI 生成。
- * TextFold 的「两句 / 一句」模式读这份数据。
+ * 由 backend/scripts/export-d1-posts.mjs 在构建前调用 Cloudflare Workers AI
+ * （Llama 3.3 70B 模型）生成。TextFold 的「两句 / 一句」模式读这份数据。
  *
  * 结构：{ "locale/slug": ["第一段摘要", "第二段摘要", ...] }
  */

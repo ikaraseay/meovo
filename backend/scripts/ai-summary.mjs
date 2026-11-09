@@ -9,45 +9,43 @@
  * 凭证走环境变量（与 export-d1-posts.mjs 相同）：
  *   CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID
  *
- * 模型选 @cf/meta/llama-3.1-8b-instruct —— 免费额度够个人博客用，
- * 中英文都过得去。换模型改 MODEL 常量。
+ * 模型选 @cf/meta/llama-3.3-70b-instruct-fp8-fast —— 70B 大模型，
+ * 中文能力比 8B 强很多，Cloudflare 免费额度够个人博客用。
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** 摘要模型 —— 免费额度每天 10,000 neurons，这个模型约 130K 输出 tokens/天 */
-const MODEL = '@cf/meta/llama-3.1-8b-instruct'
+/** Cloudflare Workers AI 端点 */
+const API_BASE = 'https://api.cloudflare.com/client/v4/accounts'
+/** 模型 —— Llama 3.3 70B，比 8B 中文能力强很多 */
+const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 /** 每段摘要的目标长度（tokens） */
-const MAX_TOKENS = 100
+const MAX_TOKENS = 150
 /** API 超时（毫秒） */
 const TIMEOUT_MS = 30000
 
-/** Cloudflare Workers AI REST API 端点 */
-function aiEndpoint(accountId) {
-  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`
-}
-
 /**
- * 调 Cloudflare AI 生成摘要。
- * @param {string} prompt - 提示词（含段落内容）
+ * 调 Cloudflare Workers AI 生成摘要。
+ * @param {Array} messages - OpenAI 格式的消息数组
  * @param {object} opts - { token, accountId }
  * @returns {Promise<string|null>} 摘要文本，失败返回 null
  */
-async function generateSummary(prompt, { token, accountId }) {
+async function generateSummary(messages, { token, accountId }) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   try {
-    const response = await fetch(aiEndpoint(accountId), {
+    const response = await fetch(`${API_BASE}/${accountId}/ai/run/${MODEL}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt,
+        messages,
         max_tokens: MAX_TOKENS,
+        temperature: 0.3, // 低温度，输出更稳定
       }),
       signal: controller.signal,
     })
@@ -61,8 +59,9 @@ async function generateSummary(prompt, { token, accountId }) {
     }
 
     const data = await response.json()
-    // Workers AI 返回格式：{ result: { response: "..." }, success: true }
-    return data.result?.response?.trim() || null
+    // Workers AI chat 模型返回 OpenAI 兼容格式：
+    // { result: { choices: [{ message: { content: "..." } }] } }
+    return data.result?.choices?.[0]?.message?.content?.trim() || null
   } catch (error) {
     clearTimeout(timeout)
     console.warn(`[ai] 请求失败：${error.message}`)
@@ -71,19 +70,100 @@ async function generateSummary(prompt, { token, accountId }) {
 }
 
 /**
- * 构造摘要提示词。
+ * 构造摘要消息 —— 锁定输出格式，防止模型跑偏。
  * @param {string} paragraph - 段落原文
  * @param {string} locale - 语言（zh / en）
- * @returns {string}
+ * @returns {Array} OpenAI 格式的消息数组
  */
-function buildPrompt(paragraph, locale) {
+function buildMessages(paragraph, locale) {
   const lang = locale === 'zh' ? '中文' : 'English'
-  // 提示词用英文（模型训练数据多），但要求输出指定语言
-  return `Summarize the following paragraph in 1-2 sentences in ${lang}. Keep the key information and maintain the original tone. Output only the summary, no prefix.
+  const maxChars = locale === 'zh' ? 100 : 200
 
----
-${paragraph}
----`
+  // 用 JSON 格式锁死输出结构，避免模型加前缀 / 推理过程 / 重复原文
+  const systemPrompt = `你是摘要生成 API。只输出合法的 JSON，不加任何解释。
+
+规则：
+- 用 1 句话概括段落核心（${lang}，不超过 ${maxChars} 字）
+- 用自己的话重述，不要照搬原文
+- 不加前缀（如"摘要："、"Summary："、"译："）
+- 不加省略号或尾部标记
+- 不输出推理过程
+
+输出格式：{"summary": "你的一句话摘要"}`
+
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: paragraph },
+  ]
+}
+
+/**
+ * 清理 AI 输出 —— 去掉常见脏标记。
+ * @param {string} raw - AI 原始返回
+ * @returns {string} 清理后的文本
+ */
+function cleanSummaryOutput(raw) {
+  if (!raw) return ''
+
+  let text = raw.trim()
+
+  // 尝试解析 JSON（新 prompt 要求的格式）
+  const jsonMatch = text.match(/\{[\s\S]*?"summary"[\s\S]*?:[\s\S]*?"([\s\S]*?)"[\s\S]*\}/)
+  if (jsonMatch) {
+    text = jsonMatch[1]
+  } else {
+    // 回退：旧格式或模型没按规矩来，直接取文本
+    // 去掉可能的 markdown 代码块标记
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  }
+
+  // 去掉常见前缀
+  text = text.replace(/^(摘要|总结|Summary|译|Translation)[:：]\s*/i, '')
+
+  // 去掉开头的省略号
+  text = text.replace(/^[.…。]+\s*/, '')
+
+  // 去掉结尾的省略号
+  text = text.replace(/\s*[.…。]+$/, '')
+
+  // 去掉推理过程标记（## Step, 【思考】等）
+  text = text.replace(/^(##\s+Step\s+\d+[:：]|【[^】]*】)\s*/gm, '')
+
+  // 去掉多余的引号
+  text = text.replace(/^["']|["']$/g, '')
+
+  return text.trim()
+}
+
+/**
+ * 验证摘要质量 —— 不合格就丢弃。
+ * @param {string} summary - 清理后的摘要
+ * @param {string} original - 原文
+ * @param {string} locale - 语言
+ * @returns {boolean} 是否合格
+ */
+function validateSummary(summary, original, locale) {
+  if (!summary || summary.length < 10) return false
+
+  // 长度上限
+  const maxLen = locale === 'zh' ? 100 : 200
+  if (summary.length > maxLen * 1.5) return false
+
+  // 不能包含明显的 AI 痕迹
+  const forbidden = [
+    /^(##|Step|【|Think|Reason)/i,
+    /译[：:]|Translation:/i,
+    /As an AI|作为 AI|我是一个 AI/i,
+    /\.{3,}|。{3,}|…{3,}/,
+  ]
+  if (forbidden.some((re) => re.test(summary))) return false
+
+  // 不能跟原文太像（简单检查：前 20 字的相似度）
+  const origStart = original.slice(0, 50).trim()
+  const sumStart = summary.slice(0, 50).trim()
+  if (origStart && sumStart && origStart === sumStart) return false
+
+  return true
 }
 
 /**
@@ -143,17 +223,24 @@ export async function summarizePost(post, { token, accountId, cache, root }) {
 
   const summaries = []
   for (let i = 0; i < paragraphs.length; i++) {
-    const prompt = buildPrompt(paragraphs[i], post.locale)
-    const summary = await generateSummary(prompt, { token, accountId })
+    const messages = buildMessages(paragraphs[i], post.locale)
+    const raw = await generateSummary(messages, { token, accountId })
 
-    if (!summary) {
+    if (!raw) {
       console.warn(`[ai] 第 ${i + 1} 段失败，跳过整篇`)
       return null
     }
 
+    // 清理 + 验证
+    const summary = cleanSummaryOutput(raw)
+    if (!validateSummary(summary, paragraphs[i], post.locale)) {
+      console.warn(`[ai] 第 ${i + 1} 段质量不合格：${summary.slice(0, 50)}...`)
+      return null
+    }
+
     summaries.push(summary)
-    // 避免触发速率限制（每分钟 300 请求，但保守点）
-    await new Promise((r) => setTimeout(r, 200))
+    // 避免触发速率限制
+    await new Promise((r) => setTimeout(r, 300))
   }
 
   // 写入缓存

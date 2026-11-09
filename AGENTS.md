@@ -112,10 +112,12 @@
     没有可折段落整张卡藏起来（`initTextFold`  toggles `bar.closest([data-widget]).hidden`）。
     选的档位记进偏好（`preferences.ts` 的 `PREFS_KEYS.foldLevel` / `readFoldLevel()`），跨页面跨刷新还原
   - **AI 摘要构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
-    （`@cf/meta/llama-3.1-8b-instruct`，走 REST API，凭证复用 `CLOUDFLARE_API_TOKEN` /
-    `CLOUDFLARE_ACCOUNT_ID`）。摘要缓存在 `frontend/content/generated/.summaries.json`，
+    （`@cf/meta/llama-3.3-70b-instruct-fp8-fast`，70B 大模型中文能力比 8B 强很多，
+    凭证复用 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`）。
+    摘要缓存在 `frontend/content/generated/.summaries.json`，
     文章 `updated_at` 没变就不重新生成。产物写成 `frontend/data/article-summaries.ts`
-    （gitignored，`--ensure` 补空壳），前端构建期 import，运行时不调 AI
+    （gitignored，`--ensure` 补空壳），前端构建期 import，运行时不调 AI。
+    输出经 JSON 格式锁定 + 后处理清洗 + 质量验证，防止模型跑偏（重复原文 / 加前缀 / 泄露推理过程）
   - **切句靠 `Intl.Segmenter`**（中文按 。！？，英文按 .!?）+ 一遍缩写合并
     （Dr. / J. K. / Fig. 不当句末；下一段小写开头也合并）。纯函数 `segmentSentences` /
     `sentenceEnds` / `snapBoundary` 由 `test/text-fold.test.ts` 守着；没有 Segmenter 的引擎当一整句（宁可不折）
