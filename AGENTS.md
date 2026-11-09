@@ -79,7 +79,8 @@
   产物里只有 `--shiki-light` / `--shiki-dark` 变量，**Astro 自己不生成切换 CSS** ——
   明暗切换写在 `prose.css` 的 `html.dark` 规则里
 - **文章页**：chrome（标题卡 / 目录 / 结构图 / 协议卡 / 上下篇 / 页脚）+ 目录折叠 / 滚动高亮 /
-  代码块复制按钮，都在 `frontend/components/Article.astro` —— 页面只管路由与数据，正文走插槽
+  代码块复制按钮，都在 `frontend/components/Article.astro` —— 页面只管路由与数据，正文走插槽。
+  标题与元信息（日期 / 阅读时间 / 分类 / 标签）在顶部通栏玻璃卡（`article-head`，`zone="top" width="xl"`）
   - **窄屏下目录与结构图排在标题卡下面** —— 靠 **DOM 顺序** 实现：窄屏卡片退回文档流，
     DOM 顺序 = 视觉顺序。桌面是绝对定位 + zone，落位由 `desk-layout.ts` 算，与 DOM 顺序无关
   - 窄屏上目录卡紧跟标题卡（`global.css` 里 side 区卡片 `margin-block-start` 收紧一档）——
@@ -102,6 +103,33 @@
   滚轮对着指针那点缩放（1~4 倍）、按住拖动平移、双击还原、Esc / 点背景关闭。
   夹取边界是纯函数 `clampPan()`（`test/image-zoom.test.ts` 守着）；
   覆盖层的 class 名走 `dom-contract.ts` 的 `CLASS`
+- **折叠阅读（TextFold 式）**：`frontend/lib/text-fold.ts` —— 把正文按句子渐进折起，
+  三档 **全文 / 每段两句 / 每段一句**，每段还能单独展开 / 收起。「两句」和「一句」模式都用
+  构建期生成的 AI 摘要（没有摘要时「两句」回退到规则取前 2 句，「一句」隐藏全部只留展开按钮）。
+  - **默认全文，读者主动选档** —— 控件是独立一张侧栏玻璃卡（`article-fold`，`TextFoldBar.astro`，
+    `zone="side" width="sm" defaultPin`，排在思维导图 `article-outline` 后面，跟目录 / 结构图一样默认固定；
+    窄屏退回文档流时紧跟结构图）。服务端先 `hidden`，脚本处理完正文、确有可折段落才揭开（连卡片一起）；
+    没有可折段落整张卡藏起来（`initTextFold`  toggles `bar.closest([data-widget]).hidden`）。
+    选的档位记进偏好（`preferences.ts` 的 `PREFS_KEYS.foldLevel` / `readFoldLevel()`），跨页面跨刷新还原
+  - **AI 摘要构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
+    （`@cf/meta/llama-3.1-8b-instruct`，走 REST API，凭证复用 `CLOUDFLARE_API_TOKEN` /
+    `CLOUDFLARE_ACCOUNT_ID`）。摘要缓存在 `frontend/content/generated/.summaries.json`，
+    文章 `updated_at` 没变就不重新生成。产物写成 `frontend/data/article-summaries.ts`
+    （gitignored，`--ensure` 补空壳），前端构建期 import，运行时不调 AI
+  - **切句靠 `Intl.Segmenter`**（中文按 。！？，英文按 .!?）+ 一遍缩写合并
+    （Dr. / J. K. / Fig. 不当句末；下一段小写开头也合并）。纯函数 `segmentSentences` /
+    `sentenceEnds` / `snapBoundary` 由 `test/text-fold.test.ts` 守着；没有 Segmenter 的引擎当一整句（宁可不折）
+  - **只折 `.prose > p`**（直接子段落）；含图 / 视频等媒体的段落跳过；
+    行内代码 / `kbd` / `samp` / `.spoiler` / `[aria-hidden]` 里的文字不参与断句
+    （句末落在这些区里就 snap 到区末，别把一句代码劈开）
+  - **split 用 DOM Range 的 `extractContents`** —— 按规范克隆部分选中的祖先，
+    跨句的链接 / 加粗拆成两半但标记都在，**不用 innerHTML 重建正文**。
+    每段切两刀（第一句末 / 第二句末）成 head + restA + restB 三段，档位只控可见性，切一次就够
+  - **正文高度变了要重排桌面** —— `onChange` 调 `relayoutDesks()`（`draggable.ts` 导出，
+    派发 `DESK_RELAYOUT_EVENT`，initDesk 走跟 resize 同一条防抖重排）+ 同步目录高亮。
+    初次折叠在 initDesk 之前落地（加载遮罩盖住，不闪）；切档 / 展开本段才派发重排事件
+  - class / data 属性走契约（`CLASS.textFoldToggle` / `textFoldRest` / `spoiler`，
+    `ATTR.textFold*`）；外观在 `prose.css`，**打印强制全文**（控件不印、尾巴强制展开）
 - **评论**：读者填昵称 / 邮箱 / 个人网站 → 进 D1 待审队列 → 后台放行才出现在文章页
   - ⚠️ **已停用**（2026-11-02）：文章页不再渲染评论，后台导航里的「评论」入口也去掉了。
     代码还在（组件 / 接口 / 表），恢复只要把 `<Comments slug={getPostSlug(post)} locale={locale} />`
@@ -207,7 +235,7 @@
   - **拖拽时卡片水平，放下后复原倾斜** —— 倾斜记在 `baseTilt`（默认落位的倾斜）：
     拖拽开始撤下 `is-tilted`，松手 `placeAbsolute` 复原
   - **正文列是宽度的唯一基准** —— 内容锚定布局里，正文列（`[data-desk-content]`）里的卡片
-    （顶部标题卡 / 底部协议卡 / 上下篇）一律取**正文列的宽度**，右缘才跟正文对齐。
+    （底部协议卡 / 上下篇）一律取**正文列的宽度**，右缘才跟正文对齐。
     卡片自己的宽度档位（`--sm` / `--lg` / `--xl`）只管没进正文列的时候
   - **侧栏卡片放不下就并到标题卡下面** —— 760px 正文列 + 300px 侧栏要 1424px 才排得下。
     窄桌面由 `fittedContentWidth` 收窄正文列给侧栏让位（保底 480px），

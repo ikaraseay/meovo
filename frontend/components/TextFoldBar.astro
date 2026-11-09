@@ -1,0 +1,109 @@
+---
+/**
+ * 折叠阅读的层级控件 —— 独立一张侧栏玻璃卡（article-fold，排在思维导图后面）。
+ * ---------------------------------------------------------
+ * 服务端先 hidden：没有 JS 就不显示（折叠本来就是渐进增强）。
+ * lib/text-fold.ts 处理完正文、确有可折的段落时才揭开它（连同所在卡片）；
+ * 没有可折段落时整张卡藏起来。文案以 JSON 内联，脚本读出来传给控制器。
+ */
+import { t, type Locale } from '../i18n'
+
+interface Props {
+  locale: Locale
+}
+
+const { locale } = Astro.props
+
+const labels = {
+  expand: t(locale, 'post.fold.expand'),
+  collapse: t(locale, 'post.fold.collapse'),
+  status: {
+    full: t(locale, 'post.fold.status.full'),
+    two: t(locale, 'post.fold.status.two'),
+    one: t(locale, 'post.fold.status.one'),
+  },
+}
+---
+
+<div class="text-fold-bar" data-text-fold hidden>
+  <span class="text-fold-label" id="text-fold-label">{t(locale, 'post.fold.label')}</span>
+  <div class="text-fold-options" role="group" aria-labelledby="text-fold-label">
+    <button type="button" class="text-fold-option" data-text-fold-level="full" aria-pressed="true">
+      {t(locale, 'post.fold.full')}
+    </button>
+    <button type="button" class="text-fold-option" data-text-fold-level="two" aria-pressed="false">
+      {t(locale, 'post.fold.two')}
+    </button>
+    <button type="button" class="text-fold-option" data-text-fold-level="one" aria-pressed="false">
+      {t(locale, 'post.fold.one')}
+    </button>
+  </div>
+  <p class="text-fold-hint">{t(locale, 'post.fold.hint')}</p>
+  <span class="sr-only" role="status" aria-live="polite" data-text-fold-status></span>
+  <script type="application/json" is:inline data-text-fold-labels set:html={JSON.stringify(labels)}></script>
+</div>
+
+<style>
+  .text-fold-bar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+  }
+
+  /* 卡片小标题 —— 跟结构图卡 .outline-summary 一个口径（小号大写宽字距） */
+  .text-fold-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ui-text-secondary);
+  }
+
+  /* 分段控件 —— 凹槽底 + 选中的那档浮起来，三档平分卡片宽 */
+  .text-fold-options {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-surface-sunken);
+  }
+
+  .text-fold-option {
+    flex: 1;
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--ui-radius-full);
+    font-size: 0.8125rem;
+    font-family: inherit;
+    text-align: center;
+    color: var(--ui-text-secondary);
+    cursor: pointer;
+    transition:
+      color var(--ui-transition-fast),
+      background var(--ui-transition-fast);
+  }
+
+  .text-fold-option:hover {
+    color: var(--ui-text);
+  }
+
+  .text-fold-option.is-active {
+    background: var(--ui-card-bg);
+    color: var(--ui-text);
+    font-weight: 600;
+  }
+
+  .text-fold-option:focus-visible {
+    outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color);
+    outline-offset: var(--ui-focus-ring-offset);
+  }
+
+  .text-fold-hint {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+  }
+</style>

@@ -57,6 +57,12 @@ export const CLASS = {
   adminFlashError: 'admin-flash--error',
   /** 正文排版容器 */
   prose: 'prose',
+  /** 正文里的悬停显示 —— 编辑工具写入、prose.css 上色、折叠阅读排除断句 */
+  spoiler: 'spoiler',
+  /** 折叠阅读：每段的展开 / 收起箭头 */
+  textFoldToggle: 'text-fold-toggle',
+  /** 折叠阅读：被折起的尾巴（第二句 / 第三句起） */
+  textFoldRest: 'text-fold-rest',
   /** 图片放大层 */
   imgZoom: 'img-zoom',
   /** 放大层里的那张图 */
@@ -158,6 +164,14 @@ export const ATTR = {
   linkUrl: 'data-link-url',
   /** 友链手动状态（ok / down / unknown） */
   linkStatus: 'data-link-status',
+  /** 折叠阅读：标题卡里的层级控件 */
+  textFold: 'data-text-fold',
+  /** 折叠阅读：每个层级按钮选中的档位（full / two / one） */
+  textFoldLevel: 'data-text-fold-level',
+  /** 折叠阅读：控件携带的文案（内联 JSON，展开 / 收起 / 状态） */
+  textFoldLabels: 'data-text-fold-labels',
+  /** 折叠阅读：切档时读给屏幕阅读器的状态行 */
+  textFoldStatus: 'data-text-fold-status',
 } as const
 
 /**

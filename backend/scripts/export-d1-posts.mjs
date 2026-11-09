@@ -22,6 +22,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { summarizeAll } from './ai-summary.mjs'
 import { fileNameFor, renderMarkdownFile } from '../lib/admin/post-export.ts'
 import { createQuery, readD1Config } from './d1-query.mjs'
 
@@ -35,6 +36,8 @@ const MANIFEST = join(OUT_DIR, '.manifest.json')
 const OVERRIDES = join(ROOT, 'frontend/i18n/overrides.ts')
 /** 项目数据文件 —— 前台是纯静态的，关于页那张卡从这里读（构建期就写好，运行时不查 D1） */
 const PROJECTS_FILE = join(ROOT, 'frontend/data/projects.ts')
+/** AI 摘要 —— TextFold 的「两句 / 一句」模式读这份（构建期生成，运行时不调 AI） */
+const SUMMARIES_FILE = join(ROOT, 'frontend/data/article-summaries.ts')
 
 /** 环境在 config.env（从 config.env.example 复制，不入库）—— 没有就只用进程里的变量 */
 try {
@@ -97,9 +100,10 @@ const COLUMNS =
   'series_id, series_title, series_order, license, created_at, updated_at'
 
 if (ensureOnly) {
-  // 只补空壳：新克隆的仓库没有这两个文件，check / test 会找不到模块
+  // 只补空壳：新克隆的仓库没有这几个文件，check / test 会找不到模块
   if (!existsSync(OVERRIDES)) writeOverrides({})
   if (!existsSync(PROJECTS_FILE)) writeProjects([])
+  if (!existsSync(SUMMARIES_FILE)) writeSummariesFile({})
   process.exit(0)
 }
 
@@ -392,6 +396,51 @@ writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2), 'utf8')
  */
 writeProjects(projectRows)
 
+/* ---- AI 摘要：TextFold 用 ---- */
+
+/**
+ * 生成 AI 摘要（只在新文章或文章更新时）
+ */
+async function generateSummaries() {
+  if (rows.length === 0) {
+    writeSummariesFile({})
+    return
+  }
+
+  const summaries = await summarizeAll(
+    rows.map((row) => ({
+      slug: row.slug,
+      locale: row.locale,
+      body: row.body,
+      updated_at: row.updated_at,
+    })),
+    { token, accountId, root: ROOT },
+  )
+
+  // 写成 TS 模块供前端 import
+  const obj = Object.fromEntries(summaries)
+  writeSummariesFile(obj)
+  console.log(`[export] AI 摘要：生成 ${summaries.size} 篇`)
+}
+
+function writeSummariesFile(data) {
+  writeFileSync(
+    SUMMARIES_FILE,
+    `/**
+ * 文章段落摘要 —— **生成的，别手改**。
+ *
+ * 由 backend/scripts/export-d1-posts.mjs 在构建前调用 Cloudflare AI 生成。
+ * TextFold 的「两句 / 一句」模式读这份数据。
+ *
+ * 结构：{ "locale/slug": ["第一段摘要", "第二段摘要", ...] }
+ */
+export const articleSummaries: Record<string, string[]> = ${JSON.stringify(data, null, 2)}
+`,
+    'utf8',
+  )
+}
+
+await generateSummaries()
 
 console.log(
   '[export] 导出 ' + written.length + ' 篇' + (skipped.length > 0 ? '，跳过 ' + skipped.length + ' 篇' : ''),

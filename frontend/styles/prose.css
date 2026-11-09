@@ -343,6 +343,78 @@ html.dark .code-block pre.astro-code span {
   }
 }
 
+/* =========================================================
+   折叠阅读 —— lib/text-fold.ts 把每段第二句起收进 .text-fold-rest，
+   段尾插一个 .text-fold-toggle 箭头。默认全文，读者主动选档才折。
+   隐藏靠全局 [hidden]{display:none!important}，这里只管外观。
+   ========================================================= */
+.prose .text-fold-rest {
+  display: inline;
+}
+
+/* AI 摘要 —— 「一句」模式时显示，替代机械切出来的第一句 */
+.prose .text-fold-summary {
+  display: inline;
+  color: var(--ui-text-secondary);
+  font-style: italic;
+}
+
+.prose .text-fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-inline-start: 0.35em;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-full);
+  background: var(--ui-surface-sunken);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--ui-transition-fast),
+    background var(--ui-transition-fast),
+    border-color var(--ui-transition-fast);
+}
+
+.prose .text-fold-toggle:hover {
+  color: var(--ui-text-accent);
+  background: var(--ui-surface-hover);
+  border-color: var(--ui-text-accent);
+}
+
+.prose .text-fold-toggle:focus-visible {
+  outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color);
+  outline-offset: var(--ui-focus-ring-offset);
+}
+
+/* 展开时箭头朝上 —— 用独立的 rotate 属性，别占 transform（卡片倾斜要用） */
+.prose .text-fold-toggle svg {
+  transition: rotate var(--ui-transition-fast);
+}
+
+.prose .text-fold-toggle[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+/* 打印 / 导出 PDF 永远全文 —— 控件不印，折起的尾巴强制展开，摘要不印 */
+@media print {
+  .text-fold-bar,
+  .prose .text-fold-toggle {
+    display: none !important;
+  }
+
+  .prose .text-fold-rest {
+    display: inline !important;
+  }
+
+  .prose .text-fold-summary {
+    display: none !important;
+  }
+}
+
 .toc-link {
   display: block;
   margin-inline-start: -1px;

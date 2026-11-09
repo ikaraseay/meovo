@@ -39,6 +39,14 @@ import {
 /** 卡片互相叠的层序上限 —— 必须低于悬浮栏（Z.nav），否则卡片会盖住导航 */
 const Z_MAX = Z.widget
 
+/** 正文高度变了（折叠阅读切档 / 展开本段）—— 通知桌面重排，别各调各的 */
+export const DESK_RELAYOUT_EVENT = 'meovo:desk-relayout'
+
+/** 请求所有玻璃桌面重排 —— 内容锚定布局里正文长高了，尾部卡片要跟着挪 */
+export function relayoutDesks(): void {
+  window.dispatchEvent(new Event(DESK_RELAYOUT_EVENT))
+}
+
 interface Entry {
   el: HTMLElement
   id: string
@@ -649,6 +657,9 @@ export function initDesk(desk: HTMLElement): DeskController | null {
 
   // 窗口尺寸变了：百分比存档按新宽高等比还原（防抖 + 布局期间关过渡）
   window.addEventListener('resize', () => scheduleRelayout())
+
+  // 正文高度变了（折叠阅读）：跟 resize 走同一条防抖重排
+  window.addEventListener(DESK_RELAYOUT_EVENT, scheduleRelayout)
 
   return { reset }
 }

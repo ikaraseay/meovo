@@ -116,6 +116,16 @@ export const ui = {
   'post.license.note.allRights': { zh: '保留所有权利，转载需事先授权。', en: 'All rights reserved. Reposting requires permission.' },
   'post.license.raw': { zh: '查看 Markdown 原文', en: 'Markdown source' },
   'post.image.close': { zh: '关闭图片', en: 'Close image' },
+  'post.fold.label': { zh: '折叠阅读', en: 'Fold reading' },
+  'post.fold.full': { zh: '全文', en: 'Full' },
+  'post.fold.two': { zh: '两句', en: 'Two' },
+  'post.fold.one': { zh: '一句', en: 'One' },
+  'post.fold.hint': { zh: '每段只留前几句，点箭头展开本段', en: 'Keep the first sentences of each paragraph; tap the arrow to expand one' },
+  'post.fold.expand': { zh: '展开本段', en: 'Expand paragraph' },
+  'post.fold.collapse': { zh: '收起本段', en: 'Collapse paragraph' },
+  'post.fold.status.full': { zh: '已显示全文', en: 'Showing full text' },
+  'post.fold.status.two': { zh: '已折叠：每段两句', en: 'Folded: two sentences per paragraph' },
+  'post.fold.status.one': { zh: '已折叠：每段一句', en: 'Folded: one sentence per paragraph' },
 
   // 评论
   'comments.title': { zh: '评论', en: 'Comments' },

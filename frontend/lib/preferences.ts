@@ -22,6 +22,8 @@ export type LinksChoice = 'auto' | 'always'
 export type TargetsChoice = 'normal' | 'large'
 /** 焦点环：默认 / 强化 */
 export type FocusChoice = 'auto' | 'strong'
+/** 折叠阅读层级：全文 / 每段两句 / 每段一句 */
+export type FoldLevel = 'full' | 'two' | 'one'
 
 export interface Preferences {
   mode: ThemeMode
@@ -59,6 +61,8 @@ export const PREFS_KEYS = {
   links: 'links',
   targets: 'targets',
   focus: 'focus',
+  /** 折叠阅读层级 */
+  foldLevel: 'text-fold-level',
 } as const
 
 /** 可写的偏好 key —— legacyScale 只读（迁移用），不往外开 */
@@ -88,6 +92,7 @@ const isContrast = (v: unknown): v is ContrastChoice => v === 'standard' || v ==
 const isLinks = (v: unknown): v is LinksChoice => v === 'auto' || v === 'always'
 const isTargets = (v: unknown): v is TargetsChoice => v === 'normal' || v === 'large'
 const isFocus = (v: unknown): v is FocusChoice => v === 'auto' || v === 'strong'
+const isFoldLevel = (v: unknown): v is FoldLevel => v === 'full' || v === 'two' || v === 'one'
 
 /** 系统偏好 —— 没有存过 mode 时用 */
 function systemPrefersDark(): boolean {
@@ -114,6 +119,16 @@ export function clearMode(store: PreferenceStore | null = defaultStore()): void 
     store?.removeItem?.(PREFS_KEYS.mode)
   } catch {
     // 存不了就算了 —— 本次会话已经切回去了
+  }
+}
+
+/** 折叠阅读层级 —— 没存过或坏值一律「全文」，折叠是读者主动选的 */
+export function readFoldLevel(store: PreferenceStore | null = defaultStore()): FoldLevel {
+  try {
+    const stored = store?.getItem(PREFS_KEYS.foldLevel)
+    return isFoldLevel(stored) ? stored : 'full'
+  } catch {
+    return 'full'
   }
 }
 

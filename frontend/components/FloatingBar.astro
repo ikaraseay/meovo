@@ -387,6 +387,7 @@ const navItems: NavItem[] = [
     readPreferences,
     setPref,
     type PrefKey,
+    type Preferences,
     type ThemeMode,
   } from '../lib/preferences'
   import {
@@ -893,7 +894,7 @@ const navItems: NavItem[] = [
   function syncToggles() {
     const prefs = readPreferences()
     toggleButtons.forEach((btn) => {
-      const key = btn.dataset.toggle as PrefKey
+      const key = btn.dataset.toggle as keyof Preferences
       const on = prefs[key] === (btn.dataset.value ?? '')
       btn.classList.toggle(CLASS.active, on)
       btn.setAttribute('aria-pressed', on ? 'true' : 'false')
@@ -902,7 +903,7 @@ const navItems: NavItem[] = [
 
   toggleButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.toggle as PrefKey
+      const key = btn.dataset.toggle as keyof Preferences
       const on = btn.dataset.value ?? ''
       const off = btn.dataset.off ?? ''
       const prefs = readPreferences()
