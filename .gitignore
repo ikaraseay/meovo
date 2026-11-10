@@ -50,5 +50,3 @@ frontend/content/generated/**/*.mdx
 frontend/i18n/overrides.ts
 frontend/data/projects.ts
 frontend/data/article-summaries.ts
-# AI 摘要缓存（避免每次构建重新生成）
-frontend/content/generated/.summaries.json

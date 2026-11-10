@@ -71,6 +71,17 @@ async function queryRest({ accountId, databaseId, token }, sql) {
 }
 
 /**
+ * 把值写成 SQL 里的字符串字面量 —— 单引号要双写。
+ * D1 的 REST 接口支持参数绑定，但 wrangler 那条路（--command）不支持，
+ * 两条路要共用同一个 query 函数，只能把 SQL 拼出来。
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function sqlText(value) {
+  return "'" + String(value ?? '').replace(/'/g, "''") + "'"
+}
+
+/**
  * 建一个查询函数。
  * @param {{root: string, wranglerConfig: string, useLocal?: boolean, token?: string, accountId?: string, databaseId?: string}} options
  */

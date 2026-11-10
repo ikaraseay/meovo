@@ -24,7 +24,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { summarizeAll } from './ai-summary.mjs'
 import { fileNameFor, renderMarkdownFile } from '../lib/admin/post-export.ts'
-import { createQuery, readD1Config } from './d1-query.mjs'
+import { createQuery, readD1Config, sqlText } from './d1-query.mjs'
 
 /** 仓库根 —— 脚本在 backend/scripts/ 下，根要往上两级 */
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -295,11 +295,6 @@ writeOverrides(overrides)
 
 /* ---- 项目：同步进本地 D1 ---- */
 
-/** SQL 里的文本 —— 单引号要双写 */
-function sqlText(value) {
-  return "'" + String(value ?? '').replace(/'/g, "''") + "'"
-}
-
 /** 远端项目行（清单快照用） */
 let projectRows = []
 
@@ -414,7 +409,7 @@ async function generateSummaries() {
       body: row.body,
       updated_at: row.updated_at,
     })),
-    { token, accountId, root: ROOT },
+    { token, accountId, query },
   )
 
   // 写成 TS 模块供前端 import
@@ -432,9 +427,11 @@ function writeSummariesFile(data) {
  * 由 backend/scripts/export-d1-posts.mjs 在构建前调用 Cloudflare Workers AI
  * （Llama 3.3 70B 模型）生成。TextFold 的「两句 / 一句」模式读这份数据。
  *
- * 结构：{ "locale/slug": ["第一段摘要", "第二段摘要", ...] }
+ * 结构：{ "locale/slug": { 段落键: "摘要", ... } }
+ * 段落键由 frontend/lib/text-fold-key.ts 的 foldKey 算出来 ——
+ * 键对不上就是那段没有摘要（回退规则折叠），不会张冠李戴。
  */
-export const articleSummaries: Record<string, string[]> = ${JSON.stringify(data, null, 2)}
+export const articleSummaries: Record<string, Record<string, string>> = ${JSON.stringify(data, null, 2)}
 `,
     'utf8',
   )

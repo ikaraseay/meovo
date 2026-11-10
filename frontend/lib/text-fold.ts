@@ -13,6 +13,7 @@
  */
 import { ATTR, CLASS } from './dom-contract.ts'
 import { readFoldLevel, setPref, type FoldLevel } from './preferences.ts'
+import { foldKey } from './text-fold-key.ts'
 import { articleSummaries } from '../data/article-summaries.ts'
 
 export type { FoldLevel }
@@ -165,7 +166,6 @@ export function initTextFold(
 
   // AI 摘要 —— 按文章 key 查，没有就用规则回退
   const summaries = options.articleKey ? articleSummaries[options.articleKey] : null
-  let paraIndex = 0
 
   function applyLevel(level: FoldLevel): void {
     for (const fp of paras) {
@@ -291,16 +291,17 @@ export function initTextFold(
     }
 
     // AI 摘要 —— 「一句」模式时显示这个，替代机械切出来的第一句
+    // 按段落文本取，不按下标 —— 构建期与运行时的段落集合并不完全一样
     let summaryEl: HTMLSpanElement | null = null
-    if (summaries && summaries[paraIndex]) {
+    const summary = summaries?.[foldKey(plain)]
+    if (summary) {
       summaryEl = document.createElement('span')
       summaryEl.className = 'text-fold-summary'
-      summaryEl.textContent = summaries[paraIndex]
+      summaryEl.textContent = summary
       summaryEl.hidden = true
       // 插在 restA 之前 —— 展开时摘要隐藏，原文露出来
       p.insertBefore(summaryEl, restA)
     }
-    paraIndex++
 
     const toggle = document.createElement('button')
     toggle.type = 'button'

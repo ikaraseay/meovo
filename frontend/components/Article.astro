@@ -111,7 +111,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       data-copy-label={t(locale, 'post.copyCode')}
       data-copied-label={t(locale, 'post.copied')}
       data-image-close={t(locale, 'post.image.close')}
-      data-article-key={`${locale}/${getPostSlug(post)}`}
+      data-article-key={`${getPostLocale(post)}/${getPostSlug(post)}`}
     >
       <slot />
     </div>

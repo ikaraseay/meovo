@@ -114,10 +114,30 @@
   - **AI 摘要构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
     （`@cf/meta/llama-3.3-70b-instruct-fp8-fast`，70B 大模型中文能力比 8B 强很多，
     凭证复用 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`）。
-    摘要缓存在 `frontend/content/generated/.summaries.json`，
-    文章 `updated_at` 没变就不重新生成。产物写成 `frontend/data/article-summaries.ts`
-    （gitignored，`--ensure` 补空壳），前端构建期 import，运行时不调 AI。
+    产物写成 `frontend/data/article-summaries.ts`（gitignored，`--ensure` 补空壳），
+    前端构建期 import，运行时不调 AI。
     输出经 JSON 格式锁定 + 后处理清洗 + 质量验证，防止模型跑偏（重复原文 / 加前缀 / 泄露推理过程）
+  - **摘要缓存在 D1 的 `ai_summaries` 表，不在 git 里** —— Workers Builds 每次从干净检出开始，
+    缓存进 git 等于没有：后台改一篇内容，也会让每次部署重跑全部文章的模型。
+    构建时读、生成后写回（`ai-summary.mjs` 的 `readCache` / `writeCache`）；
+    文章 `updated_at` 没变就不重新生成，键的算法版本变了就不认旧缓存（`CACHE_VERSION`）。
+    ⚠️ 表要先建：`pnpm wrangler d1 migrations apply blog-db --remote`
+    （迁移 `backend/db/migrations/0005_ai_summaries.sql`）。
+    缓存读写失败只警告 —— 表没建就退回到「每次都重新生成」，不影响构建
+    （写回需要 **D1 Edit（数据写）** 权限；建表需要 DDL 权限，账户级 token 可能只有前者）
+  - **摘要按「段落键」存，不按数组下标存** —— 键由 `frontend/lib/text-fold-key.ts` 的
+    `foldKey()` 算（抹掉标点、压掉空白后的纯文字）：markdown 里的直角引号渲染后是弯引号，
+    直接比文本永远对不上。构建期与运行时的段落集合也不完全一样（引用块 / 水平线 /
+    含媒体的段落运行时不会折），按下标对齐就是把别的段落的摘要贴到这一段上。
+    **键对不上 = 这段没有摘要**（回退规则折叠），不会张冠李戴
+  - **构建期段落口径必须跟运行时一致** —— `extractParagraphs()` 跳过的块
+    （标题 / 列表 / 水平线 / 引用 / 含媒体）就是运行时不会折的块；
+    口径要变就两边一起改（`test/ai-summary.test.ts` 守着）
+  - **一段失败只丢那一段** —— 整篇丢等于一次模型抽风就让整篇文章回到规则折叠；
+    失败的段不进缓存，下次构建自动重试
+  - **文章 key 用内容语言** —— `data-article-key` 是 `getPostLocale(post)` + slug，
+    不是 URL 的语言前缀：回退页（`/en/posts/<中文 slug>`）显示的是原文，
+    摘要得按原文语言查
   - **切句靠 `Intl.Segmenter`**（中文按 。！？，英文按 .!?）+ 一遍缩写合并
     （Dr. / J. K. / Fig. 不当句末；下一段小写开头也合并）。纯函数 `segmentSentences` /
     `sentenceEnds` / `snapBoundary` 由 `test/text-fold.test.ts` 守着；没有 Segmenter 的引擎当一整句（宁可不折）
