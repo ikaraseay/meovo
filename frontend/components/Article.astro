@@ -295,7 +295,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     close: prose?.dataset.imageClose ?? '',
   })
 
-  /* ---------- 折叠阅读：全文 / 每段两句 / 每段一句 ---------- */
+  /* ---------- 折叠阅读：全文 / 简述（作者原句）/ 要点（模型的话） ---------- */
 
   const foldBar = document.querySelector<HTMLElement>('[data-text-fold]')
   if (foldBar && prose) {

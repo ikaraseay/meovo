@@ -36,7 +36,7 @@ const MANIFEST = join(OUT_DIR, '.manifest.json')
 const OVERRIDES = join(ROOT, 'frontend/i18n/overrides.ts')
 /** 项目数据文件 —— 前台是纯静态的，关于页那张卡从这里读（构建期就写好，运行时不查 D1） */
 const PROJECTS_FILE = join(ROOT, 'frontend/data/projects.ts')
-/** AI 摘要 —— TextFold 的「两句 / 一句」模式读这份（构建期生成，运行时不调 AI） */
+/** AI 要点 + 理由 —— 折叠阅读的「要点」档读这份（构建期生成，运行时不调 AI） */
 const SUMMARIES_FILE = join(ROOT, 'frontend/data/article-summaries.ts')
 
 /** 环境在 config.env（从 config.env.example 复制，不入库）—— 没有就只用进程里的变量 */
@@ -425,13 +425,13 @@ function writeSummariesFile(data) {
  * 文章段落摘要 —— **生成的，别手改**。
  *
  * 由 backend/scripts/export-d1-posts.mjs 在构建前调用 Cloudflare Workers AI
- * （Llama 3.3 70B 模型）生成。TextFold 的「两句 / 一句」模式读这份数据。
+ * （Llama 3.3 70B 模型）生成。折叠阅读的「要点」档读这份数据。
  *
- * 结构：{ "locale/slug": { 段落键: "摘要", ... } }
+ * 结构：{ "locale/slug": { 段落键: { takeaway, reason }, ... } }
  * 段落键由 frontend/lib/text-fold-key.ts 的 foldKey 算出来 ——
- * 键对不上就是那段没有摘要（回退规则折叠），不会张冠李戴。
+ * 键对不上就是那段没有要点（回退规则折叠），不会张冠李戴。
  */
-export const articleSummaries: Record<string, Record<string, string>> = ${JSON.stringify(data, null, 2)}
+export const articleSummaries: Record<string, Record<string, { takeaway: string; reason: string }>> = ${JSON.stringify(data, null, 2)}
 `,
     'utf8',
   )

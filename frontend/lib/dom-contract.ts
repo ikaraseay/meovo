@@ -61,8 +61,14 @@ export const CLASS = {
   spoiler: 'spoiler',
   /** 折叠阅读：每段的展开 / 收起箭头 */
   textFoldToggle: 'text-fold-toggle',
-  /** 折叠阅读：被折起的尾巴（第二句 / 第三句起） */
+  /** 折叠阅读：被折起的部分（结论句之前的铺垫 / 之后的展开） */
   textFoldRest: 'text-fold-rest',
+  /** 折叠阅读：结论句 —— 简述档留的就是它 */
+  textFoldClaim: 'text-fold-claim',
+  /** 折叠阅读：AI 写的要点（模型的话） */
+  textFoldSummary: 'text-fold-summary',
+  /** 折叠阅读：AI 写的理由（模型的话） */
+  textFoldReason: 'text-fold-reason',
   /** 图片放大层 */
   imgZoom: 'img-zoom',
   /** 放大层里的那张图 */
@@ -166,7 +172,7 @@ export const ATTR = {
   linkStatus: 'data-link-status',
   /** 折叠阅读：标题卡里的层级控件 */
   textFold: 'data-text-fold',
-  /** 折叠阅读：每个层级按钮选中的档位（full / two / one） */
+  /** 折叠阅读：每个层级按钮选中的档位（full / brief / key） */
   textFoldLevel: 'data-text-fold-level',
   /** 折叠阅读：控件携带的文案（内联 JSON，展开 / 收起 / 状态） */
   textFoldLabels: 'data-text-fold-labels',

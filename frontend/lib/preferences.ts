@@ -22,8 +22,8 @@ export type LinksChoice = 'auto' | 'always'
 export type TargetsChoice = 'normal' | 'large'
 /** 焦点环：默认 / 强化 */
 export type FocusChoice = 'auto' | 'strong'
-/** 折叠阅读层级：全文 / 每段两句 / 每段一句 */
-export type FoldLevel = 'full' | 'two' | 'one'
+/** 折叠阅读层级：全文 / 简述（作者原句）/ 要点（AI 的话） */
+export type FoldLevel = 'full' | 'brief' | 'key'
 
 export interface Preferences {
   mode: ThemeMode
@@ -92,7 +92,7 @@ const isContrast = (v: unknown): v is ContrastChoice => v === 'standard' || v ==
 const isLinks = (v: unknown): v is LinksChoice => v === 'auto' || v === 'always'
 const isTargets = (v: unknown): v is TargetsChoice => v === 'normal' || v === 'large'
 const isFocus = (v: unknown): v is FocusChoice => v === 'auto' || v === 'strong'
-const isFoldLevel = (v: unknown): v is FoldLevel => v === 'full' || v === 'two' || v === 'one'
+const isFoldLevel = (v: unknown): v is FoldLevel => v === 'full' || v === 'brief' || v === 'key'
 
 /** 系统偏好 —— 没有存过 mode 时用 */
 function systemPrefersDark(): boolean {
@@ -126,6 +126,9 @@ export function clearMode(store: PreferenceStore | null = defaultStore()): void 
 export function readFoldLevel(store: PreferenceStore | null = defaultStore()): FoldLevel {
   try {
     const stored = store?.getItem(PREFS_KEYS.foldLevel)
+    // 旧档位（两句 / 一句）改过名 —— 读者选过的档位别丢
+    if (stored === 'two') return 'brief'
+    if (stored === 'one') return 'key'
     return isFoldLevel(stored) ? stored : 'full'
   } catch {
     return 'full'

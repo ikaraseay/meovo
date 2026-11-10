@@ -344,7 +344,10 @@ html.dark .code-block pre.astro-code span {
 }
 
 /* =========================================================
-   折叠阅读 —— lib/text-fold.ts 把每段第二句起收进 .text-fold-rest，
+   折叠阅读 —— lib/text-fold.ts 把每段切成三段：
+     .text-fold-rest（结论句前的铺垫 / 后的展开，折叠时藏起来）
+     .text-fold-claim（结论句 —— 简述档留的就是它，作者原话）
+     .text-fold-summary（AI 的要点 + 理由 —— 要点档显示的是它，模型的话）
    段尾插一个 .text-fold-toggle 箭头。默认全文，读者主动选档才折。
    隐藏靠全局 [hidden]{display:none!important}，这里只管外观。
    ========================================================= */
@@ -352,10 +355,21 @@ html.dark .code-block pre.astro-code span {
   display: inline;
 }
 
-/* AI 摘要 —— 「一句」模式时显示，替代机械切出来的第一句 */
+/* 结论句 —— 作者原话，不额外上色 */
+.prose .text-fold-claim {
+  display: inline;
+}
+
+/* AI 的要点 + 理由 —— 模型的话，跟作者的话分开 */
 .prose .text-fold-summary {
   display: inline;
   color: var(--ui-text-secondary);
+}
+
+.prose .text-fold-reason {
+  display: inline;
+  margin-inline-start: 0.5em;
+  color: var(--ui-text-muted);
   font-style: italic;
 }
 
@@ -406,7 +420,8 @@ html.dark .code-block pre.astro-code span {
     display: none !important;
   }
 
-  .prose .text-fold-rest {
+  .prose .text-fold-rest,
+  .prose .text-fold-claim {
     display: inline !important;
   }
 

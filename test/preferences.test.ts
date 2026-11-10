@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import {
   applyPreferences,
   PREFS_KEYS,
+  readFoldLevel,
   readPreferences,
   setPref,
   type PreferenceRoot,
@@ -151,4 +152,12 @@ test('没有 store / 抛异常时不炸', () => {
     setPref('rootScale', '1', broken)
     setPref('proseLh', '1.8', broken)
   })
+})
+
+test('折叠档位：旧的两句 / 一句迁移成简述 / 要点，读者选过的档位不丢', () => {
+  assert.equal(readFoldLevel(fakeStore({ [PREFS_KEYS.foldLevel]: 'two' })), 'brief')
+  assert.equal(readFoldLevel(fakeStore({ [PREFS_KEYS.foldLevel]: 'one' })), 'key')
+  assert.equal(readFoldLevel(fakeStore({ [PREFS_KEYS.foldLevel]: 'key' })), 'key')
+  assert.equal(readFoldLevel(fakeStore({ [PREFS_KEYS.foldLevel]: '坏值' })), 'full')
+  assert.equal(readFoldLevel(fakeStore({})), 'full')
 })

@@ -104,19 +104,26 @@
   夹取边界是纯函数 `clampPan()`（`test/image-zoom.test.ts` 守着）；
   覆盖层的 class 名走 `dom-contract.ts` 的 `CLASS`
 - **折叠阅读（TextFold 式）**：`frontend/lib/text-fold.ts` —— 把正文按句子渐进折起，
-  三档 **全文 / 每段两句 / 每段一句**，每段还能单独展开 / 收起。「两句」和「一句」模式都用
-  构建期生成的 AI 摘要（没有摘要时「两句」回退到规则取前 2 句，「一句」隐藏全部只留展开按钮）。
+  三档 **全文 / 简述 / 要点**，每段还能单独展开 / 收起。分档照 TextFold 的规矩：
+  **两种词不混** —— 简述是作者的原话（每段最像结论的那一句），要点是模型的话（要点 + 理由）；
+  没有模型要点时要点档退回简述（露出论断句）。档位 id 是 `full | brief | key`
+  （旧的 `two` / `one` 在 `readFoldLevel()` 里迁移，别再沿用旧名）。
   - **默认全文，读者主动选档** —— 控件是独立一张侧栏玻璃卡（`article-fold`，`TextFoldBar.astro`，
     `zone="side" width="sm" defaultPin`，排在思维导图 `article-outline` 后面，跟目录 / 结构图一样默认固定；
     窄屏退回文档流时紧跟结构图）。服务端先 `hidden`，脚本处理完正文、确有可折段落才揭开（连卡片一起）；
     没有可折段落整张卡藏起来（`initTextFold`  toggles `bar.closest([data-widget]).hidden`）。
     选的档位记进偏好（`preferences.ts` 的 `PREFS_KEYS.foldLevel` / `readFoldLevel()`），跨页面跨刷新还原
-  - **AI 摘要构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
+  - **AI 要点构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
     （`@cf/meta/llama-3.3-70b-instruct-fp8-fast`，70B 大模型中文能力比 8B 强很多，
     凭证复用 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`）。
     产物写成 `frontend/data/article-summaries.ts`（gitignored，`--ensure` 补空壳），
     前端构建期 import，运行时不调 AI。
+    每段产出 `{ takeaway, reason }`：takeaway = 结论先行、像标题、说出「那件事本身是什么」
+    （不许写「本段讨论了……」）；reason = 为什么这么讲（机制 / 依据 / 条件 / 例外）。
     输出经 JSON 格式锁定 + 后处理清洗 + 质量验证，防止模型跑偏（重复原文 / 加前缀 / 泄露推理过程）
+  - **要点不许照搬原文的头两句** —— `echoesOriginal()` 比对原文前两句，
+    照搬的要点等于没写，直接判不合格（用户抱怨的正是「跟段落第一句重复」）；
+    段值形状变了要 `CACHE_VERSION` +1（旧缓存会被当对象读）
   - **摘要缓存在 D1 的 `ai_summaries` 表，不在 git 里** —— Workers Builds 每次从干净检出开始，
     缓存进 git 等于没有：后台改一篇内容，也会让每次部署重跑全部文章的模型。
     构建时读、生成后写回（`ai-summary.mjs` 的 `readCache` / `writeCache`）；
@@ -146,12 +153,19 @@
     （句末落在这些区里就 snap 到区末，别把一句代码劈开）
   - **split 用 DOM Range 的 `extractContents`** —— 按规范克隆部分选中的祖先，
     跨句的链接 / 加粗拆成两半但标记都在，**不用 innerHTML 重建正文**。
-    每段切两刀（第一句末 / 第二句末）成 head + restA + restB 三段，档位只控可见性，切一次就够
+    每段切成三段：结论句前的铺垫 `.text-fold-rest` / 结论句 `.text-fold-claim` /
+    结论句后的展开 `.text-fold-rest`；档位只控可见性，切一次就够。
+    切口用空锚点定位、**从后往前切**（后面的切口先动，前面的偏移才还准），
+    锚点用完就 replace 掉，不留在正文里
+  - **结论句怎么挑** —— `pickClaimSentence()`（照 TextFold 的 `_claim_sentence`）：
+    前 4 句打分（论断词 +3、冒号 +1.5、条件词开头 -2.5、基础分随句序递减），
+    太短的句子跳过；英文直接取第一句。中文段落的结论常不在第一句，别改成机械取第一句
   - **正文高度变了要重排桌面** —— `onChange` 调 `relayoutDesks()`（`draggable.ts` 导出，
     派发 `DESK_RELAYOUT_EVENT`，initDesk 走跟 resize 同一条防抖重排）+ 同步目录高亮。
     初次折叠在 initDesk 之前落地（加载遮罩盖住，不闪）；切档 / 展开本段才派发重排事件
-  - class / data 属性走契约（`CLASS.textFoldToggle` / `textFoldRest` / `spoiler`，
-    `ATTR.textFold*`）；外观在 `prose.css`，**打印强制全文**（控件不印、尾巴强制展开）
+  - class / data 属性走契约（`CLASS.textFoldToggle` / `textFoldRest` / `textFoldClaim` /
+    `textFoldSummary` / `textFoldReason` / `spoiler`，`ATTR.textFold*`）；
+    外观在 `prose.css`，**打印强制全文**（控件不印、作者原话全露、模型的话不印）
 - **评论**：读者填昵称 / 邮箱 / 个人网站 → 进 D1 待审队列 → 后台放行才出现在文章页
   - ⚠️ **已停用**（2026-11-02）：文章页不再渲染评论，后台导航里的「评论」入口也去掉了。
     代码还在（组件 / 接口 / 表），恢复只要把 `<Comments slug={getPostSlug(post)} locale={locale} />`

@@ -19,8 +19,8 @@ const labels = {
   collapse: t(locale, 'post.fold.collapse'),
   status: {
     full: t(locale, 'post.fold.status.full'),
-    two: t(locale, 'post.fold.status.two'),
-    one: t(locale, 'post.fold.status.one'),
+    brief: t(locale, 'post.fold.status.brief'),
+    key: t(locale, 'post.fold.status.key'),
   },
 }
 ---
@@ -31,11 +31,11 @@ const labels = {
     <button type="button" class="text-fold-option" data-text-fold-level="full" aria-pressed="true">
       {t(locale, 'post.fold.full')}
     </button>
-    <button type="button" class="text-fold-option" data-text-fold-level="two" aria-pressed="false">
-      {t(locale, 'post.fold.two')}
+    <button type="button" class="text-fold-option" data-text-fold-level="brief" aria-pressed="false">
+      {t(locale, 'post.fold.brief')}
     </button>
-    <button type="button" class="text-fold-option" data-text-fold-level="one" aria-pressed="false">
-      {t(locale, 'post.fold.one')}
+    <button type="button" class="text-fold-option" data-text-fold-level="key" aria-pressed="false">
+      {t(locale, 'post.fold.key')}
     </button>
   </div>
   <p class="text-fold-hint">{t(locale, 'post.fold.hint')}</p>

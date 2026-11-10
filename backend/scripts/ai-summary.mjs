@@ -2,7 +2,7 @@
 /**
  * 构建期 AI 摘要生成 —— 用 Cloudflare Workers AI 给每段生成摘要。
  * ---------------------------------------------------------
- * TextFold 的「两句 / 一句」模式用这些摘要替代规则切句。
+ * 「要点」档用这些摘要替代作者原句（要点 + 理由，模型的话）。
  * 只生成一次：摘要缓存在 D1 的 ai_summaries 表（构建时读、生成后写回），
  * 文章 updated_at 没变就不重新生成。
  *
@@ -23,8 +23,8 @@ import { sqlText } from './d1-query.mjs'
 const API_BASE = 'https://api.cloudflare.com/client/v4/accounts'
 /** 模型 —— Llama 3.3 70B，比 8B 中文能力强很多 */
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
-/** 每段摘要的目标长度（tokens） */
-const MAX_TOKENS = 150
+/** 每段要点的目标长度（tokens）—— 要点 + 理由两段话，150 会把 JSON 截断 */
+const MAX_TOKENS = 220
 /** API 超时（毫秒） */
 const TIMEOUT_MS = 30000
 
@@ -74,25 +74,35 @@ async function generateSummary(messages, { token, accountId }) {
 
 /**
  * 构造摘要消息 —— 锁定输出格式，防止模型跑偏。
+ *
+ * 两段话（照 TextFold 的 ladder.py）：
+ *   takeaway —— 结论先行、像标题一样紧凑，说出「那件事本身是什么」
+ *   reason   —— 为什么这么讲：机制、依据、条件、例外
+ *
  * @param {string} paragraph - 段落原文
  * @param {string} locale - 语言（zh / en）
  * @returns {Array} OpenAI 格式的消息数组
  */
 function buildMessages(paragraph, locale) {
-  const lang = locale === 'zh' ? '中文' : 'English'
-  const maxChars = locale === 'zh' ? 100 : 200
+  const rules =
+    locale === 'zh'
+      ? `规则：
+- takeaway：一句话说出这一段确立了什么 —— 结论先行，像标题一样紧凑（15 到 40 字）。说出「那件事本身是什么」，不要写「本段讨论了……」「作者认为……」「这段介绍了……」这种描述动作的话。
+- reason：一句话说明为什么这么讲 —— 机制、依据、条件或例外（不超过 40 字）；实在没有就留空字符串。
+- 用中文写。不要照搬原文句子。
+- 不加前缀（如"要点："）、不加省略号、不输出推理过程。`
+      : `Rules:
+- takeaway: one sentence stating what this unit establishes — conclusion first, packed like a headline (8 to 25 words). Name the thing itself, not the activity; never "this paragraph discusses…".
+- reason: one sentence saying why — the mechanism, the evidence, the condition, or the exception (under 30 words). Use an empty string if there is none.
+- Write in English. Do not copy sentences from the source.
+- No prefix, no ellipsis, no reasoning trace.`
 
-  // 用 JSON 格式锁死输出结构，避免模型加前缀 / 推理过程 / 重复原文
-  const systemPrompt = `你是摘要生成 API。只输出合法的 JSON，不加任何解释。
+  // 用 JSON 格式锁死输出结构，避免模型加前缀 / 推理过程
+  const systemPrompt = `你是要点提炼 API。只输出合法的 JSON，不加任何解释。
 
-规则：
-- 用 1 句话概括段落核心（${lang}，不超过 ${maxChars} 字）
-- 用自己的话重述，不要照搬原文
-- 不加前缀（如"摘要："、"Summary："、"译："）
-- 不加省略号或尾部标记
-- 不输出推理过程
+${rules}
 
-输出格式：{"summary": "你的一句话摘要"}`
+输出格式：{"takeaway": "…", "reason": "…"}`
 
   return [
     { role: 'system', content: systemPrompt },
@@ -101,56 +111,105 @@ function buildMessages(paragraph, locale) {
 }
 
 /**
- * 清理 AI 输出 —— 去掉常见脏标记。
- * @param {string} raw - AI 原始返回
+ * 去掉常见的脏标记（前缀 / 引号 / 省略号 / 推理痕迹）。
+ * @param {*} raw
  * @returns {string} 清理后的文本
  */
-function cleanSummaryOutput(raw) {
+function cleanText(raw) {
   if (!raw) return ''
-
-  let text = raw.trim()
-
-  // 尝试解析 JSON（新 prompt 要求的格式）
-  const jsonMatch = text.match(/\{[\s\S]*?"summary"[\s\S]*?:[\s\S]*?"([\s\S]*?)"[\s\S]*\}/)
-  if (jsonMatch) {
-    text = jsonMatch[1]
-  } else {
-    // 回退：旧格式或模型没按规矩来，直接取文本
-    // 去掉可能的 markdown 代码块标记
-    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-  }
-
-  // 去掉常见前缀
-  text = text.replace(/^(摘要|总结|Summary|译|Translation)[:：]\s*/i, '')
-
-  // 去掉开头的省略号
+  let text = String(raw).trim()
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  text = text.replace(/^(要点|摘要|总结|理由|译|Translation|Summary|Key|Reason)[:：]\s*/i, '')
   text = text.replace(/^[.…。]+\s*/, '')
-
-  // 去掉结尾的省略号
   text = text.replace(/\s*[.…。]+$/, '')
-
-  // 去掉推理过程标记（## Step, 【思考】等）
   text = text.replace(/^(##\s+Step\s+\d+[:：]|【[^】]*】)\s*/gm, '')
-
-  // 去掉多余的引号
   text = text.replace(/^["']|["']$/g, '')
-
   return text.trim()
 }
 
 /**
- * 验证摘要质量 —— 不合格就丢弃。
- * @param {string} summary - 清理后的摘要
+ * 解析模型输出 —— 要点 + 理由。
+ *
+ * 模型可能多嘴（前后带解释、带代码块），先抠出 JSON；
+ * 抠不出就把整段当要点 —— 宁可少一句理由，也别整段丢掉。
+ *
+ * @param {string} raw - AI 原始返回
+ * @returns {{takeaway: string, reason: string}|null}
+ */
+export function parseSummary(raw) {
+  if (!raw) return null
+  const text = String(raw).trim()
+
+  const brace = text.match(/\{[\s\S]*\}/)
+  if (brace) {
+    try {
+      const obj = JSON.parse(brace[0])
+      const takeaway = cleanText(obj.takeaway)
+      const reason = cleanText(obj.reason)
+      if (takeaway) return { takeaway, reason }
+    } catch {
+      // 不是 JSON —— 落到下面的兜底
+    }
+  }
+
+  // JSON 被截断（max_tokens 到了）—— 抠出要点那一半，别整段丢掉
+  const partial = text.match(/"takeaway"\s*:\s*"([^"]+)"/)
+  if (partial) {
+    const takeaway = cleanText(partial[1])
+    if (takeaway) return { takeaway, reason: '' }
+  }
+
+  const fallback = cleanText(text)
+  return fallback ? { takeaway: fallback, reason: '' } : null
+}
+
+/** 归一化：去掉标点空白，只看字面 */
+function normalize(text) {
+  return text.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase()
+}
+
+/**
+ * 要点是不是把原文的头两句照搬了一遍。
+ *
+ * 用户抱怨的正是「跟段落第一句重复」—— 照搬的要点等于没写。
+ * @param {string} takeaway
+ * @param {string} original
+ * @returns {boolean}
+ */
+export function echoesOriginal(takeaway, original) {
+  const t = normalize(takeaway)
+  if (t.length < 6) return false
+  const sentences = original
+    .split(/[。！？!?]+|\.\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+  return sentences.some((s) => {
+    const n = normalize(s)
+    if (n.length < 6) return false
+    return t === n || t.startsWith(n) || n.startsWith(t) || t.includes(n)
+  })
+}
+
+/**
+ * 验证要点质量 —— 不合格就丢弃（这一段退回规则折叠）。
+ * @param {{takeaway: string, reason: string}} summary
  * @param {string} original - 原文
  * @param {string} locale - 语言
  * @returns {boolean} 是否合格
  */
-function validateSummary(summary, original, locale) {
-  if (!summary || summary.length < 10) return false
+export function validateSummary(summary, original, locale) {
+  if (!summary) return false
+  const { takeaway, reason } = summary
+  // 下限只是挡退化输出（"内容概述"这类），不是质量线 ——
+  // prompt 里已经要求中文 15~40 字 / 英文 8~25 词
+  const minLen = locale === 'zh' ? 8 : 16
+  if (!takeaway || takeaway.length < minLen) return false
 
   // 长度上限
   const maxLen = locale === 'zh' ? 100 : 200
-  if (summary.length > maxLen * 1.5) return false
+  if (takeaway.length > maxLen * 1.5) return false
+  if (reason && reason.length > maxLen) return false
 
   // 不能包含明显的 AI 痕迹
   const forbidden = [
@@ -159,26 +218,24 @@ function validateSummary(summary, original, locale) {
     /As an AI|作为 AI|我是一个 AI/i,
     /\.{3,}|。{3,}|…{3,}/,
   ]
-  if (forbidden.some((re) => re.test(summary))) return false
+  if (forbidden.some((re) => re.test(takeaway) || re.test(reason))) return false
 
-  // 不能跟原文太像（简单检查：前 20 字的相似度）
-  const origStart = original.slice(0, 50).trim()
-  const sumStart = summary.slice(0, 50).trim()
-  if (origStart && sumStart && origStart === sumStart) return false
+  // 照搬原文的头两句 —— 摘要等于没写
+  if (echoesOriginal(takeaway, original)) return false
 
   return true
 }
 
 /**
- * 缓存格式版本 —— 段落键的算法一改就得 +1。
+ * 缓存格式版本 —— 段落键的算法或值的形状一改就得 +1。
  * 旧缓存里的旧键跟新键对不上，不换版本就会拿旧摘要当新的用（或者一条都取不到）。
  */
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 
 /**
  * 读缓存 —— 缓存在 D1 的 ai_summaries 表，不在 git 里。
  * @param {(sql: string) => Promise<any[]>} query - D1 查询函数
- * @returns {Promise<Map<string, {updated_at: string, version: number, summaries: Record<string, string>}>>}
+ * @returns {Promise<Map<string, {updated_at: string, version: number, summaries: Record<string, {takeaway: string, reason: string}>}>>}
  */
 export async function readCache(query) {
   const rows = await query('SELECT key, version, updated_at, summaries FROM ai_summaries')
@@ -201,7 +258,7 @@ export async function readCache(query) {
  * 写回缓存 —— 一篇文章一行。
  * @param {(sql: string) => Promise<any[]>} query - D1 查询函数
  * @param {string} key - locale/slug
- * @param {{updated_at: string, summaries: Record<string, string>}} entry
+ * @param {{updated_at: string, summaries: Record<string, {takeaway: string, reason: string}>}} entry
  */
 export async function writeCache(query, key, entry) {
   await query(
@@ -228,7 +285,7 @@ export async function writeCache(query, key, entry) {
  *
  * @param {object} post - { slug, locale, body, updated_at }
  * @param {object} opts - { token, accountId, cache, root }
- * @returns {Promise<Record<string,string>|null>} 段落键 → 摘要，一段都没成功返回 null
+ * @returns {Promise<Record<string,{takeaway: string, reason: string}>|null>} 段落键 → 要点+理由，一段都没成功返回 null
  */
 export async function summarizePost(post, { token, accountId, cache, query }) {
   const key = `${post.locale}/${post.slug}`
@@ -249,13 +306,13 @@ export async function summarizePost(post, { token, accountId, cache, query }) {
     for (const para of todo) {
       const messages = buildMessages(para.text, post.locale)
       const raw = await generateSummary(messages, { token, accountId })
-      const summary = raw ? cleanSummaryOutput(raw) : ''
+      const summary = raw ? parseSummary(raw) : null
 
       if (summary && validateSummary(summary, para.text, post.locale)) {
         summaries[para.key] = summary
       } else {
         // 一段失败只丢这一段 —— 整篇丢的话，模型抽一次风整篇文章就没摘要了
-        console.warn(`[ai] 段落摘要不合格，跳过：${summary.slice(0, 50)}`)
+        console.warn(`[ai] 段落要点不合格，跳过：${summary?.takeaway?.slice(0, 50) ?? ''}`)
       }
 
       // 避免触发速率限制

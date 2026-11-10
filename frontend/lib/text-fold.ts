@@ -1,8 +1,12 @@
 /**
- * 折叠阅读 —— 把正文按句子渐进折起（全文 / 每段两句 / 每段一句）。
+ * 折叠阅读 —— 把正文按句子渐进折起（全文 / 简述 / 要点）。
  * ---------------------------------------------------------
- * 规则折叠 + AI 摘要：「两句」模式取前 2 句（规则），「一句」模式用构建期生成的 AI 摘要。
- * 没有 AI 摘要时回退到规则（取第 1 句）。读者在控件里选层级，选择记进偏好；
+ * 三档的分工照 TextFold（chenxiachan/textfold）的分级来：
+ *   全文 —— 原样的段落（作者）
+ *   简述 —— 每段最像结论的那一句原句（作者，一字不改）
+ *   要点 —— 模型写的「要点 + 理由」（模型的话）
+ * **两种词不混**：混了简述与要点就分不出档，读者只会觉得两档一样。
+ * 没有 AI 要点时退回规则（露出论断句）。读者在控件里选层级，选择记进偏好；
  * 每段还能单独展开 / 收起。
  *
  * 切句靠 Intl.Segmenter（中文按 。！？，英文按 .!?），再过一遍缩写合并
@@ -70,6 +74,47 @@ export function sentenceEnds(text: string): number[] {
   return ends
 }
 
+/** 中文段落的「论断词」—— 结论句常在这些词附近 */
+const CLAIM_MARKERS = [
+  '认为', '主张', '应当', '应该', '需要', '必须', '旨在', '在于', '而是', '可见',
+  '因此', '所以', '证明', '表明', '说明', '标志', '意味着', '构成', '属于', '界定', '确立', '即：',
+]
+/** 条件句开头 —— 多半是铺垫，不是结论 */
+const COND_LEADS = ['而如果', '如果', '若', '倘若', '假如', '尽管', '虽然', '由于', '随着', '鉴于', '但是']
+/** 有中文才用中文启发式 */
+const CJK = /[\u4e00-\u9fff]/
+
+/**
+ * 这一段的结论句是第几句（0 起）。
+ *
+ * 中文段落常以引子或条件句开头，真正的结论在一两句之后 —— 照 TextFold 的打分：
+ * 含论断词加分，含冒号加分，以条件词开头减分，基础分随句序递减（越靠前越可能是结论）。
+ * 没有中文就取第一句。
+ *
+ * @param plain 段落纯文本
+ * @param ends 句末偏移（累计长度）
+ * @returns 结论句的序号
+ */
+export function pickClaimSentence(plain: string, ends: number[]): number {
+  if (!CJK.test(plain)) return 0
+  let best = 0
+  let bestScore = -99
+  const limit = Math.min(4, ends.length)
+  for (let i = 0; i < limit; i++) {
+    const text = plain.slice(i === 0 ? 0 : ends[i - 1], ends[i])
+    if (text.trim().length < 10) continue
+    let score = 0.4 - 0.6 * i
+    if (CLAIM_MARKERS.some((m) => text.includes(m))) score += 3
+    if (text.includes('：') || text.includes(':')) score += 1.5
+    if (COND_LEADS.some((m) => text.startsWith(m))) score -= 2.5
+    if (score > bestScore) {
+      best = i
+      bestScore = score
+    }
+  }
+  return best
+}
+
 /**
  * 句末偏移落在排除区（行内代码 / 悬停显示等）内部时，挪到该区末尾 ——
  * 不能把一句代码从中间劈开。正好在边界上就不动。
@@ -120,9 +165,13 @@ interface TextChunk {
 }
 
 interface FoldPara {
-  restA: HTMLSpanElement
-  restB: HTMLSpanElement | null
-  /** AI 摘要元素 —— 「一句」模式时显示这个，替代第一句 */
+  /** 结论句之前的铺垫 —— 折叠两档都藏起来 */
+  lead: HTMLSpanElement | null
+  /** 结论句 —— 简述档显示的就是它（作者原话） */
+  claim: HTMLSpanElement
+  /** 结论句之后的展开 —— 折叠两档都藏起来 */
+  rest: HTMLSpanElement | null
+  /** AI 写的要点 + 理由 —— 要点档显示的是它（模型的话） */
   summaryEl: HTMLSpanElement | null
   toggle: HTMLButtonElement
   expanded: boolean
@@ -167,20 +216,26 @@ export function initTextFold(
   // AI 摘要 —— 按文章 key 查，没有就用规则回退
   const summaries = options.articleKey ? articleSummaries[options.articleKey] : null
 
+  /** 展开状态：作者的原文全露出来 */
+  function showAll(fp: FoldPara): void {
+    if (fp.lead) fp.lead.hidden = false
+    fp.claim.hidden = false
+    if (fp.rest) fp.rest.hidden = false
+  }
+
   function applyLevel(level: FoldLevel): void {
     for (const fp of paras) {
-      const { restA, restB, summaryEl, toggle } = fp
+      const { lead, claim, rest, summaryEl, toggle } = fp
       if (level === 'full') {
-        restA.hidden = false
-        if (restB) restB.hidden = false
+        showAll(fp)
         if (summaryEl) summaryEl.hidden = true
         toggle.hidden = true
         fp.expanded = false
         continue
       }
       if (fp.expanded) {
-        restA.hidden = false
-        if (restB) restB.hidden = false
+        // 展开的这一段：作者的原文全露出来，模型的话让位
+        showAll(fp)
         if (summaryEl) summaryEl.hidden = true
         toggle.hidden = false
         toggle.setAttribute('aria-expanded', 'true')
@@ -189,28 +244,20 @@ export function initTextFold(
       }
       toggle.setAttribute('aria-expanded', 'false')
       toggle.setAttribute('aria-label', labels.expand)
-      // 「两句」和「一句」都用 AI 摘要（如果有）；没有就回退到规则切分
-      if (summaryEl) {
-        // 有 AI 摘要：两句 / 一句都显示摘要，隐藏原文
-        restA.hidden = true
-        if (restB) restB.hidden = true
+      if (level === 'key' && summaryEl) {
+        // 要点档：只留模型的话，作者的原句全藏起来
+        if (lead) lead.hidden = true
+        claim.hidden = true
+        if (rest) rest.hidden = true
         summaryEl.hidden = false
-        toggle.hidden = false
-      } else if (level === 'one') {
-        // 无摘要 + 一句模式：隐藏全部，只留展开按钮
-        restA.hidden = true
-        if (restB) restB.hidden = true
-        toggle.hidden = false
       } else {
-        // 无摘要 + 两句模式：第二段露出来，第三段起收起
-        restA.hidden = false
-        if (restB) {
-          restB.hidden = true
-          toggle.hidden = false
-        } else {
-          toggle.hidden = true
-        }
+        // 简述档（要点档没有模型的话时也退回这一档）：只留论断那一句
+        if (lead) lead.hidden = true
+        claim.hidden = false
+        if (rest) rest.hidden = true
+        if (summaryEl) summaryEl.hidden = true
       }
+      toggle.hidden = false
     }
   }
 
@@ -254,35 +301,68 @@ export function initTextFold(
     const ends = sentenceEnds(plain)
     if (ends.length < 2) continue
     const total = plain.length
-    const cut1 = snapBoundary(ends[0], excludedRanges)
-    let cut2: number | null = ends.length >= 3 ? snapBoundary(ends[1], excludedRanges) : null
-    if (cut1 <= 0 || cut1 >= total) continue
-    if (cut2 !== null && (cut2 <= cut1 || cut2 >= total)) cut2 = null
 
-    const loc1 = locate(chunks, cut1)
-    if (!loc1) continue
-    const loc2 = cut2 !== null ? locate(chunks, cut2) : null
+    // 结论句 —— 简述档留的就是它（作者原话，一字不改）
+    const claimIdx = pickClaimSentence(plain, ends)
+    const claimStart = claimIdx === 0 ? 0 : snapBoundary(ends[claimIdx - 1], excludedRanges)
+    const claimEnd = Math.min(snapBoundary(ends[claimIdx], excludedRanges), total)
+    if (claimStart >= claimEnd) continue
+    const hasLead = claimStart > 0
+    const hasRest = claimEnd < total
+    if (!hasLead && !hasRest) continue
 
-    // 先切靠后的第二刀，再切第一刀 —— 第一刀的文本节点不会被第二刀动到
-    let restB: HTMLSpanElement | null = null
-    if (loc2) {
+    // 锚点：从后往前插 —— 后面的切口先动，前面的偏移才还准
+    let anchorEnd: HTMLElement | null = null
+    if (hasRest) {
+      const loc = locate(chunks, claimEnd)
+      if (!loc) continue
       const range = document.createRange()
-      range.setStart(loc2.node, loc2.offset)
-      range.setEndAfter(p.lastChild as Node)
-      restB = document.createElement('span')
-      restB.className = CLASS.textFoldRest
-      restB.appendChild(range.extractContents())
-      p.appendChild(restB)
+      range.setStart(loc.node, loc.offset)
+      range.setEnd(loc.node, loc.offset)
+      anchorEnd = document.createElement('span')
+      range.insertNode(anchorEnd)
     }
-    const range = document.createRange()
-    range.setStart(loc1.node, loc1.offset)
-    if (restB) range.setEndBefore(restB)
-    else range.setEndAfter(p.lastChild as Node)
-    const restA = document.createElement('span')
-    restA.className = CLASS.textFoldRest
-    restA.appendChild(range.extractContents())
-    if (restB) p.insertBefore(restA, restB)
-    else p.appendChild(restA)
+    const locStart = locate(chunks, claimStart)
+    if (!locStart) continue
+    const startRange = document.createRange()
+    startRange.setStart(locStart.node, locStart.offset)
+    startRange.setEnd(locStart.node, locStart.offset)
+    const anchorStart = document.createElement('span')
+    startRange.insertNode(anchorStart)
+
+    // 尾巴（结论句之后）—— 先切
+    let rest: HTMLSpanElement | null = null
+    if (anchorEnd) {
+      const range = document.createRange()
+      range.setStartAfter(anchorEnd)
+      range.setEndAfter(p.lastChild as Node)
+      rest = document.createElement('span')
+      rest.className = CLASS.textFoldRest
+      rest.appendChild(range.extractContents())
+      anchorEnd.replaceWith(rest)
+    }
+
+    // 结论句
+    const claimRange = document.createRange()
+    claimRange.setStartAfter(anchorStart)
+    if (rest) claimRange.setEndBefore(rest)
+    else claimRange.setEndAfter(p.lastChild as Node)
+    const claim = document.createElement('span')
+    claim.className = CLASS.textFoldClaim
+    claim.appendChild(claimRange.extractContents())
+    anchorStart.replaceWith(claim)
+
+    // 铺垫（结论句之前）
+    let lead: HTMLSpanElement | null = null
+    if (hasLead) {
+      const range = document.createRange()
+      range.setStart(p, 0)
+      range.setEndBefore(claim)
+      lead = document.createElement('span')
+      lead.className = CLASS.textFoldRest
+      lead.appendChild(range.extractContents())
+      p.insertBefore(lead, claim)
+    }
 
     // 切口正好落在行内元素起点时，extractContents 会在头部留一个空壳（<a></a>）——
     // 空链接看不见却 tab 得进去，清掉。只清没有 id、无元素子节点且无文字的空行内壳。
@@ -290,17 +370,23 @@ export function initTextFold(
       if (!el.id && el.children.length === 0 && el.textContent === '') el.remove()
     }
 
-    // AI 摘要 —— 「一句」模式时显示这个，替代机械切出来的第一句
+    // AI 的要点 + 理由 —— 要点档显示的是它（模型的话）
     // 按段落文本取，不按下标 —— 构建期与运行时的段落集合并不完全一样
     let summaryEl: HTMLSpanElement | null = null
-    const summary = summaries?.[foldKey(plain)]
-    if (summary) {
+    const entry = summaries?.[foldKey(plain)]
+    if (entry) {
       summaryEl = document.createElement('span')
-      summaryEl.className = 'text-fold-summary'
-      summaryEl.textContent = summary
+      summaryEl.className = CLASS.textFoldSummary
+      summaryEl.textContent = entry.takeaway
+      if (entry.reason) {
+        const reasonEl = document.createElement('span')
+        reasonEl.className = CLASS.textFoldReason
+        reasonEl.textContent = entry.reason
+        summaryEl.appendChild(reasonEl)
+      }
       summaryEl.hidden = true
-      // 插在 restA 之前 —— 展开时摘要隐藏，原文露出来
-      p.insertBefore(summaryEl, restA)
+      // 插在结论句之后 —— 展开时摘要隐藏，原文露出来
+      p.insertBefore(summaryEl, claim.nextSibling)
     }
 
     const toggle = document.createElement('button')
@@ -312,7 +398,7 @@ export function initTextFold(
     p.appendChild(toggle)
     p.setAttribute(ATTR.textFold, '')
 
-    const fp: FoldPara = { restA, restB, summaryEl, toggle, expanded: false }
+    const fp: FoldPara = { lead, claim, rest, summaryEl, toggle, expanded: false }
     toggle.addEventListener('click', () => {
       fp.expanded = !fp.expanded
       applyLevel(current)
@@ -329,7 +415,7 @@ export function initTextFold(
   for (const btn of buttons) {
     btn.addEventListener('click', () => {
       const level = btn.getAttribute(ATTR.textFoldLevel)
-      if (level === 'full' || level === 'two' || level === 'one') setLevel(level)
+      if (level === 'full' || level === 'brief' || level === 'key') setLevel(level)
     })
   }
 

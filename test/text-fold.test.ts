@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { segmentSentences, sentenceEnds, snapBoundary } from '../frontend/lib/text-fold.ts'
+import {
+  pickClaimSentence,
+  segmentSentences,
+  sentenceEnds,
+  snapBoundary,
+} from '../frontend/lib/text-fold.ts'
 
 test('中文按 。！？ 切句', () => {
   assert.deepEqual(segmentSentences('这是第一句。这是第二句！第三句呢？最后一句。'), [
@@ -72,6 +77,26 @@ test('句末偏移是累计长度，纯空白不算一句', () => {
   assert.deepEqual(sentenceEnds('这是第一句。这是第二句！第三句呢？最后一句。'), [6, 12, 17, 22])
   assert.deepEqual(sentenceEnds('Hello world. This is a test. Another sentence here.'), [13, 29, 51])
   assert.deepEqual(sentenceEnds(''), [])
+})
+
+test('论断句：英文取第一句', () => {
+  const text = 'The cache lives in D1. Git is rebuilt from a clean checkout.'
+  assert.equal(pickClaimSentence(text, sentenceEnds(text)), 0)
+})
+
+test('论断句：中文的结论常不在第一句', () => {
+  const text = '他点点头。可心里清楚，这事真办成，没那么简单。'
+  assert.equal(pickClaimSentence(text, sentenceEnds(text)), 1)
+})
+
+test('论断句：带论断词的那句优先', () => {
+  const text = '摘要缓存应该放在 D1 里。因为每次构建都从干净检出开始。'
+  assert.equal(pickClaimSentence(text, sentenceEnds(text)), 0)
+})
+
+test('论断句：条件句开头被扣分', () => {
+  const text = '如果我们把缓存放进 git，每次部署都会重跑模型。结论是缓存必须放 D1。'
+  assert.equal(pickClaimSentence(text, sentenceEnds(text)), 1)
 })
 
 test('snapBoundary：落在排除区内部挪到区末，边界上不动', () => {

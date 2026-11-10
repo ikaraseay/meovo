@@ -50,3 +50,6 @@ frontend/content/generated/**/*.mdx
 frontend/i18n/overrides.ts
 frontend/data/projects.ts
 frontend/data/article-summaries.ts
+
+# 本地 Cloudflare 构建的 miniflare 注册目录（CLOUDFLARE_DEV_REGISTRY_PATH 指着它）
+.cf-dev/
