@@ -91,16 +91,33 @@
 .img-zoom {
   position: fixed;
   inset: 0;
-  z-index: var(--ui-z-popup);
-  display: grid;
-  place-items: center;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
   background: rgb(0 0 0 / 0.72);
   backdrop-filter: blur(6px);
   cursor: zoom-out;
 }
 
-.img-zoom[hidden] {
-  display: none;
+/* 只在打开时铺满 —— 无条件写 display 会把关闭状态顶出来 */
+.img-zoom[open] {
+  display: grid;
+  place-items: center;
+}
+
+/* 背景层别跟着滚，也别再叠一层暗色（覆盖层自己已经压过了） */
+.img-zoom::backdrop {
+  background: transparent;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+dialog.img-zoom:modal {
+  overscroll-behavior: contain;
 }
 
 .img-zoom__img {

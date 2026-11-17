@@ -75,7 +75,7 @@ const faviconUrl = link.avatar || (domain ? `https://www.google.com/s2/favicons?
     overflow: hidden;
   }
 
-  :host-context(.dark) .link-avatar,
+  /* Astro 没有 Shadow DOM —— :host-context() 在这儿永远不匹配，别再写回去 */
   html.dark .link-avatar {
     background: hsl(var(--avatar-hue) 40% 20%);
   }
@@ -97,7 +97,6 @@ const faviconUrl = link.avatar || (domain ? `https://www.google.com/s2/favicons?
     color: hsl(var(--avatar-hue) 70% 35%);
   }
 
-  :host-context(.dark) .link-avatar__fallback,
   html.dark .link-avatar__fallback {
     color: hsl(var(--avatar-hue) 60% 75%);
   }

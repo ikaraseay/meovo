@@ -4,6 +4,8 @@
  * 一个覆盖层：原图按自然尺寸摆进去，滚轮缩放（对着指针那点放大）、
  * 按住拖动平移、双击还原、Esc 或点背景关闭。
  *
+ * 覆盖层是原生 <dialog>：顶层、Esc、焦点圈禁、背景 inert 由浏览器兜底。
+ *
  * 纯 DOM，没依赖。夹取边界是纯函数（test/image-zoom.test.ts 守着）。
  */
 import { CLASS } from './dom-contract.ts'
@@ -37,6 +39,8 @@ export function clampPan(
 export interface ImageZoomLabels {
   /** 关闭按钮的名字 */
   close: string
+  /** 覆盖层本身的名字 —— 原生 dialog 需要可访问名 */
+  label: string
 }
 
 /**
@@ -46,11 +50,11 @@ export interface ImageZoomLabels {
 export function initImageZoom(images: HTMLImageElement[], labels: ImageZoomLabels): void {
   if (images.length === 0) return
 
-  const overlay = document.createElement('div')
+  // 原生 <dialog> —— 顶层、Esc、焦点圈禁、背景 inert 都由浏览器兜底
+  const overlay = document.createElement('dialog')
   overlay.className = CLASS.imgZoom
-  overlay.hidden = true
-  overlay.setAttribute('role', 'dialog')
-  overlay.setAttribute('aria-modal', 'true')
+  overlay.setAttribute('closedby', 'any')
+  overlay.setAttribute('aria-label', labels.label)
 
   const picture = document.createElement('img')
   picture.className = CLASS.imgZoomImage
@@ -70,7 +74,6 @@ export function initImageZoom(images: HTMLImageElement[], labels: ImageZoomLabel
   let scale = 1
   let x = 0
   let y = 0
-  let lastFocus: HTMLElement | null = null
 
   /** 图在屏幕上的自然尺寸（未缩放） */
   function baseSize(): Size {
@@ -94,19 +97,20 @@ export function initImageZoom(images: HTMLImageElement[], labels: ImageZoomLabel
   }
 
   function open(source: HTMLImageElement) {
-    lastFocus = document.activeElement as HTMLElement | null
     picture.src = source.currentSrc || source.src
     picture.alt = source.alt
-    overlay.hidden = false
+    overlay.showModal()
     reset()
-    closeButton.focus()
   }
 
   function close() {
-    overlay.hidden = true
-    picture.removeAttribute('src')
-    lastFocus?.focus()
+    overlay.close()
   }
+
+  // 关掉后把图源摘掉 —— 别让大图一直占着内存
+  overlay.addEventListener('close', () => {
+    picture.removeAttribute('src')
+  })
 
   for (const image of images) {
     image.classList.add(CLASS.imgZoomable)
@@ -126,18 +130,18 @@ export function initImageZoom(images: HTMLImageElement[], labels: ImageZoomLabel
 
   closeButton.addEventListener('click', close)
 
-  // 点背景关闭 —— 点在图上不算
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) close()
-  })
-
-  document.addEventListener('keydown', (event) => {
-    if (overlay.hidden) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      close()
-    }
-  })
+  // Safari 还不认 closedby —— 自己补「点空白处关闭」。
+  // 按下和松手都得落在空白处：拖完图片松手别把窗口关了。
+  if (!('closedBy' in HTMLDialogElement.prototype)) {
+    let pressedOnBackdrop = false
+    overlay.addEventListener('pointerdown', (event) => {
+      pressedOnBackdrop = event.target === overlay
+    })
+    overlay.addEventListener('pointerup', (event) => {
+      if (pressedOnBackdrop && event.target === overlay) close()
+      pressedOnBackdrop = false
+    })
+  }
 
   // 滚轮缩放 —— 对着指针那点放大
   overlay.addEventListener(
@@ -204,6 +208,6 @@ export function initImageZoom(images: HTMLImageElement[], labels: ImageZoomLabel
 
   // 视口变了 —— 图得重新摆
   window.addEventListener('resize', () => {
-    if (!overlay.hidden) apply()
+    if (overlay.open) apply()
   })
 }

@@ -16,20 +16,17 @@ const TIMEOUT_MS = 5000
 
 /** 用 no-cors 探一次 —— 跨域站也能拿到「到了没有」的信号 */
 async function probe(url: string): Promise<boolean> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     await fetch(url, {
       method: 'HEAD',
       mode: 'no-cors',
-      signal: controller.signal,
+      // 超时由 AbortSignal.timeout 兜住 —— 断开时抛 TimeoutError，catch 里算不可达
+      signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     })
     return true
   } catch {
     return false
-  } finally {
-    clearTimeout(timer)
   }
 }
 

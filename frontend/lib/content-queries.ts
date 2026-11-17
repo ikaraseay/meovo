@@ -51,19 +51,12 @@ export async function getVisiblePosts(): Promise<Post[]> {
 }
 
 export function sortByDateDesc(posts: Post[]): Post[] {
-  return [...posts].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
+  return posts.toSorted((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime())
 }
 
 /** 按翻译键分组：key -> 各语言版本 */
 export function groupByTranslation(posts: Post[]): Map<string, Post[]> {
-  const groups = new Map<string, Post[]>()
-  for (const post of posts) {
-    const key = getTranslationKey(post)
-    const list = groups.get(key)
-    if (list) list.push(post)
-    else groups.set(key, [post])
-  }
-  return groups
+  return Map.groupBy(posts, getTranslationKey)
 }
 
 /** 全部标签，去重排序 */
@@ -195,7 +188,7 @@ export function getSeriesEntries(items: PostItem[], locale: Locale): SeriesEntry
  * order 相同（或都没写）时按发布时间倒序。
  */
 export function sortSeriesItems(items: PostItem[]): PostItem[] {
-  return [...items].sort((a, b) => {
+  return items.toSorted((a, b) => {
     const oa = a.post.data.series?.order
     const ob = b.post.data.series?.order
     if (oa !== ob) {

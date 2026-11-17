@@ -94,7 +94,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   function raise(el: HTMLElement) {
     zCounter += 1
     if (zCounter >= Z_MAX) {
-      const ordered = [...entries].sort(
+      const ordered = entries.toSorted(
         (a, b) => parseInt(a.el.style.zIndex || '0', 10) - parseInt(b.el.style.zIndex || '0', 10),
       )
       ordered.forEach((entry, i) => {
@@ -652,8 +652,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       layoutMobile()
     }
   }
-  if (typeof mq.addEventListener === 'function') mq.addEventListener('change', mqListener)
-  else mq.addListener(mqListener)
+  mq.addEventListener('change', mqListener)
 
   // 窗口尺寸变了：百分比存档按新宽高等比还原（防抖 + 布局期间关过渡）
   window.addEventListener('resize', () => scheduleRelayout())

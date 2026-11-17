@@ -116,6 +116,7 @@ export const ui = {
   'post.license.note.allRights': { zh: '保留所有权利，转载需事先授权。', en: 'All rights reserved. Reposting requires permission.' },
   'post.license.raw': { zh: '查看 Markdown 原文', en: 'Markdown source' },
   'post.image.close': { zh: '关闭图片', en: 'Close image' },
+  'post.image.label': { zh: '查看大图', en: 'View larger image' },
   'post.fold.label': { zh: '折叠阅读', en: 'Fold reading' },
   'post.fold.full': { zh: '全文', en: 'Full' },
   'post.fold.brief': { zh: '简述', en: 'Brief' },

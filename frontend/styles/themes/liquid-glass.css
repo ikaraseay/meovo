@@ -13,6 +13,9 @@
    ========================================================= */
 
 html[data-theme='liquid-glass'] {
+  /* 浏览器原生 UI（滚动条、表单控件、画布）跟着站点主题走 */
+  color-scheme: light;
+
   /* ==================== 页面与背景 ==================== */
   --ui-bg: #efe8dd;
   --ui-surface: rgba(255, 255, 255, 0.66);
@@ -219,6 +222,8 @@ html[data-theme='liquid-glass'] {
 
 /* ==================== 深色模式 ==================== */
 html[data-theme='liquid-glass'].dark {
+  color-scheme: dark;
+
   --ui-bg: #0d0c12;
   --ui-surface: rgba(255, 255, 255, 0.06);
   --ui-surface-raised: rgba(255, 255, 255, 0.1);

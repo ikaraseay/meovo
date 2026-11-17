@@ -39,6 +39,12 @@
     · `frontend/lib/squircle.ts` 只管 `clip-path: path()`，**不碰阴影**（别再往里加 drop-shadow）
   - **阴影的颜色跟主角走**：主题文件里所有阴影用深海军蓝紫 `rgba(47, 35, 81, …)`（avatar 主色 #2f2351），
     **别用暖棕** —— 暖棕在奶油底上显脏，跟主角的冷调对不上
+  - **`color-scheme` 跟站点主题走，不跟系统走** —— 主题文件里
+    `html[data-theme='liquid-glass']` 写 `color-scheme: light`、`.dark` 那组写 `dark`，
+    浏览器原生 UI（滚动条、表单控件、画布）据此上色。
+    别在 `:root` 上写 `color-scheme: light dark` —— 那会让原生 UI 永远跟系统，
+    用户手动选过深色就穿帮（站点主题才是事实来源）；
+    `<head>` 里那条 `<meta name="color-scheme" content="light dark">` 只管首屏别闪白
   - **部件 tint**：组件（`GlassWidget.astro`）只内联**色相** `--ui-widget-hue`，
     浅色 / 深色两套配方在 `tokens.css` 的 `.ui-widget` 规则里（深色那组写在
     `html[data-theme='liquid-glass'].dark` 下）—— 组件里不写死 S/L/A。
@@ -112,6 +118,12 @@
   滚轮对着指针那点缩放（1~4 倍）、按住拖动平移、双击还原、Esc / 点背景关闭。
   夹取边界是纯函数 `clampPan()`（`test/image-zoom.test.ts` 守着）；
   覆盖层的 class 名走 `dom-contract.ts` 的 `CLASS`
+  - **放大层是原生 `<dialog>`** —— 顶层、Esc、焦点圈禁、背景 inert 都交给浏览器，
+    别再手搓 `role="dialog"` / `aria-modal` / Esc 监听 / 焦点归还。
+    「点空白处关闭」用 `closedby="any"`；Safari 不认这个属性，靠
+    `HTMLDialogElement.prototype.closedBy` 特征探测后自己补 pointerdown/up
+    （按下和松手都得落在空白处 —— 拖完图松手别把窗口关了）。
+    样式上 dialog 的 UA 默认值要压掉，`display` 只能写在 `[open]` 上
 - **折叠阅读（TextFold 式）**：`frontend/lib/text-fold.ts` —— 把正文按句子渐进折起，
   三档 **全文 / 简述 / 要点**，每段还能单独展开 / 收起。分档照 TextFold 的规矩：
   **两种词不混** —— 简述是作者的原话（每段最像结论的那一句），要点是模型的话（要点 + 理由）；

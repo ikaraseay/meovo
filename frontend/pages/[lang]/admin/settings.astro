@@ -441,7 +441,6 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   window.addEventListener('beforeunload', (event) => {
     if (changedCount() === 0) return
     event.preventDefault()
-    event.returnValue = ''
   })
 
   void load()

@@ -111,6 +111,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       data-copy-label={t(locale, 'post.copyCode')}
       data-copied-label={t(locale, 'post.copied')}
       data-image-close={t(locale, 'post.image.close')}
+      data-image-label={t(locale, 'post.image.label')}
       data-article-key={`${getPostLocale(post)}/${getPostSlug(post)}`}
     >
       <slot />
@@ -293,6 +294,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
 
   initImageZoom([...document.querySelectorAll<HTMLImageElement>('.prose img')], {
     close: prose?.dataset.imageClose ?? '',
+    label: prose?.dataset.imageLabel ?? '',
   })
 
   /* ---------- 折叠阅读：全文 / 简述（作者原句）/ 要点（模型的话） ---------- */
