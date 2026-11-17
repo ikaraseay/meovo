@@ -58,6 +58,25 @@ test('散开：每张卡片都有位置，且互不重叠', () => {
   }
 })
 
+test('散开：比一列宽的卡横跨几列，不压到旁边的卡', () => {
+  const cards: DeskCard[] = [
+    { id: 'hero', width: 900, height: 300 },
+    { id: 'a', width: 420, height: 200 },
+    { id: 'b', width: 420, height: 200 },
+  ]
+  const { positions } = scatterLayout(cards, { deskWidth: 1872, viewportHeight: 900, topOffset: 100 })
+  const hero = positions.get('hero')!
+  const a = positions.get('a')!
+  const b = positions.get('b')!
+
+  // 大卡横跨两列 —— 右缘落在第三列之前
+  assert.ok(hero.x + hero.width <= 1360, `大卡太宽：${hero.x}+${hero.width}`)
+  // 后面那张卡被挤到右边那列，不再全挤在左边
+  assert.ok(a.x > hero.x + hero.width, `后卡没被挤开：a.x=${a.x}`)
+  // 两张后卡上下不重叠（同一列，高度 200）
+  assert.ok(a.y + 200 <= b.y || b.y + 200 <= a.y, `后卡重叠：a.y=${a.y} b.y=${b.y}`)
+})
+
 test('散开：固定卡片保留槽位 —— 固定 / 拖走一张卡不挪动别人', () => {
   const cards: DeskCard[] = [
     { id: 'a', width: 300, height: 100 },

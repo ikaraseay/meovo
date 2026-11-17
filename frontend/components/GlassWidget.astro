@@ -125,6 +125,13 @@ const hue = hashHue(id)
     width: 720px;
   }
 
+  /* 宽屏给 xl 一点余量 —— 终端卡横排时画跟文字都别被挤 */
+  @media (min-width: 1440px) {
+    .ui-widget--xl {
+      width: 900px;
+    }
+  }
+
   /* 给了最小高度：卡片成一块有留白的版面 —— 抓手留在顶部，正文垂直居中 */
   .ui-widget--tall {
     display: flex;

@@ -66,7 +66,15 @@ export function scatterLayout(
 ): ScatterResult {
   const { deskWidth, viewportHeight, topOffset } = opts
   const list = cards
-  const cols = clamp(Math.round((deskWidth + DESK_GAP_X) / COL_MIN_WIDTH), 1, 3)
+  // 列宽按「典型卡」的宽度算 —— 不然卡片会压到旁边那张；
+  // 特别宽的卡（欢迎卡那种）自己横跨几列，不参与定列宽
+  const plain = list.filter((card) => !card.full)
+  const widths = plain.map((card) => card.width).sort((a, b) => a - b)
+  const typical = widths.length ? widths[Math.floor(widths.length / 2)] : COL_MIN_WIDTH
+  const minColWidth = Math.max(COL_MIN_WIDTH, typical)
+  // 列数：桌面放得下几列，最多几列；卡不够多就少开几列 —— 免得全挤在左边
+  const colsByWidth = clamp(Math.floor((deskWidth + DESK_GAP_X) / (minColWidth + DESK_GAP_X)), 1, 3)
+  const cols = clamp(Math.min(colsByWidth, Math.max(plain.length, 1)), 1, 3)
   const colW = (deskWidth - DESK_GAP_X * (cols - 1)) / cols
   const colH = new Array<number>(cols).fill(topOffset)
   for (let i = 1; i < cols; i++) colH[i] = topOffset + COL_STAGGER
@@ -85,15 +93,19 @@ export function scatterLayout(
     }
     let c = 0
     for (let i = 1; i < cols; i++) if (colH[i] < colH[c]) c = i
-    const x = Math.max(DESK_PAD, c * (colW + DESK_GAP_X) + (colW - card.width) / 2)
-    const y = colH[c]
+    // 比一列宽的卡横跨几列 —— 不然它会压到旁边的卡上
+    const span = Math.min(cols, Math.max(1, Math.ceil((card.width + DESK_GAP_X) / (colW + DESK_GAP_X))))
+    if (c + span > cols) c = cols - span
+    const y = Math.max(...colH.slice(c, c + span))
+    const spanW = span * colW + (span - 1) * DESK_GAP_X
+    const x = Math.max(DESK_PAD, c * (colW + DESK_GAP_X) + (spanW - card.width) / 2)
     positions.set(card.id, {
       x,
       y,
       width: card.width,
       tilt: (index % 2 === 0 ? 1 : -1) * (0.6 + (index % 3) * 0.35),
     })
-    colH[c] = y + card.height + DESK_GAP_Y
+    for (let i = c; i < c + span; i++) colH[i] = y + card.height + DESK_GAP_Y
     scatterH = Math.max(scatterH, y + card.height)
   })
 

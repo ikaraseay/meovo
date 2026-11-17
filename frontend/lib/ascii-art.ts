@@ -1,21 +1,21 @@
 /**
- * ASCII 画 —— 头像那张字符猫。
+ * ASCII 画 —— 头像那张字符画（角色侧脸）。
  * ---------------------------------------------------------
  * 源文件 frontend/assets/ascii-art.txt（构建期用 Vite 的 ?raw 内联）。
- * 颜色按字符分：@ 描边 / # 深橙 / - 橙身 / . 白毛 —— 跟像素头像对得上。
+ * 颜色按字符分：@ 发色 / ~ 紫挑染 / O 耳橙 / B 蓝瞳 /
+ * . 肤色 / : 浅毛 —— 跟头像那张画对得上（画里只有这 6 种字符）。
  */
 
 import raw from '../assets/ascii-art.txt?raw'
 
 /** 字符 → 颜色 token（--ui-art-*，浅色深色各一套） */
 const ART_COLOR: Record<string, string> = {
-  '@': '--ui-art-outline',
-  '=': '--ui-art-outline-soft',
-  '#': '--ui-art-shade',
-  '*': '--ui-art-shade',
-  '-': '--ui-art-body',
-  '.': '--ui-art-light',
-  ':': '--ui-art-light-soft',
+  '@': '--ui-art-hair',
+  '~': '--ui-art-violet',
+  'O': '--ui-art-orange',
+  'B': '--ui-art-blue',
+  '.': '--ui-art-skin',
+  ':': '--ui-art-light',
 }
 
 /** 画本身：去掉空行，缩进原样留着 */
@@ -43,13 +43,14 @@ export function colorizeArt(text: string): string {
       for (const char of line) {
         const next = ART_COLOR[char] ?? ''
         if (next !== token) {
-          if (run) html += `<span style="color:var(${token})">${escapeHtml(run)}</span>`
+          // 没有对应颜色的（空格等）直接输出文本，别包成 color:var() —— 那是无效值
+          if (run) html += token ? `<span style="color:var(${token})">${escapeHtml(run)}</span>` : escapeHtml(run)
           run = ''
           token = next
         }
         run += char
       }
-      if (run) html += `<span style="color:var(${token})">${escapeHtml(run)}</span>`
+      if (run) html += token ? `<span style="color:var(${token})">${escapeHtml(run)}</span>` : escapeHtml(run)
       return html
     })
     .join('\n')

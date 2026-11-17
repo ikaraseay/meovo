@@ -30,6 +30,15 @@
   - `frontend/styles/prose.css` —— 正文排版 / 代码块 / 目录样式（由 `global.css` 引入）
   - `frontend/styles/motion.css` —— 动效原语与归零（由 `global.css` 引入）
   - 组件的 scoped 样式里**不要**再写 `background` / `border-radius` / `box-shadow`，会盖掉主题
+  - **玻璃卡没有外阴影，只有 inset 内高光** —— 这是踩坑换来的结论，别改回去：
+    · Safari 的 `clip-path` **裁不掉 `box-shadow`** → 卡片是 squircle、影子却是方角，边缘对不上
+    · 换成 `filter: drop-shadow()` 也救不回来 —— 半透明玻璃会把影子浓度折掉近一半，
+      糊成一条脏边；而且 drop-shadow 只有一个来源，两个引擎表现还不一致
+    · 所以 `--ui-card-shadow` / `--ui-nav-shadow` 这些 token **只写 inset 层**，
+      深度交给背景透色 + 描边 + 内高光（`test/squircle.test.ts` 守着这条）
+    · `frontend/lib/squircle.ts` 只管 `clip-path: path()`，**不碰阴影**（别再往里加 drop-shadow）
+  - **阴影的颜色跟主角走**：主题文件里所有阴影用深海军蓝紫 `rgba(47, 35, 81, …)`（avatar 主色 #2f2351），
+    **别用暖棕** —— 暖棕在奶油底上显脏，跟主角的冷调对不上
   - **部件 tint**：组件（`GlassWidget.astro`）只内联**色相** `--ui-widget-hue`，
     浅色 / 深色两套配方在 `tokens.css` 的 `.ui-widget` 规则里（深色那组写在
     `html[data-theme='liquid-glass'].dark` 下）—— 组件里不写死 S/L/A。
@@ -185,7 +194,8 @@
   用 Vite 的 `?raw` 导入在构建期内联（声明在 `frontend/assets/raw.d.ts`）。
   流体光标仍挂在 `.hero-sub`（小字区）
   - 头像是**字符画**：`frontend/assets/ascii-art.txt` 用 Vite 的 `?raw` 在构建期内联，
-    再按字符上色（`@` 描边 / `#` 深橙 / `-` 橙身 / `.` 白毛）—— 颜色是 `--ui-art-*` 一套 token，
+    再按字符上色（`@` 发色 / `~` 紫挑染 / `O` 耳橙 / `B` 蓝瞳 / `.` 肤色 /
+    `:` 浅毛）—— 颜色是 `--ui-art-*` 一套 token，
     浅色深色各一套；上色后的 HTML 走 `set:html`，颜色只能内联在 span 上
   - 终端面板的样式在 `frontend/styles/terminal.css`（`.term*` 一族）—— 首页欢迎卡与
     `frontend/pages/404.astro` 共用，别再各写一份
@@ -266,6 +276,10 @@
     不能是上一趟布局写进 inline width 的值（那个值一旦量错就自我固化）
   - **默认落位是基线** —— 散开布局按**全量**卡片排（固定卡也占槽位）：
     固定一张、拖走一张，都不挪动别人的落位与倾斜
+  - **散开布局的列数按卡片数定** —— 列数 = min(桌面放得下的列数, 卡片数)，
+    卡少就少开几列，免得全挤在左边；列宽按「典型卡」（中位数宽度）算，
+    **比一列宽的卡横跨几列**（`span`）—— 欢迎卡那种宽卡自己占两列，
+    不跟旁边的卡压在一起
   - **卡片不许出屏幕** —— 边缘与屏幕边缘至少留 **1vw / 1vh**：
     `clampToViewport` 一处算，拖拽、固定、默认固定全走它
   - **拖拽时卡片水平，放下后复原倾斜** —— 倾斜记在 `baseTilt`（默认落位的倾斜）：

@@ -35,7 +35,7 @@ const newest = items[0]
 
 <BaseLayout locale={locale} wide>
   <div class="desk" data-desk>
-    <GlassWidget id="hero" width="lg" locale={locale} noLimit>
+    <GlassWidget id="hero" width="xl" locale={locale} noLimit>
       <!-- 终端面板：字符画头像 + 命令行文案 -->
       <div class="term hero-term ui-gradient-border">
         <div class="term__bar">
@@ -115,14 +115,7 @@ const newest = items[0]
 </BaseLayout>
 
 <style>
-  /* 桌面：欢迎卡是正方形 —— 不铺满整行。窄屏放不下，让它按内容长 */
-  @media (min-width: 1024px) {
-    .hero-term {
-      aspect-ratio: 1;
-    }
-  }
-
-  /* 正方形里：画在上、命令行在下 —— 横排放不下中文标题 */
+  /* 桌面：画在左、命令行在右；窄屏退回上下（画在上） */
   .hero-body {
     gap: var(--ui-space-md);
     align-items: flex-start;
@@ -130,7 +123,14 @@ const newest = items[0]
 
   @media (min-width: 1024px) {
     .hero-body {
-      height: calc(100% - 2.5rem);
+      flex-direction: row;
+      align-items: center;
+      gap: var(--ui-space-lg);
+    }
+
+    .term__console {
+      flex: 1 1 20rem;
+      min-width: 0;
     }
   }
 
@@ -138,6 +138,13 @@ const newest = items[0]
     flex: none;
     display: flex;
     align-items: flex-start;
+  }
+
+  /* 桌面横排时画能占更多 —— 上限放宽一档 */
+  @media (min-width: 1024px) {
+    .hero-art .term__art {
+      font-size: min(0.75rem, 2.6cqw);
+    }
   }
 
   .hero-quote {

@@ -5,8 +5,10 @@
  * 普通 border-radius 是圆弧（曲率在切点突变），squircle 是超椭圆弧（曲率连续）。
  *
  * 做法：用 clip-path: path() 裁出 squircle 形状。
- * clip-path 会裁掉 border 和 box-shadow，所以：
- *   · 阴影靠 filter: drop-shadow() 补回来（它跟着 clip-path 形状走）
+ *
+ * ⚠️ 阴影不归这里管：外阴影在 Safari 下跟这张卡片对不上
+ * （clip-path 裁不掉 box-shadow，而 drop-shadow 又被半透明玻璃折成脏边），
+ * 所以玻璃卡一律**没有外阴影**，只有 inset 内高光 —— 见主题里的 --ui-card-shadow。
  *
  * 为什么用 JS 而不是 CSS：clip-path: path() 的坐标是绝对像素，
  * 元素尺寸变了（窗口缩放、内容撑高）得重算路径。
@@ -85,8 +87,6 @@ export function applySquircle(el: HTMLElement, radius?: number): void {
     if (!w || !h) {
       if (lastW || lastH) {
         el.style.clipPath = ''
-        el.style.boxShadow = ''
-        el.style.filter = ''
         lastW = 0
         lastH = 0
       }
@@ -97,14 +97,11 @@ export function applySquircle(el: HTMLElement, radius?: number): void {
     lastW = w
     lastH = h
 
-    const shadow = readShadow(el)
     if (sizeChanged) {
       const r = radius ?? readRadius(el)
       const path = squirclePath(w, h, r)
       el.style.clipPath = `path('${path}')`
-      el.style.boxShadow = 'none'
     }
-    el.style.filter = buildFilter(shadow)
   }
 
   update()
@@ -128,66 +125,8 @@ export function refreshSquircle(el: HTMLElement): void {
 /** 撤掉 squircle 效果 */
 export function removeSquircle(el: HTMLElement): void {
   el.style.clipPath = ''
-  el.style.filter = ''
   applied.delete(el)
   appliedList.delete(el)
-}
-
-/** 读元素的 box-shadow，转成 drop-shadow 参数（只处理外部阴影，inset 无法用 drop-shadow 模拟） */
-function readShadow(el: HTMLElement): Array<{ x: number; y: number; blur: number; color: string }> {
-  const raw = getComputedStyle(el).boxShadow
-  if (!raw || raw === 'none') {
-    // 默认阴影：柔和的下落阴影
-    return [{ x: 0, y: 4, blur: 12, color: 'rgba(0,0,0,0.08)' }]
-  }
-
-  const shadows: Array<{ x: number; y: number; blur: number; color: string }> = []
-  // 分割多个 shadow（逗号分隔，但 rgba 里也有逗号，所以要小心）
-  const parts = splitShadows(raw)
-  for (const part of parts) {
-    const trimmed = part.trim()
-    // 跳过 inset 阴影（drop-shadow 无法模拟）
-    if (trimmed.startsWith('inset')) continue
-    // 匹配: [color] x y blur [spread]
-    const m = trimmed.match(/^(rgba?\([^)]+\)|#[\da-fA-F]+|[\w]+)?\s*(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px/)
-    if (m) {
-      shadows.push({
-        x: parseFloat(m[2]),
-        y: parseFloat(m[3]),
-        blur: parseFloat(m[4]),
-        color: m[1] ?? 'rgba(0,0,0,0.1)',
-      })
-    }
-  }
-  // 多个阴影叠加会过重，只保留主阴影（第一个非零的）
-  if (shadows.length > 1) {
-    return [shadows[0]]
-  }
-  return shadows.length ? shadows : [{ x: 0, y: 4, blur: 12, color: 'rgba(0,0,0,0.08)' }]
-}
-
-/** 分割 box-shadow 字符串（处理 rgba 内的逗号） */
-function splitShadows(raw: string): string[] {
-  const parts: string[] = []
-  let current = ''
-  let parenDepth = 0
-  for (const char of raw) {
-    if (char === '(') parenDepth++
-    else if (char === ')') parenDepth--
-    else if (char === ',' && parenDepth === 0) {
-      parts.push(current)
-      current = ''
-      continue
-    }
-    current += char
-  }
-  if (current) parts.push(current)
-  return parts
-}
-
-/** 把 box-shadow 参数转成 drop-shadow filter 字符串 */
-function buildFilter(shadows: Array<{ x: number; y: number; blur: number; color: string }>): string {
-  return shadows.map((s) => `drop-shadow(${s.x}px ${s.y}px ${s.blur}px ${s.color})`).join(' ')
 }
 
 /** 从元素的样式里读圆角半径 */
@@ -234,7 +173,7 @@ export function initSquircles(): void {
   })
 
   // 监听主题切换（<html> 的 class 变化，.dark 类切换明暗模式）
-  // 主题变了阴影颜色跟着变，需要强制刷新所有元素的 drop-shadow
+  // 主题变了（尺寸没变）也要重算一次路径
   const themeMo = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {

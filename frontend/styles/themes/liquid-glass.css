@@ -75,13 +75,14 @@ html[data-theme='liquid-glass'] {
     var(--ui-block-3) 100%
   );
 
-  /* ASCII 画 —— 猫的配色（描边 / 深橙 / 橙身 / 白毛 / 阴影） */
-  --ui-art-outline: #3b2f26;
-  --ui-art-outline-soft: #7d6650;
-  --ui-art-shade: #c96a1e;
-  --ui-art-body: #ff9d3c;
-  --ui-art-light: #e6cfa6;
-  --ui-art-light-soft: #c6a479;
+  /* ASCII 画 —— 角色的配色（发 / 挑染 / 耳橙 / 蓝瞳 / 肤 / 浅毛 / 腮红）
+     浅色档底是「纸」：颜色要比头像那张画再压深一档，才看得清 */
+  --ui-art-hair: #241546;
+  --ui-art-violet: #6d28d9;
+  --ui-art-orange: #d97706;
+  --ui-art-blue: #1d4ed8;
+  --ui-art-skin: #d9a184;
+  --ui-art-light: #8b83c9;
 
   /* 终端面板 —— 首页那张卡：浅色档是「纸」 */
   --ui-term-bg: #f3ede1;
@@ -127,13 +128,18 @@ html[data-theme='liquid-glass'] {
   --ui-card-radius: var(--ui-radius-lg);
   --ui-card-radius-sm: var(--ui-radius-md);
   --ui-card-radius-lg: var(--ui-radius-xl);
+  /* 阴影一律跟主角走：深海军蓝紫（avatar 主色 #2f2351），
+     别用暖棕 —— 暖棕在奶油底上显脏，跟主角的冷调对不上 */
+  /* 玻璃卡没有外阴影 —— 只有 inset 内高光。
+     外阴影要么是「方角 box-shadow」（Safari 的 clip-path 不裁它，跟 squircle 对不上），
+     要么是 drop-shadow（浓度被玻璃 alpha 折半，糊成一条脏边）。
+     深度交给背景透色 + 描边 + 内高光 */
   --ui-card-shadow:
-    0 8px 32px rgba(140, 80, 40, 0.12),
-    0 1px 2px rgba(140, 80, 40, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   --ui-card-shadow-hover:
-    0 20px 48px rgba(140, 80, 40, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   --ui-card-lift: -4px;
   --ui-card-pattern: none;
   --ui-card-pattern-size: 12px 12px;
@@ -162,21 +168,18 @@ html[data-theme='liquid-glass'] {
   /* 折射滤镜负责「掰弯」，模糊只留一点点 —— blur 大了折射就白做了 */
   --ui-nav-blur: blur(3px) saturate(180%);
   --ui-nav-border: rgba(255, 255, 255, 0.62);
+  /* 悬浮栏：影子贴着形状走（偏移小、糊得紧），别摊成一大坨 */
   --ui-nav-shadow:
-    0 10px 30px rgba(120, 60, 30, 0.14),
-    0 2px 6px rgba(120, 60, 30, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     inset 0 -1px 0 rgba(255, 255, 255, 0.28);
   --ui-nav-shadow-top:
-    0 -8px 32px rgba(120, 60, 30, 0.13),
-    0 -2px 8px rgba(120, 60, 30, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 
   /* ==================== 拖拽时跟着指针走的玻璃镜片 ==================== */
   --ui-lens-bg: rgba(255, 255, 255, 0.24);
   --ui-lens-border: rgba(255, 255, 255, 0.8);
   --ui-lens-shadow:
-    0 8px 22px rgba(120, 60, 30, 0.2),
+    0 6px 16px rgba(47, 35, 81, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   /* 拟态镜片（渲染不出真折射时用）：顶部高光 + 左右两条色散边 */
@@ -192,9 +195,9 @@ html[data-theme='liquid-glass'] {
   --ui-glass-border: var(--ui-border-subtle);
 
   /* ==================== 阴影 ==================== */
-  --ui-shadow-sm: 0 2px 10px rgba(140, 80, 40, 0.1);
-  --ui-shadow-md: 0 8px 24px rgba(140, 80, 40, 0.12);
-  --ui-shadow-lg: 0 20px 48px rgba(140, 80, 40, 0.16);
+  --ui-shadow-sm: 0 2px 10px rgba(47, 35, 81, 0.09);
+  --ui-shadow-md: 0 8px 24px rgba(47, 35, 81, 0.12);
+  --ui-shadow-lg: 0 18px 44px rgba(47, 35, 81, 0.15);
 
   /* ==================== 装饰形状 ==================== */
   --ui-shape-color: transparent;
@@ -259,13 +262,13 @@ html[data-theme='liquid-glass'].dark {
   --ui-mark-bg: rgba(255, 109, 154, 0.32);
   --ui-mark-fg: #ffd6e4;
 
-  /* ASCII 画 —— 深色档 */
-  --ui-art-outline: #0c0a08;
-  --ui-art-outline-soft: #6b5a48;
-  --ui-art-shade: #b85c14;
-  --ui-art-body: #ffa445;
-  --ui-art-light: #f2e4cd;
-  --ui-art-light-soft: #c6ae8c;
+  /* ASCII 画 —— 深色档（深底会放大彩度，色统一压低） */
+  --ui-art-hair: #3f3480;
+  --ui-art-violet: #a78bfa;
+  --ui-art-orange: #f9a825;
+  --ui-art-blue: #5b9dff;
+  --ui-art-skin: #f7cdb0;
+  --ui-art-light: #ded9f7;
 
   /* 终端面板 —— 深色档 */
   --ui-term-bg: #101319;
@@ -301,12 +304,11 @@ html[data-theme='liquid-glass'].dark {
   --ui-card-blur: blur(16px) saturate(160%);
   --ui-card-border: rgba(255, 255, 255, 0.14);
   --ui-card-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   --ui-card-shadow-hover:
-    0 20px 48px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 
   --ui-btn-secondary-bg: rgba(255, 255, 255, 0.08);
   --ui-btn-secondary-hover: rgba(255, 255, 255, 0.14);
@@ -324,19 +326,15 @@ html[data-theme='liquid-glass'].dark {
   --ui-nav-blur: blur(3px) saturate(180%);
   --ui-nav-border: rgba(255, 255, 255, 0.24);
   --ui-nav-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.42),
-    0 2px 6px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   --ui-nav-shadow-top:
-    0 -8px 32px rgba(0, 0, 0, 0.35),
-    0 -2px 8px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
   --ui-lens-bg: rgba(104, 104, 120, 0.26);
   --ui-lens-border: rgba(255, 255, 255, 0.42);
   --ui-lens-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.4),
+    0 5px 14px rgba(7, 5, 20, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.26);
   --ui-lens-sheen: rgba(255, 255, 255, 0.16);
   --ui-lens-fringe-warm: rgba(255, 108, 92, 0.4);
@@ -348,9 +346,9 @@ html[data-theme='liquid-glass'].dark {
   --ui-glass-border-width: 1px;
   --ui-glass-border: var(--ui-border-subtle);
 
-  --ui-shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
-  --ui-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
-  --ui-shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --ui-shadow-sm: 0 2px 10px rgba(9, 7, 24, 0.4);
+  --ui-shadow-md: 0 8px 24px rgba(9, 7, 24, 0.45);
+  --ui-shadow-lg: 0 18px 44px rgba(9, 7, 24, 0.5);
 
   --ui-icon-well-border: 1px solid rgba(255, 255, 255, 0.14);
 }

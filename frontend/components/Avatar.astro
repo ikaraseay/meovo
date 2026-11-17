@@ -3,7 +3,11 @@
  * 作者头像 —— 全站只有一位作者，图片在 `cloudflare/public/avatar.png`。
  *
  * 尺寸由 props 给：不同场合给不同的值（首页小卡 56 / 关于页 96）。
- * 图片本身已经是圆角方块（PNG 里带透明角），这里不再压圆角。
+ * 图片是不透明底的角色图，边缘用两层遮罩羽化掉（mask）。
+ *
+ * 羽化用两层嵌套的遮罩各管一个方向（横向 / 纵向），
+ * 不用 mask-composite —— 交集合成在旧 WebKit 上语义不同，
+ * 兜底会退化成十字形，别赌。
  */
 import { t, type Locale } from '../i18n'
 
@@ -16,22 +20,48 @@ interface Props {
 const { locale, size = 96 } = Astro.props
 ---
 
-<img
-  class="avatar"
-  src="/avatar.png"
-  width={size}
-  height={size}
-  alt={t(locale, 'site.author')}
-  decoding="async"
-  style={`--avatar-size: ${size}px`}
-/>
+<span class="avatar-frame" style={`--avatar-size: ${size}px`}>
+  <span class="avatar-frame-in">
+    <img
+      class="avatar ui-anim-fade-in"
+      src="/avatar.png"
+      width={size}
+      height={size}
+      alt={t(locale, 'site.author')}
+      decoding="async"
+    />
+  </span>
+</span>
 
 <style>
-  .avatar {
+  .avatar-frame,
+  .avatar-frame-in {
+    display: block;
     width: var(--avatar-size);
     height: var(--avatar-size);
+    flex-shrink: 0;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  /* 横向两边的软边 */
+  .avatar-frame {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%);
+  }
+
+  /* 纵向两边的软边 —— 两层叠起来就是四边一圈的羽化 */
+  .avatar-frame-in {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
+  }
+
+  .avatar {
+    width: 100%;
+    height: 100%;
     display: block;
     object-fit: cover;
-    flex-shrink: 0;
+    /* 圆角跟玻璃卡一套 */
+    border-radius: var(--ui-radius-lg);
   }
 </style>
