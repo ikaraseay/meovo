@@ -87,6 +87,43 @@
   cursor: zoom-in;
 }
 
+/* ==================== 绕排 ====================
+   卡片压到正文上时，正文逐行让开：
+   一行一个块（.prose-line），行里按走廊分几截（.prose-seg）——
+   卡片在中间时左右各一截，文字从左截流到右截，把卡片包在中间。
+   每一截的宽度与间距由脚本写成内联样式；
+   走廊太窄的那一行是空块（跳过这一行）。
+   断行由 pretext 算（跟浏览器同一套字体），画字的还是 DOM。 */
+.prose-line {
+  display: block;
+  /* 断行已经算好了 —— 别让浏览器再断一次，也别再断词 */
+  white-space: nowrap;
+  hyphens: none;
+  text-align: justify;
+  text-align-last: justify;
+}
+
+/* 段末那一行不两端对齐 —— 跟普通段落一样 */
+.prose-line:last-child {
+  text-align-last: start;
+}
+
+/* 一行里的每一截走廊 —— 卡片在中间时左右各一截，
+   文字从左截流到右截，把卡片包在中间。
+   宽度与间距由脚本写成内联样式。 */
+.prose-seg {
+  display: inline-block;
+  vertical-align: top;
+  /* 断行是算好的 —— 别让浏览器再断一次；
+     量出来比走廊宽一点的话，宁可裁掉也不许压到卡片上 */
+  overflow: hidden;
+}
+
+/* 走廊太窄的空行 —— 占一行的高度，字不画 */
+.prose-line--skip {
+  min-height: 1lh;
+}
+
 /* ==================== 图片放大层 ==================== */
 .img-zoom {
   position: fixed;

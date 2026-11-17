@@ -35,6 +35,8 @@ import {
   type DeskCard,
   type Position,
 } from './desk-layout'
+import { createFlowState, updateFlow, type FlowState } from './prose-flow'
+import { type Obstacle, type Rect } from './yield-layout'
 
 /** 卡片互相叠的层序上限 —— 必须低于悬浮栏（Z.nav），否则卡片会盖住导航 */
 const Z_MAX = Z.widget
@@ -57,6 +59,8 @@ interface Entry {
   /** 默认落位的倾斜 —— 拖拽时撤下，放下复原 */
   baseTilt?: number
   pinned: boolean
+  /** 正在拖 —— 布局与存档都跳过它，别跟拖拽抢位置 */
+  dragging: boolean
 }
 
 /** 页面上的一个玻璃桌面 —— 「重置布局」靠它把卡片摆回默认落位 */
@@ -73,6 +77,9 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   const mq = window.matchMedia(DESKTOP_MQ)
   const flow = desk.hasAttribute(ATTR.deskFlow)
   const contentEl = flow ? desk.querySelector<HTMLElement>(`[${ATTR.deskContent}]`) : null
+  // 让位：卡片压到正文上时，正文逐行绕开（pretext 算走廊，DOM 画字）
+  const proseEl = contentEl?.querySelector<HTMLElement>(`.${CLASS.prose}`) ?? null
+  const flowState: FlowState | null = proseEl ? createFlowState(proseEl) : null
   let saved = readWidgetPositions()
 
   const entries: Entry[] = widgets.map((el) => ({
@@ -83,9 +90,16 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     w: 0,
     h: 0,
     pinned: false,
+    dragging: false,
   }))
 
-  let zCounter = 0
+  // 卡片一律浮在正文之上。正文列是 position: relative，排在它前面的卡片
+  // 不给 z-index 的话，正文会盖住卡片 —— 手把抓不到，卡片也拖不动。
+  entries.forEach((entry, i) => {
+    entry.el.style.zIndex = String(i + 1)
+  })
+
+  let zCounter = entries.length
   /** 上一次布局用的参考尺寸 —— 存档百分比按它换算，读 / 写必须用同一套基准 */
   let refW = 0
   let refH = 0
@@ -113,6 +127,91 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       entry.w = entry.el.offsetWidth
       entry.h = entry.el.offsetHeight
     }
+  }
+
+  /** 压在正文上的卡片（文档坐标）—— 隐藏的卡量不到，跳过 */
+  function collectObstacles(): Obstacle[] {
+    const obstacles: Obstacle[] = []
+    for (const entry of entries) {
+      if (entry.el.getClientRects().length === 0) continue
+      obstacles.push({ id: entry.id, rect: rectOf(entry.el) })
+    }
+    return obstacles
+  }
+
+  /** 元素的矩形（文档坐标） */
+  function rectOf(el: HTMLElement): Rect {
+    const r = el.getBoundingClientRect()
+    return {
+      top: r.top + window.scrollY,
+      bottom: r.bottom + window.scrollY,
+      left: r.left + window.scrollX,
+      right: r.right + window.scrollX,
+    }
+  }
+
+  /**
+   * 固定卡有没有压到正文列 —— 压到了才需要跟着滚动重排。
+   * 固定卡在正文列旁边（常见情况）时，滚动不该打扰正文。
+   */
+  function pinnedOverlapsContent(): boolean {
+    if (!contentEl) return false
+    const col = contentEl.getBoundingClientRect()
+    for (const entry of entries) {
+      if (!entry.pinned) continue
+      if (entry.el.getClientRects().length === 0) continue
+      const r = entry.el.getBoundingClientRect()
+      if (r.right > col.left && r.left < col.right) return true
+    }
+    return false
+  }
+
+  /**
+   * 让位：卡片压到正文上时，正文逐行绕开。
+   * 返回这一趟的决策签名 —— 签名不再变就说明几何跟决策自洽了。
+   */
+  function updateYield(): string {
+    if (!flowState) return ''
+    // 窄屏卡片退回文档流，压不到正文 —— 障碍清空，绕排一并撤掉
+    const obstacles = mq.matches ? collectObstacles() : []
+    return updateFlow(flowState, obstacles)
+  }
+
+  /** 拖拽中让位跟着走 —— 一帧一次，别每个 pointermove 都重排 */
+  let yieldFrame = 0
+  function scheduleYield() {
+    if (yieldFrame) return
+    yieldFrame = requestAnimationFrame(() => {
+      yieldFrame = 0
+      const before = flowState?.prose.offsetHeight ?? 0
+      updateYield()
+      // 正文高度变了 → 尾部卡片（协议卡 / 上下篇）得跟着挪，
+      // 不然它们会被顶上来压在正文上
+      if (contentEl && (flowState?.prose.offsetHeight ?? 0) !== before) {
+        layoutContentAnchored(contentEl)
+      }
+    })
+  }
+
+  /**
+   * 让位 + 重排，迭代到决策不再变化。
+   *
+   * 让位会改正文高度 → 桌面变高 → 按比例存的卡片位置跟着往下挪 →
+   * 让位又落后一截。签名是这一趟的决策（每一行的宽度与偏移）——
+   * 签名不再变，就说明几何跟决策对上了，收敛。
+   */
+  function settle(): void {
+    if (!contentEl) return
+    let last = ''
+    for (let i = 0; i < 8; i++) {
+      const sig = updateYield()
+      layoutContentAnchored(contentEl)
+      if (sig === last) return
+      last = sig
+    }
+    // 迭代用尽：把让位对齐到最后一趟布局
+    updateYield()
+    layoutContentAnchored(contentEl)
   }
 
   function placeAbsolute(entry: Entry) {
@@ -158,6 +257,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
    */
   function placeEntries(layout: Map<string, Position>) {
     for (const entry of entries) {
+      // 正在拖的那张由拖拽自己管 —— 布局别跟它抢
+      if (entry.dragging) continue
       const pos = layout.get(entry.id)
       if (!pos) continue
       // 倾斜是默认落位的一部分：固定卡也记着，取消固定就恢复散乱的样子
@@ -167,16 +268,26 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       entry.y = pos.y
       entry.w = pos.width
     }
-    applySavedPositions(refW, refH)
+    applySavedPositions()
   }
 
-  /** 给未固定卡片套用存档（百分比 → 像素，基准是桌面宽高） */
-  function applySavedPositions(refW: number, refH: number) {
+  /**
+   * 给未固定卡片套用存档。
+   *
+   * 纵坐标用绝对像素（yPx）还原 —— 按「网页高度百分比」还原的话，
+   * 绕排让正文一变高，基准就跟着变，刷新时卡片会跳。
+   */
+  function applySavedPositions() {
     for (const entry of entries) {
-      if (entry.pinned) continue
+      if (entry.pinned || entry.dragging) continue
       const pos = saved[entry.id]
       if (!pos || pos.pinned) continue
-      const p = restoreFromPct(pos, { width: entry.w, height: entry.h }, { width: refW, height: refH })
+      const y = pos.yPx ?? fromPct(pos.yPct, refH)
+      const p = clampToDesk(
+        { x: fromPct(pos.xPct, refW), y },
+        { width: entry.w, height: entry.h },
+        { width: refW, height: refH },
+      )
       entry.x = p.x
       entry.y = p.y
     }
@@ -241,7 +352,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     placeEntries(result.positions)
 
     for (const entry of entries) {
-      if (entry.pinned) continue
+      if (entry.pinned || entry.dragging) continue
       placeAbsolute(entry)
     }
     desk.style.minHeight = `${result.minHeight}px`
@@ -363,6 +474,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       contentEl.style.width = ''
     }
     desk.style.minHeight = ''
+    // 绕排也撤掉 —— 卡片退回文档流，压不到正文了，绕排留着就是白绕
+    if (flowState) updateYield()
   }
 
   function apply() {
@@ -385,6 +498,9 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     else layoutScatter()
 
     syncPinned()
+
+    // 让位：卡片压到正文上时正文让开 —— 正文高度变了，桌面跟着重排
+    settle()
   }
 
   /** 把卡片当前像素位置换算成百分比存档（固定 → 视口百分比；未固定 → 桌面百分比） */
@@ -403,6 +519,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       const pos = {
         xPct: toPct(entry.x, w),
         yPct: toPct(entry.y, h),
+        // 纵坐标记绝对像素 —— 绕排让正文变高，按百分比还原会漂
+        yPx: entry.y,
         pinned: false,
       }
       saveWidgetPosition(entry.id, pos)
@@ -452,6 +570,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       placeAbsolute(entry)
     }
     persist(entry)
+    // 固定 / 取消固定都要重排 —— 固定卡也是障碍，文字得绕开它
+    settle()
   }
 
   /** 复原：删除存档、取消固定、重新布局回默认落位 */
@@ -479,6 +599,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       enabled: () => mq.matches,
       onStart: () => {
         // 拖拽期间统一用 fixed（视口坐标），卡片永远贴着鼠标
+        entry.dragging = true
         const rect = entry.el.getBoundingClientRect()
         origLeft = rect.left
         origTop = rect.top
@@ -501,14 +622,24 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         )
         entry.el.style.left = `${p.x}px`
         entry.el.style.top = `${p.y}px`
+        scheduleYield()
       },
       onEnd: () => {
         const left = parseFloat(entry.el.style.left)
         const top = parseFloat(entry.el.style.top)
+        entry.dragging = false
 
         if (entry.pinned) {
-          entry.x = left
-          entry.y = top
+          // 固定卡拖完还是固定的 —— 固定就该一直跟着视口，
+          // 正文绕着它排（滚动时也会重排）。
+          const p = clampToViewport(
+            { x: left, y: top },
+            { width, height: entry.h },
+            { width: window.innerWidth, height: window.innerHeight },
+          )
+          entry.x = p.x
+          entry.y = p.y
+          placePinned(entry)
         } else {
           const deskRect = desk.getBoundingClientRect()
           entry.x = left - deskRect.left
@@ -519,6 +650,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         void entry.el.offsetHeight
         entry.el.classList.remove('is-dragging')
         persist(entry)
+        // 位置换回桌面坐标 → 让位重算 → 正文高度变了，桌面跟着重排
+        settle()
       },
     })
   }
@@ -656,6 +789,25 @@ export function initDesk(desk: HTMLElement): DeskController | null {
 
   // 窗口尺寸变了：百分比存档按新宽高等比还原（防抖 + 布局期间关过渡）
   window.addEventListener('resize', () => scheduleRelayout())
+
+  /**
+   * 固定卡压在正文上时，滚动要重排 —— 固定卡跟着视口走，
+   * 文字得一直绕开它。
+   *
+   * 滚动中不重排：正文高度一变，浏览器的滚动锚定会把读者的滚动
+   * 吃掉一半（页面滚不动）。等滚动停下来再重排 ——
+   * 文字重新绕开固定卡，浏览器的锚定负责把视图稳住。
+   */
+  let pinTimer = 0
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (!mq.matches || !pinnedOverlapsContent()) return
+      window.clearTimeout(pinTimer)
+      pinTimer = window.setTimeout(() => settle(), 120)
+    },
+    { passive: true },
+  )
 
   // 正文高度变了（折叠阅读）：跟 resize 走同一条防抖重排
   window.addEventListener(DESK_RELAYOUT_EVENT, scheduleRelayout)

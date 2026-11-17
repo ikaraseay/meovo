@@ -26,8 +26,16 @@ const LEGACY_VERSION = 3
 export interface WidgetPosition {
   /** 横向百分比（0-100，可略超界） */
   xPct: number
-  /** 纵向百分比（0-100，可略超界） */
+  /** 纵向百分比（0-100，可略超界）—— 固定卡用它（相对视口高度） */
   yPct: number
+  /**
+   * 未固定卡的纵坐标绝对像素（桌面坐标）。
+   *
+   * 为什么不用百分比：卡片压到正文上时正文会绕排变高，
+   * 按「网页高度百分比」还原，基准跟着正文变 —— 刷新时卡片就跳。
+   * 记绝对位置，刷新才回得到原处。
+   */
+  yPx?: number
   /** 是否固定 */
   pinned?: boolean
 }
@@ -52,9 +60,11 @@ function clean(value: unknown): WidgetPositions {
   if (!value || typeof value !== 'object') return {}
   const out: WidgetPositions = {}
   for (const [id, pos] of Object.entries(value as Record<string, unknown>)) {
-    const p = pos as { xPct?: unknown; yPct?: unknown; pinned?: unknown } | undefined
+    const p = pos as { xPct?: unknown; yPct?: unknown; yPx?: unknown; pinned?: unknown } | undefined
     if (p && finite(p.xPct) && finite(p.yPct)) {
-      out[id] = { xPct: p.xPct, yPct: p.yPct, pinned: p.pinned === true }
+      const clean: WidgetPosition = { xPct: p.xPct, yPct: p.yPct, pinned: p.pinned === true }
+      if (finite(p.yPx)) clean.yPx = p.yPx
+      out[id] = clean
     }
   }
   return out

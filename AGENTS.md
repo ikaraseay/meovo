@@ -305,6 +305,36 @@
     别掉到正文末尾（那儿是协议卡 / 上下篇的位置，目录与思维导图掉最后反而难找）
   - **默认固定位置贴着正文列的右缘** —— 不是视口右上角：右上角在窄桌面会正好压在正文上。
     判定「放得下」用**桌面的右缘**（与布局那侧同一把尺），固定 / 取消固定结果一致
+- **卡片压到正文上时，正文逐行绕开**（`frontend/lib/prose-flow.ts` + `frontend/lib/yield-layout.ts`）
+  - **pretext 算断行，DOM 画字** —— 做法照 pretext 官方 demo（龙形 / 伞形）：
+    每一行自己算走廊（能占多宽、往哪边挪），pretext 按走廊宽度断行，浏览器把这一行画出来。
+    **不是 canvas** —— 文字还是真 DOM：可选中、可搜索、屏幕阅读器照读。
+    （`@chenglou/pretext/rich-inline` 的 `prepareRichInline` + `layoutNextRichInlineLineRange`）
+  - **一行一个块**（`.prose-line`），行里按走廊分几截**（`.prose-seg`）** ——
+    卡片在中间时左右各一截，文字从左截流到右截，**把卡片包在中间**；
+    宽度与间距写成内联样式
+  - **一截都放不下就跳过这一行** —— `yield-layout.ts` 的 `corridorAt`；
+    一截走廊的下限 `max(96px, 列宽×12%)`，比这更窄的那截丢掉（别塞几个字进去）；
+    一截都不剩才是空行（`.prose-line--skip`）—— **宁可空一行，也不把字挤成一条缝**
+  - **走廊按整行的高度算** —— 取行底而不是行中：卡片只压到行底缘时，
+    字形盒仍会探进卡片几像素，按行中算就会让字压在卡片边上
+  - **原件留着，撤得回去** —— 绕排时把块里原来的子节点收进 `DocumentFragment`，
+    卡片挪开后原样放回 —— 折叠阅读的监听与隐藏状态都不丢；
+    **折叠箭头（`.text-fold-toggle`）绕排时被塞进行块，撤绕排时要先摘出来** —— 跟着行块一起没了箭头就没了
+  - **行内标记跟着文字走** —— 每一行从原文里切出来（`Range` 那一套，同 text-fold），
+    切口处的祖先元素克隆一份，所以加粗还是加粗、链接还是链接
+  - **卡片从上往下逐个处理** —— 上面几段变高了，下面的位置跟着挪；
+    位移一次算清（`prose-flow.ts` 里的 `shift`），别一趟一趟地飘
+  - **绕排与桌面高度互相影响，要迭代到收敛** —— `draggable.ts` 的 `settle()`
+    迭代到**决策签名不变**（每一行的走廊）为止
+  - **固定卡也是障碍，正文绕着它排** —— 固定卡在视口坐标里，
+    障碍矩形取「视口位置 + 滚动量」才是正文坐标；
+    **滚动时不重排，滚动停下来再重排**（`draggable.ts` 的 `pinTimer`）——
+    滚动中改正文高度会被浏览器的滚动锚定吃掉一半（页面滚不动）
+  - **拖动固定卡 = 它还是固定的** —— 拖拽期间统一用 fixed（视口坐标），
+    松手按固定态落回视口坐标（`placePinned`），不再「拖一下就摘下固定」
+  - **卡片一律浮在正文之上** —— 正文列是 `position: relative`，排在它前面的卡片不给 z-index
+    的话，正文会盖住卡片 —— 手把抓不到，卡片拖不动
 - **部署**：Cloudflare **Workers**（适配器 v14 已移除 Pages 支持）。构建 `pnpm build` → `dist/client`（静态资源）+ `dist/server`（Worker）；Node 钉在 `.node-version`，
   pnpm 钉在 `package.json` 的 `packageManager`（Workers Builds 的镜像会读这个字段装对应版本）。
   - **部署有两条等价路径，共用一个账户级 Token**：Cloudflare Workers Builds 直连 GitHub
@@ -390,8 +420,10 @@
     反向检查的范围是 lib 层：组件内部自己写自己读的名字不算跨 module。
 - **持久化**：走 `frontend/lib/persist.ts` 的 `createStore({ key, version, clean, migrate })` ——
   序列化、版本、清洗只有一处。两个 adapter：`floating-bar-state.ts`（像素）与
-  `widget-state.ts`（百分比）。落盘格式是 `{ version, data }`，旧格式靠 `migrate` 迁，
-  用户摆过的位置不丢。
+  `widget-state.ts`（横坐标百分比 + **纵坐标绝对像素**）。落盘格式是 `{ version, data }`，
+  旧格式靠 `migrate` 迁，用户摆过的位置不丢。
+  - **卡片纵坐标记绝对像素，不记「网页高度的百分比」** —— 卡片压到正文上时正文会绕排变高，
+    百分比基准跟着变，刷新时卡片就跳（用户报过的抖动）。横向还是百分比（桌面宽度不受绕排影响）
 - **明暗模式**：`<html>` 上的 `.dark` 类 + `data-theme="liquid-glass"`。首屏前的内联脚本负责定深浅，别删。
 - **默认跟随系统** —— 明暗与语言一个口径：
   - 明暗：localStorage 里**没存**就跟随系统（首屏脚本读 `prefers-color-scheme`）；

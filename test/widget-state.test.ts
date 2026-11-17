@@ -76,6 +76,27 @@ test('pinned 布尔值往返', () => {
   assert.deepEqual(readWidgetPositions(store).hero, { xPct: 10, yPct: 20, pinned: true })
 })
 
+test('纵坐标的绝对像素往返 —— 刷新要回得到原处', () => {
+  const store = fakeStore()
+  saveWidgetPosition('hero', { xPct: 10, yPct: 20, yPx: 648.8 }, store)
+  assert.deepEqual(readWidgetPositions(store).hero, {
+    xPct: 10,
+    yPct: 20,
+    yPx: 648.8,
+    pinned: false,
+  })
+})
+
+test('坏的绝对像素丢掉 —— 百分比还能兜底', () => {
+  const store = fakeStore({
+    'widget-state': JSON.stringify({
+      version: 4,
+      data: { hero: { xPct: 10, yPct: 20, yPx: '高一点' } },
+    }),
+  })
+  assert.deepEqual(readWidgetPositions(store).hero, { xPct: 10, yPct: 20, pinned: false })
+})
+
 test('NaN 不算数', () => {
   const store = fakeStore()
   saveWidgetPosition('hero', { xPct: Number.NaN, yPct: 40 }, store)

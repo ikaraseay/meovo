@@ -57,6 +57,12 @@ export const CLASS = {
   adminFlashError: 'admin-flash--error',
   /** 正文排版容器 */
   prose: 'prose',
+  /** 绕排：正文的一行（宽度与偏移由脚本写成内联样式） */
+  proseLine: 'prose-line',
+  /** 绕排：一行里的一截走廊 —— 卡片在中间时左右各一截 */
+  proseSeg: 'prose-seg',
+  /** 绕排：走廊太窄、空着的那一行 */
+  proseLineSkip: 'prose-line--skip',
   /** 正文里的悬停显示 —— 编辑工具写入、prose.css 上色、折叠阅读排除断句 */
   spoiler: 'spoiler',
   /** 折叠阅读：每段的展开 / 收起箭头 */
