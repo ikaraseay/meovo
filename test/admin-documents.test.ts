@@ -75,14 +75,42 @@ test('文档：分类与标签都要 ASCII slug', () => {
   assert.ok(normalizeDocument({ ...valid, tags: '中文' }).errors.includes('tag_invalid'))
 })
 
+test('文档：标签按逗号拆、空格折连字符、去重', () => {
+  // 后台是「一颗颗加」，但接口照样得接得住一串
+  const result = normalizeDocument({ ...valid, tags: 'Astro Blog, css，astro blog' })
+  assert.deepEqual(result.value?.tags, ['astro-blog', 'css'])
+})
+
 test('文档：日期坏了要报错', () => {
   assert.ok(normalizeDocument({ ...valid, pubDate: '不是日期' }).errors.includes('date_invalid'))
 })
 
-test('文档：系列要同时有 ID 与标题', () => {
+test('文档：系列 id 由标题派生 —— 作者不用手填', () => {
+  // 只有 id 没有标题 = 一半的输入
   assert.ok(normalizeDocument({ ...valid, seriesId: 'x' }).errors.includes('series_invalid'))
-  assert.ok(normalizeDocument({ ...valid, seriesTitle: 'x' }).errors.includes('series_invalid'))
-  const ok = normalizeDocument({ ...valid, seriesId: 'x', seriesTitle: 'X', seriesOrder: 2 })
+
+  // 英文标题直接取 slug
+  assert.equal(
+    normalizeDocument({ ...valid, seriesTitle: 'Docker Notes' }).value?.seriesId,
+    'docker-notes',
+  )
+
+  // 中文标题没有 ASCII 可取 —— 用稳定短码，同一个标题永远同一个 id
+  const zh = normalizeDocument({ ...valid, seriesTitle: 'Docker 入门' }).value?.seriesId ?? ''
+  assert.match(zh, /^series-[a-z0-9]+$/)
+  assert.equal(
+    normalizeDocument({ ...valid, seriesTitle: 'Docker 入门' }).value?.seriesId,
+    zh,
+    '同一个标题派生两次必须一致，否则系列页地址会漂',
+  )
+  // 中文标题 slugify 后只剩零碎英文 —— 不能让两个不同的系列撞成一个 id
+  assert.notEqual(
+    normalizeDocument({ ...valid, seriesTitle: 'Docker 进阶' }).value?.seriesId,
+    zh,
+    '「Docker 入门」与「Docker 进阶」不能派生出同一个 id',
+  )
+
+  const ok = normalizeDocument({ ...valid, seriesTitle: 'X', seriesOrder: 2 })
   assert.equal(ok.ok, true)
   assert.equal(ok.value?.seriesOrder, 2)
 })

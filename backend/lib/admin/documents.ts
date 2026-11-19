@@ -101,6 +101,22 @@ export function uniqueSlug(base: string, taken: string[]): string {
   return candidate
 }
 
+/**
+ * 系列标题 → 系列 id —— 作者只填标题，不填 id。
+ *
+ * 中文标题没有 ASCII 可取，用标题的稳定短码兜底：
+ * 同一个标题永远同一个 id，系列页的地址就不会因为作者重填而漂。
+ */
+export function deriveSeriesId(title: string): string {
+  const slug = slugify(title)
+  // 只有**纯 ASCII** 的标题才用 slug：中文标题 slugify 后会剩零碎英文，
+  // 「Docker 入门」与「Docker 进阶」都会变成 docker —— 两个系列撞成一个。
+  if (slug && SLUG_PATTERN.test(slug) && !/[^\x20-\x7e]/.test(title)) return slug
+  let hash = 0
+  for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) >>> 0
+  return 'series-' + hash.toString(36)
+}
+
 /** 今天 —— 本地日期（作者看到的就是这个） */
 export function todayDate(now: Date = new Date()): string {
   const offset = now.getTimezoneOffset() * 60000
@@ -133,7 +149,8 @@ export function parseTags(input: unknown): string[] {
   const raw = Array.isArray(input) ? input.map(String) : String(input ?? '').split(/[,，]/)
   const tags: string[] = []
   for (const item of raw) {
-    const tag = item.trim().toLowerCase()
+    // 空格折成连字符 —— 作者会写「astro blog」，tag 得是 slug
+    const tag = item.trim().toLowerCase().replace(/\s+/g, '-')
     if (!tag || tags.includes(tag)) continue
     tags.push(tag)
   }
@@ -187,11 +204,13 @@ export function normalizeDocument(input: DocumentInput): {
   const updatedDate = asDate(input.updatedDate)
   if (input.updatedDate && !updatedDate) errors.push('date_invalid')
 
-  const seriesId = asText(input.seriesId).trim().toLowerCase()
+  // 系列 id 不手填 —— 给了标题就派生（同 slug 的道理：作者不该去想 ASCII 名字）
   const seriesTitle = asText(input.seriesTitle).trim()
-  if ((seriesId && !seriesTitle) || (!seriesId && seriesTitle)) {
-    errors.push('series_invalid')
-  }
+  const seriesId =
+    asText(input.seriesId).trim().toLowerCase() ||
+    (seriesTitle ? deriveSeriesId(seriesTitle) : '')
+  // 只有 id 没有标题 = 一半的输入，报错
+  if (seriesId && !seriesTitle) errors.push('series_invalid')
   if (seriesId && !SLUG_PATTERN.test(seriesId)) errors.push('series_invalid')
 
   let seriesOrder: number | null = null

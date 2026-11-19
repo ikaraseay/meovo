@@ -40,10 +40,11 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     </div>
 
     <!-- 实时预览：真的把站点装进框里，改了什么立刻看得见 -->
-    <section class="admin-card admin-preview">
+    <!-- 别用 admin-preview —— 那是编辑器的 markdown 预览，两处同名会互相套样式 -->
+    <section class="admin-card admin-live">
       <div class="admin-settings__bar">
         <h2 class="admin-card__title">{t(locale, 'admin.settings.preview')}</h2>
-        <div class="admin-preview__modes">
+        <div class="admin-live__modes">
           <button class="ui-btn ui-btn--primary" type="button" data-admin-preview-mode="home">
             {t(locale, 'admin.settings.previewHome')}
           </button>
@@ -56,8 +57,8 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
         </div>
       </div>
       <p class="admin-card__hint">{t(locale, 'admin.settings.previewHint')}</p>
-      <div class="admin-preview__frame" data-admin-preview-box>
-        <iframe class="admin-preview__iframe" data-admin-preview title={t(locale, 'admin.settings.preview')}></iframe>
+      <div class="admin-live__frame" data-admin-preview-box>
+        <iframe class="admin-live__iframe" data-admin-preview title={t(locale, 'admin.settings.preview')}></iframe>
       </div>
     </section>
   </div>
@@ -319,6 +320,15 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     return reset
   }
 
+  /** 行尾两个小动作 —— 恢复默认 + 「已修改」标记，收在一起 */
+  function rowActions(entry: Entry): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'admin-settings__actions'
+    box.appendChild(resetButton(entry))
+    box.appendChild(badge(entry))
+    return box
+  }
+
   /** 「已修改」标记 —— 改过的条目一眼能挑出来 */
   function badge(entry: Entry): HTMLElement {
     const element = document.createElement('span')
@@ -347,8 +357,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       row.appendChild(keyLabel(key))
       row.appendChild(entryInput(entry, 'zh'))
       row.appendChild(entryInput(entry, 'en'))
-      row.appendChild(resetButton(entry))
-      row.appendChild(badge(entry))
+      row.appendChild(rowActions(entry))
       infoBox.appendChild(row)
     }
   }
@@ -365,8 +374,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       row.appendChild(keyLabel(item.key))
       row.appendChild(entryInput(entry, 'zh', item.multiline))
       row.appendChild(entryInput(entry, 'en', item.multiline))
-      row.appendChild(resetButton(entry))
-      row.appendChild(badge(entry))
+      row.appendChild(rowActions(entry))
       footerBox.appendChild(row)
     }
     renderFooterHeight(footerBox)
@@ -409,7 +417,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     wrap.appendChild(hint)
     row.appendChild(wrap)
 
-    row.appendChild(resetButton(entry))
+    row.appendChild(rowActions(entry))
 
     box.appendChild(row)
   }
@@ -438,8 +446,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     row.appendChild(keyLabel(entry.key))
     row.appendChild(entryInput(entry, 'zh'))
     row.appendChild(entryInput(entry, 'en'))
-    row.appendChild(resetButton(entry))
-    row.appendChild(badge(entry))
+    row.appendChild(rowActions(entry))
     return row
   }
 
@@ -589,6 +596,62 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     target.setAttribute('href', 'https://icp.gov.moe/?keyword=' + number)
   }
 
+  /**
+   * 预览里点某句话 → 跳到要改的那一条。
+   * 搜索 / 筛选会把它藏起来，所以先清掉再定位；定位到就把光标放进输入框，
+   * 点一下就能直接改，不用自己在三百多条里翻。
+   */
+  function jumpToEntry(key: string): void {
+    if (!entries.some((item) => item.key === key)) return
+    if (searchInput) searchInput.value = ''
+    if (moduleSelect) moduleSelect.value = ''
+
+    if (isFooterKey(key)) {
+      footerBox?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    } else if (INFO_KEYS.includes(key)) {
+      infoBox?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    } else {
+      const index = visibleEntries().findIndex((item) => item.key === key)
+      if (index >= 0) {
+        page = Math.floor(index / PAGE_SIZE) + 1
+        renderList()
+      }
+      listBox?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+
+    const input = document.querySelector<HTMLInputElement>('[data-admin-field="' + key + ':zh"]')
+    if (!input) return
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    input.focus({ preventScroll: true })
+    input.select()
+  }
+
+  /**
+   * 预览里的字可以点：点谁就跳到谁。
+   * 每换一次面（导航）都是一个新 document，所以监听在 load 里重挂。
+   */
+  function bindPreview(): void {
+    const doc = previewFrame?.contentDocument
+    if (!doc?.head) return
+    // 可点的提示只能注入 iframe 里 —— 外层样式管不到别的 document
+    const hint = doc.createElement('style')
+    hint.textContent =
+      '[' + ATTR.copy + ']{cursor:pointer}' +
+      '[' + ATTR.copy + ']:hover{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}'
+    doc.head.appendChild(hint)
+    doc.addEventListener('click', (event) => {
+      const target = event.target as Element | null
+      const marked = target?.closest('[' + ATTR.copy + ']')
+      // 预览用来看效果，不是用来逛站点的 —— 任何链接都不跟随
+      if (target?.closest('a')) event.preventDefault()
+      if (!marked) return
+      // 可改的那句话：连站点自己的跳转也不做，直接跳到词条
+      event.stopPropagation()
+      const key = marked.getAttribute(ATTR.copy)
+      if (key) jumpToEntry(key)
+    })
+  }
+
   function scrollPreviewTo(where: 'top' | 'bottom'): void {
     const win = previewFrame?.contentWindow
     const doc = win?.document
@@ -648,6 +711,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   previewFrame?.addEventListener('load', () => {
     fitPreview()
     applyPreview()
+    bindPreview()
     scrollPreviewTo(previewMode === 'footer' ? 'bottom' : 'top')
   })
 

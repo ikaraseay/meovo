@@ -637,6 +637,74 @@
   margin-inline-start: auto;
 }
 
+/* 构建上线 —— 后台唯一「会改变线上」的动作，别跟普通按钮混成一片 */
+.admin-build {
+  padding-inline: var(--ui-space-lg);
+  font-weight: 600;
+  box-shadow: 0 6px 18px var(--ui-accent-glow);
+}
+
+/* ---------------- 标签（多个值） ---------------- */
+
+/* 文章标签与「已修改」标记共用 —— 之前 admin-tag 一条样式都没有，标记是裸文字 */
+.admin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-raised);
+  font-size: 0.75rem;
+  color: var(--ui-text-secondary);
+  white-space: nowrap;
+}
+
+.admin-tag--published {
+  color: var(--ui-text-accent);
+  border-color: var(--ui-border-accent);
+}
+
+.admin-tag__remove {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.admin-tag__remove:hover {
+  opacity: 1;
+  color: var(--ui-danger);
+}
+
+/* 标签输入 —— 芯片 + 输入框排一行，回车 / 逗号加一个 */
+.admin-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-xs);
+  padding: var(--ui-space-xs);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-sunken);
+}
+
+/* 芯片直接排进外层 flex，别让它们另起一行 */
+.admin-tags__list {
+  display: contents;
+}
+
+.admin-tags__input {
+  flex: 1 1 9rem;
+  min-width: 0;
+  border: none;
+  background: transparent;
+}
+
 /* ---------------- 设置页 ---------------- */
 
 .admin-settings__bar {
@@ -657,25 +725,46 @@
 
 .admin-settings__row {
   display: grid;
-  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--ui-space-sm);
   padding: var(--ui-space-sm) 0;
   border-block-start: 1px solid var(--ui-border-subtle);
 }
 
+/* 列表行的行尾 —— 恢复默认与「已修改」并排，别一高一低 */
+.admin-settings__row > .admin-settings__actions {
+  align-self: center;
+}
+
+/* 站点信息 / 页脚的行 —— 左边那栏只有几百像素，
+   五列硬挤会把两个输入框压到 80px（文字溢出到邻格，看着像叠在一起）。
+   所以键名独占一行，两个输入框平分下一行，动作收在行尾。 */
 .admin-settings__info-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: end;
-  gap: var(--ui-space-sm);
-  padding: var(--ui-space-sm) 0;
+  gap: var(--ui-space-xs) var(--ui-space-sm);
+  padding: var(--ui-space-md) 0;
   border-block-start: 1px solid var(--ui-border-subtle);
+}
+
+.admin-settings__info-row > .admin-settings__key {
+  grid-column: 1 / -1;
+}
+
+/* 行尾：恢复默认 + 「已修改」—— 只属于信息行的两行式布局 */
+.admin-settings__info-row > .admin-settings__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-xs);
+  grid-column: 3;
+  grid-row: 2;
 }
 
 /* 单控件的行：键名 + 一个控件 + 恢复默认（没有中英两列） */
 .admin-settings__info-row--single {
-  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .admin-settings__field {
@@ -715,6 +804,13 @@
   .admin-settings__info-row--single {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* 单列之后没有「第 3 列」了 —— 让它自己排在最后一行 */
+  .admin-settings__info-row > .admin-settings__actions {
+    grid-column: auto;
+    grid-row: auto;
+    justify-content: flex-end;
+  }
 }
 
 /* 左边表单，右边实时预览 —— 改一个字段就看得见效果 */
@@ -737,37 +833,41 @@
   gap: var(--ui-space-lg);
 }
 
-/* 预览 —— 真的把站点装进框里，改了什么立刻看得见 */
-.admin-preview {
+/* 实时预览 —— 真的把站点装进框里，改了什么立刻看得见。
+   ⚠️ 类名别用 .admin-preview：那是**编辑器**的 markdown 预览，
+   它自带 height + overflow，套到这张卡上会把整页压成一个定高滚动框。 */
+.admin-live {
   position: sticky;
   inset-block-start: var(--ui-space-lg);
 }
 
 @media not (min-width: 1024px) {
-  .admin-preview {
+  .admin-live {
     position: static;
   }
 }
 
-.admin-preview__modes {
+.admin-live__modes {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ui-space-xs);
 }
 
-.admin-preview__frame {
-  height: 32rem;
+.admin-live__frame {
+  height: 30rem;
   overflow: hidden;
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);
   background: var(--ui-surface-sunken);
 }
 
-.admin-preview__iframe {
+.admin-live__iframe {
   display: block;
   border: 0;
   transform-origin: top left;
   background: var(--ui-surface);
 }
+
 
 /* 分页 —— 三百多条词条一次铺开既慢又找不着 */
 .admin-pager {

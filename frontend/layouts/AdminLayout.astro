@@ -66,7 +66,13 @@ const nav: { id: Props['section']; label: string; href: string; hint: string }[]
           {intro && <p class="admin-head__intro">{intro}</p>}
         </div>
         <div class="admin-head__actions">
-          <button class="ui-btn" type="button" data-admin-build>
+          <!-- 全站唯一会改动线上的动作 —— 主色 + 光晕，别跟普通按钮混成一片 -->
+          <button
+            class="ui-btn ui-btn--primary admin-build"
+            type="button"
+            data-admin-build
+            title={t(locale, 'admin.hint.build')}
+          >
             {t(locale, 'admin.action.build')}
           </button>
           <slot name="actions" />

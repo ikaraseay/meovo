@@ -103,10 +103,20 @@ const langs = ['zh', 'en'] as const
           <input class="ui-input admin-input--mono" type="text" name="category" />
         </label>
 
-        <label class="admin-field">
+        {/* 标签是「多个值」，不是一段字符串 —— 一颗颗加，回车或逗号分隔 */}
+        <div class="admin-field admin-field--wide">
           <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="tags" />
-        </label>
+          <div class="admin-tags">
+            <div class="admin-tags__list" data-admin-tags></div>
+            <input
+              class="ui-input admin-tags__input"
+              type="text"
+              name="tags"
+              placeholder={t(locale, 'admin.hint.tagsPlaceholder')}
+            />
+          </div>
+          <span class="admin-field__hint">{t(locale, 'admin.hint.tags')}</span>
+        </div>
 
         <label class="admin-field">
           <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
@@ -117,14 +127,11 @@ const langs = ['zh', 'en'] as const
           </select>
         </label>
 
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesId')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="seriesId" />
-        </label>
 
         <label class="admin-field">
           <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
           <input class="ui-input" type="text" name="seriesTitle" />
+          <span class="admin-field__hint">{t(locale, 'admin.hint.series')}</span>
         </label>
 
         <label class="admin-field">
@@ -165,6 +172,8 @@ const langs = ['zh', 'en'] as const
   import {
     checkRequired,
     deriveSlug,
+    isSlug,
+    parseTags,
     todayDate,
   } from '../../../../../backend/lib/admin/documents'
   import {
@@ -246,6 +255,8 @@ const langs = ['zh', 'en'] as const
   let currentLang: Lang = 'zh'
   /** 这一组（两种语言）共用的链接 —— 系统分配的，界面上只读 */
   let groupSlug = ''
+  /** 系列 id —— 同样由标题派生，作者不填；改标题也不动它（地址要稳） */
+  let groupSeriesId = ''
   let dirty = false
 
   function field(name: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null {
@@ -275,13 +286,65 @@ const langs = ['zh', 'en'] as const
     if (element) element.value = value
   }
 
-  function safeTags(raw: string): string {
+  /* ---------------- 标签（多个值） ---------------- */
+
+  /** 文档里存的是 JSON 数组 */
+  function documentTags(raw: string): string[] {
     try {
       const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed.join(', ') : ''
+      return Array.isArray(parsed) ? parsed.map(String) : []
     } catch {
-      return ''
+      return []
     }
+  }
+
+  /** 界面上已有的标签 —— 芯片在，值就在 */
+  function readTags(): string[] {
+    return [...document.querySelectorAll<HTMLElement>('[data-admin-tag]')].map(
+      (chip) => chip.dataset.adminTag ?? '',
+    )
+  }
+
+  function renderTags(tags: string[]): void {
+    const box = document.querySelector<HTMLElement>('[data-admin-tags]')
+    if (!box) return
+    box.textContent = ''
+    for (const tag of tags) {
+      const chip = document.createElement('span')
+      chip.className = 'admin-tag'
+      chip.dataset.adminTag = tag
+      chip.textContent = tag
+      const remove = document.createElement('button')
+      remove.className = 'admin-tag__remove'
+      remove.type = 'button'
+      remove.textContent = '×'
+      remove.setAttribute('aria-label', t(locale, 'admin.tags.remove', { tag }))
+      remove.addEventListener('click', () => {
+        chip.remove()
+        dirty = true
+      })
+      chip.appendChild(remove)
+      box.appendChild(chip)
+    }
+  }
+
+  /** 输入框里的内容 → 变成一颗颗标签（回车 / 逗号 / 失焦都算） */
+  function commitTags(input: HTMLInputElement): void {
+    // 与服务端同一个解析器 —— 后台怎么拆，接口就怎么拆
+    const added = parseTags(input.value)
+    input.value = ''
+    if (added.length === 0) return
+    const tags = readTags()
+    for (const tag of added) {
+      // 标签是 ASCII slug（URL 与 i18n 都按它查）—— 中文标签会被服务端拒掉，这里先说清楚
+      if (!isSlug(tag)) {
+        say(errorText(locale, 'tag_invalid'), true)
+        continue
+      }
+      if (!tags.includes(tag)) tags.push(tag)
+    }
+    renderTags(tags)
+    dirty = true
   }
 
   /** 两种语言共用的字段 */
@@ -289,9 +352,9 @@ const langs = ['zh', 'en'] as const
     return {
       pubDate: field('pubDate')?.value ?? '',
       category: field('category')?.value ?? '',
-      tags: field('tags')?.value ?? '',
+      tags: readTags(),
       license: field('license')?.value ?? 'cc-by',
-      seriesId: field('seriesId')?.value ?? '',
+      seriesId: groupSeriesId,
       seriesTitle: field('seriesTitle')?.value ?? '',
       seriesOrder: field('seriesOrder')?.value ?? '',
     }
@@ -299,10 +362,10 @@ const langs = ['zh', 'en'] as const
 
   function fillShared(doc: DocumentRow) {
     groupSlug = doc.slug
+    groupSeriesId = doc.series_id ?? ''
     setField('pubDate', (doc.pub_date ?? '').slice(0, 10))
     setField('category', doc.category ?? '')
-    setField('tags', safeTags(doc.tags))
-    setField('seriesId', doc.series_id ?? '')
+    renderTags(documentTags(doc.tags))
     setField('seriesTitle', doc.series_title ?? '')
     setField('seriesOrder', doc.series_order == null ? '' : String(doc.series_order))
     setField('license', doc.license)
@@ -572,6 +635,18 @@ const langs = ['zh', 'en'] as const
     }
   }
 
+  /* ---------------- 标签输入框 ---------------- */
+
+  const tagsInput = field('tags') as HTMLInputElement | null
+  tagsInput?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ',') return
+    // 回车默认会提交表单 —— 这里只加一个标签
+    event.preventDefault()
+    commitTags(tagsInput)
+  })
+  // 打完字直接点到别处，也算加一个（别让作者以为没生效）
+  tagsInput?.addEventListener('blur', () => commitTags(tagsInput))
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault()
     await save(false)
@@ -806,13 +881,13 @@ const langs = ['zh', 'en'] as const
       const category = typeof fields.category === 'string' ? fields.category : ''
       const license = typeof fields.license === 'string' ? fields.license : ''
       const pubDate = typeof fields.pubDate === 'string' ? fields.pubDate : ''
-      const tags = Array.isArray(fields.tags) ? fields.tags.join(', ') : ''
+      const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : []
       setLangField('title', pane.lang, title)
       setLangField('description', pane.lang, description)
       setField('category', category)
       setField('license', license)
       setField('pubDate', pubDate.slice(0, 10))
-      setField('tags', tags)
+      renderTags(tags)
       setLangField('body', pane.lang, parsed.body)
       bodyChanged(pane)
       say(t(locale, 'admin.hint.imported'))

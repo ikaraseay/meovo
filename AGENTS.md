@@ -410,6 +410,11 @@
       设置页改完按 key 把新文案贴回 iframe 里那些元素（`footer.custom` 贴 HTML，邮箱改 mailto）
     - ⚠️ key 写错是**静默失灵**（预览里那句话不动，也没报错）——
       `test/dom-contract.test.ts` 盯着每个 `data-copy` 的 key 都在语言包里
+    - **点预览里的任意一句 → 直接跳到对应的词条**（`jumpToEntry`）：先清掉搜索 / 筛选、
+      翻到那一页，再聚焦那个输入框。预览里的链接**一律不跟随** —— 它是用来看效果的，不是逛站点的
+    - ⚠️ 预览那张卡的类名是 `.admin-live`，**别写 `.admin-preview`** ——
+      那是**编辑器**的 markdown 预览，自带 `height` + `overflow`，
+      套到设置页上会把整页压成一个定高滚动框（踩过一次）
   - **改完即存**：失焦就 PUT 单条（没有「保存改动」按钮），连着改两个字段时排队串行写，
     存失败的条在字段上标红。界面文案三百多条 —— 搜索 + 按模块筛 + 每页 20 条
   - 站点信息（`site.*`）同样**不进「界面文案」列表** —— 它自己有「站点信息」卡
@@ -509,10 +514,19 @@
   - **保存与构建是分开的两步** —— 保存只改 D1，**不触发构建**；
     要上线点页头的「构建上线」（`POST /api/admin/build`，`AdminLayout.astro` 里接线）。
     攒着改完一次构建就行，别每改一个字就构建一次。
+    它是后台**唯一会改动线上的动作**，样式上单独强调（`.admin-build`：主色 + 光晕），
+    别退化成普通按钮 —— 作者会以为「保存完就上线了」。
   - **中英文各摆一块编辑界面**（没有「切语言」这回事）：同一篇文章的两个语言版本
     各占一张卡，各自带标题 / 摘要 / 正文 / 工具栏 / 预览；slug、日期、分类这些共用。
     保存时两种语言一起存 —— 填了标题的那一版才存（只写中文很正常）。
     另一版从 `GET /api/admin/documents?slug=&locale=` 取（同一 slug 换个语言就是它）
+  - **作者不手填 id**（界面上没有 slug / 系列 ID 输入框）：
+    `slug` 由标题派生（取第一个能成 ASCII 的标题，兜底 `post-<日期>-<短码>`）；
+    `seriesId` 由 `seriesTitle` 派生（`deriveSeriesId`）—— **纯 ASCII 标题才用 slug**，
+    否则取标题的稳定短码：中文标题 slugify 后只剩零碎英文，「Docker 入门」与「Docker 进阶」
+    会撞成同一个 id。已分配的 id 一经保存不再变（改标题不动地址）
+  - **标签是多值**：编辑器里是一颗颗芯片（`[data-admin-tag]`），回车 / 逗号 / 失焦各加一个，
+    重复的自动跳过；解析走服务端**同一个** `parseTags`（空格折连字符、去重、必须是 ASCII slug）
   - **编辑器有 markdown 工具栏 + 自动预览**：
     - 按钮表与纯文本改写函数都在 `frontend/lib/editor-tools.ts`（`EDITOR_TOOLS` +
       `wrapSelection` / `prefixLines` / `insertLink` / `insertTable`），组件只管读写 textarea。
