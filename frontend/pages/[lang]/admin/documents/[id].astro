@@ -3,8 +3,11 @@
  * 文档编辑器 —— 新建 / 修改 / 预览 / 插图 / 导入 .md。
  *
  * 中英文各摆一块编辑界面：同一篇文章的两个语言版本，
- * 标题 / 摘要 / 正文各自独立，slug 与分类这些字段共用。
+ * 标题 / 摘要 / 正文各自独立，链接与分类这些字段共用。
  * 改完一起保存 —— 上线由「构建上线」那一步决定。
+ *
+ * **链接（slug）由系统分配**：作者不用填，也不该改 ——
+ * 改了链接，旧的地址就全废了。要换标题不影响链接。
  */
 export const prerender = false
 
@@ -38,59 +41,15 @@ const langs = ['zh', 'en'] as const
     <section class="admin-card">
       <h2 class="admin-card__title">{t(locale, 'admin.card.basics')}</h2>
       <div class="admin-grid">
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.slug')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="slug" required />
-          <span class="admin-field__hint">{t(locale, 'admin.hint.slug')}</span>
-        </label>
+        <div class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.url')}</span>
+          <span class="admin-url" data-admin-url></span>
+          <span class="admin-field__hint">{t(locale, 'admin.hint.url')}</span>
+        </div>
 
         <label class="admin-field">
           <span class="admin-field__label">{t(locale, 'admin.field.pubDate')}</span>
           <input class="ui-input" type="date" name="pubDate" />
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.updatedDate')}</span>
-          <input class="ui-input" type="date" name="updatedDate" />
-        </label>
-      </div>
-    </section>
-
-    <section class="admin-card">
-      <h2 class="admin-card__title">{t(locale, 'admin.card.taxonomy')}</h2>
-      <div class="admin-grid">
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.category')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="category" />
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="tags" />
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
-          <select class="ui-input" name="license">
-            {LICENSE_IDS.map((id) => (
-              <option value={id}>{t(locale, LICENSES[id].nameKey)}</option>
-            ))}
-          </select>
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesId')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="seriesId" />
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
-          <input class="ui-input" type="text" name="seriesTitle" />
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesOrder')}</span>
-          <input class="ui-input" type="number" name="seriesOrder" min="1" />
         </label>
       </div>
     </section>
@@ -135,12 +94,49 @@ const langs = ['zh', 'en'] as const
       ))
     }
 
+    {/* 少用的设置折起来 —— 分类、标签、协议、系列都不是每篇都要 */}
+    <details class="admin-card admin-card--fold">
+      <summary class="admin-card__title">{t(locale, 'admin.card.more')}</summary>
+      <div class="admin-grid">
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.category')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="category" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="tags" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
+          <select class="ui-input" name="license">
+            {LICENSE_IDS.map((id) => (
+              <option value={id}>{t(locale, LICENSES[id].nameKey)}</option>
+            ))}
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesId')}</span>
+          <input class="ui-input admin-input--mono" type="text" name="seriesId" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
+          <input class="ui-input" type="text" name="seriesTitle" />
+        </label>
+
+        <label class="admin-field">
+          <span class="admin-field__label">{t(locale, 'admin.field.seriesOrder')}</span>
+          <input class="ui-input" type="number" name="seriesOrder" min="1" />
+        </label>
+      </div>
+    </details>
+
     <div class="admin-actionbar admin-actionbar--sticky">
       <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
       <div class="admin-actionbar__buttons">
-        <button class="ui-btn" type="button" data-admin-preview-button>
-          {t(locale, 'admin.action.preview')}
-        </button>
         <button class="ui-btn" type="button" data-admin-media-button>
           {t(locale, 'admin.action.insertImage')}
         </button>
@@ -166,6 +162,11 @@ const langs = ['zh', 'en'] as const
   import { t } from '../../../../i18n'
   import { api, errorText, nextToken } from '../../../../../backend/lib/admin/client'
   import { parseFrontmatter } from '../../../../../backend/lib/admin/frontmatter'
+  import {
+    checkRequired,
+    deriveSlug,
+    todayDate,
+  } from '../../../../../backend/lib/admin/documents'
   import {
     EDITOR_TOOLS,
     wrapSelection,
@@ -243,6 +244,8 @@ const langs = ['zh', 'en'] as const
   let activePane: Pane | null = null
   /** 页面上这篇文档是哪种语言 */
   let currentLang: Lang = 'zh'
+  /** 这一组（两种语言）共用的链接 —— 系统分配的，界面上只读 */
+  let groupSlug = ''
   let dirty = false
 
   function field(name: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null {
@@ -284,9 +287,7 @@ const langs = ['zh', 'en'] as const
   /** 两种语言共用的字段 */
   function collectShared() {
     return {
-      slug: field('slug')?.value ?? '',
       pubDate: field('pubDate')?.value ?? '',
-      updatedDate: field('updatedDate')?.value ?? '',
       category: field('category')?.value ?? '',
       tags: field('tags')?.value ?? '',
       license: field('license')?.value ?? 'cc-by',
@@ -297,15 +298,24 @@ const langs = ['zh', 'en'] as const
   }
 
   function fillShared(doc: DocumentRow) {
-    setField('slug', doc.slug)
+    groupSlug = doc.slug
     setField('pubDate', (doc.pub_date ?? '').slice(0, 10))
-    setField('updatedDate', (doc.updated_date ?? '').slice(0, 10))
     setField('category', doc.category ?? '')
     setField('tags', safeTags(doc.tags))
     setField('seriesId', doc.series_id ?? '')
     setField('seriesTitle', doc.series_title ?? '')
     setField('seriesOrder', doc.series_order == null ? '' : String(doc.series_order))
     setField('license', doc.license)
+    renderUrl()
+  }
+
+  /** 链接那栏 —— 保存前显示「待生成」，保存后显示真实路径 */
+  function renderUrl() {
+    const box = document.querySelector<HTMLElement>('[data-admin-url]')
+    if (!box) return
+    box.textContent = groupSlug
+      ? '/' + locale + '/posts/' + groupSlug + '/'
+      : t(locale, 'admin.hint.urlPending')
   }
 
   /** 一篇文档 → 一种语言 */
@@ -317,7 +327,7 @@ const langs = ['zh', 'en'] as const
     renderLangStatus(lang)
   }
 
-  /** 另一种语言还没有这一版 —— 清空那一块 */
+  /** 另一种语言还没有这一版 —— 清空那一块（链接照旧共用） */
   function clearDoc(lang: Lang) {
     docs[lang] = { id: null, status: 'draft', updatedAt: null }
     setLangField('title', lang, '')
@@ -356,8 +366,7 @@ const langs = ['zh', 'en'] as const
     }
     if (viewLink) {
       viewLink.hidden = !published
-      const slug = field('slug')?.value ?? ''
-      if (published && slug) viewLink.href = '/' + currentLang + '/posts/' + slug + '/'
+      if (published && groupSlug) viewLink.href = '/' + currentLang + '/posts/' + groupSlug + '/'
     }
     if (deleteButton) deleteButton.hidden = docId === 'new'
     if (publishButton) {
@@ -380,22 +389,84 @@ const langs = ['zh', 'en'] as const
     }).format(date)
   }
 
+  /* ---------------- 必填项 ---------------- */
+
+  /** 错误代码 → 字段 —— 服务端只给代码，界面要知道标哪儿 */
+  const ERROR_FIELD: Record<string, string> = {
+    title_required: 'title',
+    license_invalid: 'license',
+    category_invalid: 'category',
+    tag_invalid: 'tags',
+    date_invalid: 'pubDate',
+    series_invalid: 'seriesId',
+    series_order_invalid: 'seriesOrder',
+  }
+
+  /** 字段上的红字 —— 挨着输入框，别只丢一句飘在上面的消息 */
+  function showFieldError(name: string, message: string) {
+    const input = field(name)
+    if (!input) return
+    input.setAttribute('aria-invalid', 'true')
+    const wrap = input.closest('.admin-field')
+    if (!wrap) return
+    let note = wrap.querySelector<HTMLElement>('.admin-field__error')
+    if (!note) {
+      note = document.createElement('span')
+      note.className = 'admin-field__error'
+      wrap.appendChild(note)
+    }
+    note.textContent = message
+  }
+
+  function clearFieldErrors() {
+    if (!form) return
+    for (const input of form.querySelectorAll('[aria-invalid]')) {
+      input.removeAttribute('aria-invalid')
+    }
+    for (const note of form.querySelectorAll('.admin-field__error')) note.remove()
+  }
+
+  /** 两版都验一遍 —— 有内容却没标题就是漏填 */
+  function validateAll(): string[] {
+    const issues: string[] = []
+    for (const lang of LANGS) {
+      const issue = checkRequired({
+        title: langField('title', lang)?.value ?? '',
+        description: langField('description', lang)?.value ?? '',
+        body: langField('body', lang)?.value ?? '',
+      })
+      if (!issue) continue
+      issues.push(issue)
+      showFieldError('title-' + lang, errorText(locale, issue))
+    }
+    return issues
+  }
+
+  /** 服务端返回的错误代码 → 标到对应的字段上 */
+  function markFields(lang: Lang, errors: string[]) {
+    for (const code of errors) {
+      const base = ERROR_FIELD[code]
+      if (!base) continue
+      showFieldError(base === 'title' ? 'title-' + lang : base, errorText(locale, code))
+    }
+  }
+
   /* ---------------- 保存 ---------------- */
 
   /** 一篇文档存一次 —— 有了就改，没有就建 */
   async function saveDoc(lang: Lang, publish: boolean): Promise<string | null> {
     const state = docs[lang]
-    const title = langField('title', lang)?.value ?? ''
-    // 没填标题 —— 这一版就不存在（只写了中文是很正常的事）
-    if (!title.trim()) return null
     const payload = {
       ...collectShared(),
       locale: lang,
-      title,
+      title: langField('title', lang)?.value ?? '',
       description: langField('description', lang)?.value ?? '',
       body: langField('body', lang)?.value ?? '',
       updatedAt: state.updatedAt ?? '',
     }
+    // 整版都空 —— 这一版不存在（只写了中文是很正常的事）
+    if (!payload.title.trim() && !payload.description.trim() && !payload.body.trim()) return null
+
     let created = false
     if (state.id) {
       const saved = await api<{ updatedAt?: string }>('/api/admin/documents/' + state.id, {
@@ -405,12 +476,28 @@ const langs = ['zh', 'en'] as const
       // 令牌换新的 —— 服务端每次写入都换，不换的话第二次保存必然 409
       state.updatedAt = nextToken(state.updatedAt, saved)
     } else {
-      const result = await api<{ id?: string; updatedAt?: string }>('/api/admin/documents', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
+      const result = await api<{ id?: string; slug?: string; updatedAt?: string }>(
+        '/api/admin/documents',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...payload,
+            // 同一篇的另一种语言要共用一个链接；还没有就按标题猜一个
+            slug: groupSlug,
+            slugHint: groupSlug
+              ? ''
+              : deriveSlug([
+                  langField('title', 'en')?.value ?? '',
+                  langField('title', 'zh')?.value ?? '',
+                ]),
+          }),
+        },
+      )
       state.id = result.id ?? null
       state.updatedAt = nextToken(null, result)
+      // 服务端分配的结果说了算 —— 撞车时它会自己加后缀
+      groupSlug = result.slug ?? groupSlug
+      renderUrl()
       created = true
     }
     if (publish && state.id) {
@@ -426,11 +513,24 @@ const langs = ['zh', 'en'] as const
   }
 
   async function save(publish: boolean): Promise<boolean> {
+    clearFieldErrors()
+    // 先把两版都验一遍 —— 有漏填就别写库，免得存一半
+    const issues = validateAll()
+    if (issues.length > 0) {
+      say(errorText(locale, issues[0]), true)
+      return false
+    }
     try {
       let created: string | null = null
       for (const lang of LANGS) {
-        const id = await saveDoc(lang, publish)
-        if (id && !created) created = id
+        try {
+          const id = await saveDoc(lang, publish)
+          if (id && !created) created = id
+        } catch (error) {
+          const failure = error as { code?: string; errors?: string[] }
+          markFields(lang, failure.errors ?? [])
+          throw error
+        }
       }
       dirty = false
       renderStatus()
@@ -647,17 +747,6 @@ const langs = ['zh', 'en'] as const
     pane.timer = window.setTimeout(() => void refreshPreview(pane), 400)
   }
 
-  document
-    .querySelector<HTMLButtonElement>('[data-admin-preview-button]')
-    ?.addEventListener('click', () => {
-      // 没聚焦过正文框就用第一块 —— 点了必须有个反应
-      const pane = activePane ?? panes[0]
-      if (!pane) return
-      void refreshPreview(pane)
-      // 预览面板在正文框旁边，按钮在页面最下面 —— 不滚过去看着像没反应
-      pane.preview.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-
   /* ---------------- 图库与导入 ---------------- */
 
   function insertAtCursor(text: string) {
@@ -725,23 +814,19 @@ const langs = ['zh', 'en'] as const
       setField('pubDate', pubDate.slice(0, 10))
       setField('tags', tags)
       setLangField('body', pane.lang, parsed.body)
-      if (!field('slug')?.value) {
-        setField('slug', title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-'))
-      }
       bodyChanged(pane)
       say(t(locale, 'admin.hint.imported'))
     })
 
   /* ---------------- 载入 ---------------- */
 
-  /** 另一种语言的那一版 —— 同一 slug 下换个语言就是它 */
+  /** 另一种语言的那一版 —— 同一链接下换个语言就是它 */
   async function loadSibling() {
-    const slug = (field('slug')?.value ?? '').trim()
-    if (!slug) return
+    if (!groupSlug) return
     const other: Lang = currentLang === 'zh' ? 'en' : 'zh'
     try {
       const data = await api<{ document: DocumentRow | null }>(
-        '/api/admin/documents?slug=' + encodeURIComponent(slug) + '&locale=' + other,
+        '/api/admin/documents?slug=' + encodeURIComponent(groupSlug) + '&locale=' + other,
       )
       if (data.document) fillDoc(other, data.document)
       else clearDoc(other)
@@ -755,6 +840,9 @@ const langs = ['zh', 'en'] as const
 
   async function load() {
     if (docId === 'new') {
+      // 新文章：发布日期默认今天，作者想改再改
+      setField('pubDate', todayDate())
+      renderUrl()
       renderStatus()
       return
     }
@@ -773,9 +861,6 @@ const langs = ['zh', 'en'] as const
       say(errorText(locale, failure.code ?? 'request_failed'), true)
     }
   }
-
-  // slug 改了 —— 另一语言的那一版要跟着换
-  field('slug')?.addEventListener('change', () => void loadSibling())
 
   // 没保存就离开 —— 别把改了一半的内容丢掉
   window.addEventListener('beforeunload', (event) => {

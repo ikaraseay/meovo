@@ -83,6 +83,12 @@ export async function getDocument(id: string): Promise<DocumentRecord | null> {
   return env.DB.prepare('SELECT * FROM documents WHERE id = ?').bind(id).first<DocumentRecord>()
 }
 
+/** 所有用过的 slug —— 派生新 slug 时避开它们 */
+export async function listDocumentSlugs(): Promise<string[]> {
+  const result = await env.DB.prepare('SELECT slug FROM documents').all<{ slug: string }>()
+  return (result.results ?? []).map((row) => row.slug)
+}
+
 export async function findDocumentBySlug(
   slug: string,
   locale: string,
@@ -112,7 +118,7 @@ export interface DocumentValues {
   license: string
 }
 
-export async function createDocument(id: string, values: DocumentValues): Promise<void> {
+export async function createDocument(id: string, values: DocumentValues): Promise<string> {
   const now = new Date().toISOString()
   const sql =
     'INSERT INTO documents (' +
@@ -138,6 +144,8 @@ export async function createDocument(id: string, values: DocumentValues): Promis
       now,
     )
     .run()
+  // 新令牌回传 —— 客户端不拿它，下一次保存就等于没有并发保护
+  return now
 }
 
 export async function updateDocument(
@@ -145,20 +153,18 @@ export async function updateDocument(
   values: DocumentValues,
   expectedUpdatedAt: string | null,
 ): Promise<{ result: 'ok' | 'conflict' | 'missing'; updatedAt: string }> {
-  const current = await getDocument(id)
-  if (!current) return { result: 'missing', updatedAt: '' }
-  // 别人改过了就别覆盖 —— 后写覆盖先写会丢内容
-  if (expectedUpdatedAt && current.updated_at !== expectedUpdatedAt) {
-    return { result: 'conflict', updatedAt: current.updated_at }
-  }
-
   // 新令牌写进去也返回出去 —— 客户端要靠它做下一次保存
   const updatedAt = new Date().toISOString()
+  // 并发保护写在 SQL 里：只有令牌还跟库里一样时才写得进去。
+  // 先查后写会有缝 —— 两个请求都读到同一个旧令牌、都通过检查、都写入，
+  // 后写静默覆盖先写（正文就没了）。
+  // 没带令牌时用当前值当期望值 —— 相当于「无条件覆盖」，但仍是原子的。
+  const expect = expectedUpdatedAt || (await getDocument(id))?.updated_at || ''
   const sql =
     'UPDATE documents SET slug = ?, locale = ?, title = ?, description = ?, body = ?, ' +
     'pub_date = ?, updated_date = ?, category = ?, tags = ?, series_id = ?, series_title = ?, ' +
-    'series_order = ?, license = ?, updated_at = ? WHERE id = ?'
-  await env.DB.prepare(sql)
+    'series_order = ?, license = ?, updated_at = ? WHERE id = ? AND updated_at = ?'
+  const result = await env.DB.prepare(sql)
     .bind(
       values.slug,
       values.locale,
@@ -175,8 +181,16 @@ export async function updateDocument(
       values.license,
       updatedAt,
       id,
+      expect,
     )
     .run()
+
+  // 一行都没改 —— 令牌对不上：要么被别人改过，要么这文档没了
+  if (result.meta.changes === 0) {
+    const current = await getDocument(id)
+    if (!current) return { result: 'missing', updatedAt: '' }
+    return { result: 'conflict', updatedAt: current.updated_at }
+  }
   return { result: 'ok', updatedAt }
 }
 
@@ -307,25 +321,32 @@ export async function deleteProject(id: string): Promise<void> {
 
 /* ---------------- 登录限流 ---------------- */
 
-export async function getLoginAttempt(ip: string): Promise<LoginAttempt> {
-  const row = await env.DB.prepare('SELECT count, window_at FROM login_attempts WHERE ip = ?')
-    .bind(ip)
-    .first<LoginAttempt>()
-  return row ?? { count: 0, window_at: new Date(0).toISOString() }
-}
-
-export async function recordLoginFailure(ip: string, windowMs: number): Promise<void> {
+/**
+ * 记一次失败并返回计数 —— **一条语句**，不先读再写。
+ *
+ * ⚠️ 「读 count → 加一 → 写回」三步是竞态：并发请求各读到同一个旧 count，
+ * 各算出同一个新值，后写覆盖先写 —— 计数停在 1，限流形同虚设。
+ * 让数据库自己加（count + 1）并用 RETURNING 拿回新值，D1 串行化写入，
+ * 并发请求各拿到各的号。
+ *
+ * 窗口过期就在同一条语句里把 count 归 1、窗口重开 ——
+ * 条件写在 SQL 里，同样没有竞态。
+ */
+export async function recordLoginFailure(ip: string, windowMs: number): Promise<LoginAttempt> {
   const now = Date.now()
-  const current = await getLoginAttempt(ip)
-  const expired = now - new Date(current.window_at).getTime() >= windowMs
-  const count = expired ? 1 : current.count + 1
-  const windowAt = expired ? new Date(now).toISOString() : current.window_at
-  await env.DB.prepare(
-    'INSERT INTO login_attempts (ip, count, window_at) VALUES (?, ?, ?) ' +
-      'ON CONFLICT(ip) DO UPDATE SET count = excluded.count, window_at = excluded.window_at',
+  const windowAt = new Date(now).toISOString()
+  // 窗口的起点 —— 比它还早的记录算过期
+  const cutoff = new Date(now - windowMs).toISOString()
+  const row = await env.DB.prepare(
+    'INSERT INTO login_attempts (ip, count, window_at) VALUES (?, 1, ?) ' +
+      'ON CONFLICT(ip) DO UPDATE SET ' +
+        'count = CASE WHEN window_at <= ? THEN 1 ELSE count + 1 END, ' +
+        'window_at = CASE WHEN window_at <= ? THEN ? ELSE window_at END ' +
+      'RETURNING count, window_at',
   )
-    .bind(ip, count, windowAt)
-    .run()
+    .bind(ip, windowAt, cutoff, cutoff, windowAt)
+    .first<LoginAttempt>()
+  return row ?? { count: 1, window_at: windowAt }
 }
 
 export async function clearLoginAttempts(ip: string): Promise<void> {

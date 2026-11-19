@@ -7,6 +7,7 @@
  * 浅到「感觉得出来一点就好」；组件只内联色相，浅/深两套配方在 tokens.css。
  */
 import { t, type Locale } from '../i18n'
+import { hashHue } from '../lib/tint-hue'
 
 interface Props {
   /** 部件 id —— 跨页面唯一，位置按它存 localStorage，也决定 tint 色相 */
@@ -29,16 +30,6 @@ interface Props {
 }
 
 const { id, width = 'auto', full = false, zone, defaultPin = false, minHeight = 0, maxHeight = 0, noLimit = false, locale } = Astro.props
-
-/** 悦目的色相集合 —— 避开病态的黄绿，只取看着舒服的暖/冷色 */
-const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
-
-/** 字符串哈希 → 0..N-1，同一 id 永远同一个色相 */
-function hashHue(key: string): number {
-  let h = 0
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
-  return TINT_HUES[h % TINT_HUES.length]
-}
 
 const hue = hashHue(id)
 

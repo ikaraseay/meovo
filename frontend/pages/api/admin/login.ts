@@ -7,7 +7,7 @@ export const prerender = false
 import type { APIRoute } from 'astro'
 import {
   LOGIN_WINDOW_MS,
-  isRateLimited,
+  lockAfterFailure,
   verifyPassword,
 } from '../../../../backend/lib/admin/password.ts'
 import {
@@ -18,7 +18,6 @@ import {
 import {
   clearLoginAttempts,
   clientIp,
-  getLoginAttempt,
   recordLoginFailure,
   secret,
 } from '../../../../backend/lib/admin/db.ts'
@@ -50,10 +49,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // 口令不对 —— 这才要限流
-  const attempt = await getLoginAttempt(ip)
-  if (isRateLimited(attempt.count, new Date(attempt.window_at).getTime())) {
+  // 计数与判定一起做（一条原子语句）—— 先查后写会被并发请求钻空子
+  const attempt = await recordLoginFailure(ip, LOGIN_WINDOW_MS)
+  if (lockAfterFailure(attempt.count, new Date(attempt.window_at).getTime())) {
     return fail('rate_limited', 429)
   }
-  await recordLoginFailure(ip, LOGIN_WINDOW_MS)
   return fail('invalid_password', 401)
 }

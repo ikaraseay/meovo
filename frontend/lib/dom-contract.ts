@@ -89,6 +89,12 @@ export const CLASS = {
   expanded: 'is-expanded',
   /** 卡片内容可滚动 */
   scrollable: 'ui-widget--scrollable',
+  /** 卡片正在被拖 —— 关掉自身的过渡，别跟着抖 */
+  isDragging: 'is-dragging',
+  /** 友链探活：通的 */
+  linkOk: 'link-ok',
+  /** 友链探活：不通的 */
+  linkDown: 'link-down',
   /** 卡片正文容器 */
   widgetBody: 'ui-widget__body',
   /** 卡片原语 —— 全站统一的卡片外观 */
@@ -172,6 +178,8 @@ export const ATTR = {
   adminProjects: 'data-admin-projects',
   /** 友链行 */
   linkRow: 'data-link-row',
+  /** 这一段文字对应哪个可改文案 —— 后台预览靠它把改动贴回真实页面 */
+  copy: 'data-copy',
   /** 友链地址（探测用） */
   linkUrl: 'data-link-url',
   /** 友链手动状态（ok / down / unknown） */

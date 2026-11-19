@@ -2,10 +2,12 @@
 export const prerender = false
 
 import type { APIRoute } from 'astro'
-import { normalizeDocument } from '../../../../../backend/lib/admin/documents.ts'
+import {
+  normalizeDocument,
+  todayDate,
+} from '../../../../../backend/lib/admin/documents.ts'
 import {
   deleteDocument,
-  findDocumentBySlug,
   getDocument,
   updateDocument,
 } from '../../../../../backend/lib/admin/db.ts'
@@ -31,20 +33,24 @@ export const PUT: APIRoute = async ({ params, request }) => {
   }
   const values = normalized.value
 
-  const taken = await findDocumentBySlug(values.slug, values.locale, id)
-  if (taken) return fail('slug_taken', 409)
+  // slug 一经分配就不再变 —— 改了链接，旧的地址就全废了
+  const slug = existing.slug
+  // 内容改了就把「更新于」写成今天 —— 作者不用记得手动改这个日期
+  const changed = existing.title !== values.title || existing.body !== values.body
+  const updatedDate =
+    values.updatedDate ?? (changed && existing.published_at ? todayDate() : existing.updated_date)
 
   const expected = typeof body.updatedAt === 'string' ? body.updatedAt : null
   const { result, updatedAt } = await updateDocument(
     id,
     {
-      slug: values.slug,
+      slug,
       locale: values.locale,
       title: values.title,
       description: values.description,
       body: values.body,
       pub_date: values.pubDate,
-      updated_date: values.updatedDate,
+      updated_date: updatedDate,
       category: values.category,
       tags: values.tags,
       series_id: values.seriesId,
@@ -57,8 +63,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   if (result === 'conflict') return fail('conflict', 409)
   if (result === 'missing') return fail('not_found', 404)
 
-  // 新令牌回传 —— 客户端不换掉手里那份，下一次保存必然 409
-  return json({ ok: true, updatedAt })
+  return json({ ok: true, updatedAt, slug })
 }
 
 export const DELETE: APIRoute = async ({ params }) => {

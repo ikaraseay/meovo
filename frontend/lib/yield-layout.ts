@@ -45,12 +45,12 @@ export interface Corridor {
 
 /** 一截走廊的绝对下限 —— 再窄就没法读了 */
 export const MIN_YIELD_MEASURE = 96
-/** 也不能窄到只剩列宽的一成半 —— 太窄就不绕了 */
+/** 也不能窄到只剩列宽的一成二 —— 太窄就不绕了 */
 const MIN_YIELD_RATIO = 0.12
 /** 卡片与文字之间留的缝 */
 export const YIELD_MARGIN = 12
 
-/** 走廊下限：窄列上更严（列宽的一成半） */
+/** 走廊下限：窄列上更严（列宽的一成二） */
 export function minMeasure(column: Rect): number {
   const width = column.right - column.left
   return Math.max(MIN_YIELD_MEASURE, width * MIN_YIELD_RATIO)

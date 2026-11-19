@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { ATTR, CLASS, Z } from '../frontend/lib/dom-contract.ts'
+import { DESKTOP_MIN_WIDTH } from '../frontend/lib/breakpoint.ts'
+import { allText } from '../frontend/i18n/ui.ts'
 
 /** 收集目录下的源码文件 */
 function sources(dir: URL, out: string[] = []): string[] {
@@ -20,6 +22,8 @@ const read = (file: string) => readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\
 const styleFiles = [
   ...sources(new URL('../frontend/styles/', import.meta.url)),
   ...sources(new URL('../frontend/components/', import.meta.url)),
+  // 页面也有 scoped 样式 —— 契约里的 class 名可能在页面上定义
+  ...sources(new URL('../frontend/pages/', import.meta.url)),
 ]
 const markupFiles = [
   ...sources(new URL('../frontend/components/', import.meta.url)),
@@ -75,6 +79,17 @@ test('契约里的 data 属性都有人在用', () => {
   }
 })
 
+test('可改文案的标记都指向语言包里的 key', () => {
+  // 后台设置页靠 data-copy 把改好的词条贴回真实页面 —— key 写错是**静默失灵**：
+  // 预览里那句话不动，页面上也没有任何报错。
+  for (const file of markupFiles) {
+    const source = read(file)
+    for (const match of source.matchAll(/data-copy="([^"]+)"/g)) {
+      assert.ok(match[1] in allText, `${file} 里的 data-copy="${match[1]}" 不在语言包里`)
+    }
+  }
+})
+
 test('部件 tint：色相变量在组件与样式层同名', () => {
   // 组件只内联色相，配方在 tokens.css —— 两边变量名对不上，tint 会静默消失（没有报错，只有颜色没了）
   const tokens = read(new URL('../frontend/styles/tokens.css', import.meta.url).pathname)
@@ -97,6 +112,25 @@ test('契约要双向守：lib 层读的名字都得登记', () => {
       const name = match[1].slice(1)
       assert.ok(classes.has(name), `${file} 用了未登记的 class：${name}`)
     }
+    // classList 的裸字符串也算 —— 上一条只认带点的选择器，
+    // classList.add('is-dragging') 这种写法会从缝里溜过去。
+    for (const match of source.matchAll(/classList\.(?:add|remove|toggle)\(\s*['"`]([\w-]+)['"`]/g)) {
+      assert.ok(classes.has(match[1]), `${file} 用了未登记的 class：${match[1]}`)
+    }
+  }
+})
+
+test('断点只有一条线：CSS 与 breakpoint.ts 对得上', () => {
+  // 桌面 (min-width: 1024px) / 移动 not (min-width: 1024px) 是一对，
+  // 必须配套 —— 移动那条写成 max-width: 1023px 会在 1023~1024 之间留缝：
+  // 桌面规则和移动规则都不生效，JS 却已经按移动端处理了。
+  const css = styleFiles.map(read).join('\n')
+  assert.ok(
+    !/max-width:\s*1023px/.test(css),
+    '移动端那条不能写 max-width: 1023px —— 1023~1024 之间会留一条缝',
+  )
+  for (const match of css.matchAll(/not\s*\(min-width:\s*(\d+)px\)/g)) {
+    assert.equal(Number(match[1]), DESKTOP_MIN_WIDTH, `CSS 的断点是 ${match[1]}，与 breakpoint.ts 的 ${DESKTOP_MIN_WIDTH} 对不上`)
   }
 })
 

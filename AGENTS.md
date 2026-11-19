@@ -261,6 +261,9 @@
   那会在 1023~1024px 之间留一条缝（2048 宽的屏对半分正好 1023.5px）：
   桌面规则和移动规则都不生效，JS 却已经按移动端处理了。
   JS 侧用 `frontend/lib/breakpoint.ts` 的 `DESKTOP_MQ` / `isDesktop()`。
+  ⚠️ CSS 拿不到这个常量（媒体查询里不能用自定义属性），
+  所以 **`test/dom-contract.test.ts` 盯着 CSS 那侧的 1024** ——
+  改断点要同时改 `breakpoint.ts` 与所有媒体查询，测试会逼你改齐。
 - **浮层（悬浮栏）**：栏体、二级面板、设置 FAB、设置弹窗是四个独立的 fixed 面，规则见
   `docs/adr/0002-floating-bar-overlay-state.md`。
   - **层级刻度在 `tokens.css` 的 `--ui-z-*`** —— 组件里不写裸 `z-index`，层序由语义决定
@@ -401,6 +404,15 @@
     这几条**不进「界面文案」列表**，也不在「站点信息」区里 —— 页脚的事一页说清
   - **`footer.custom` 按裸 HTML 渲染**（`set:html`）—— 作者要写链接、图标就写标签。
     跟正文一样不消毒：内容只来自后台那位作者
+  - **后台设置页右边那块是真实预览** —— 不是画出来的假界面，是**真的把站点装进 iframe**
+    （首页 / 关于页两个真实页面 + 页脚那一面），改一个字预览里立刻变
+    - 前台在可改文案处打 `data-copy="<i18n key>"` 标记（契约 `ATTR.copy`），
+      设置页改完按 key 把新文案贴回 iframe 里那些元素（`footer.custom` 贴 HTML，邮箱改 mailto）
+    - ⚠️ key 写错是**静默失灵**（预览里那句话不动，也没报错）——
+      `test/dom-contract.test.ts` 盯着每个 `data-copy` 的 key 都在语言包里
+  - **改完即存**：失焦就 PUT 单条（没有「保存改动」按钮），连着改两个字段时排队串行写，
+    存失败的条在字段上标红。界面文案三百多条 —— 搜索 + 按模块筛 + 每页 20 条
+  - 站点信息（`site.*`）同样**不进「界面文案」列表** —— 它自己有「站点信息」卡
   - ⚠️ `config/site.json` 的值**可以留空** —— 空 = 站上不显示（作者可以在后台填）。
     但中英要么都填、要么都空；词典（`ui.ts`）里的每条仍必须非空
   - 构建期由 `backend/scripts/export-d1-posts.mjs` 写进 `frontend/i18n/overrides.ts`，
@@ -418,6 +430,10 @@
   - **契约测试双向守**：lib 层读到的 `data-*` 与 class 字面量也得登记 ——
     真正会咬人的是「标记里有人用了契约外的名字」（改名只会静默失灵）。
     反向检查的范围是 lib 层：组件内部自己写自己读的名字不算跨 module。
+    ⚠️ 检查认两种写法：选择器里的 `'.foo'` **与** `classList.add('foo')` ——
+    后者不带点，早期的检查漏了它，`is-dragging` 就是这么漏出去的。
+  - **部件 tint 的色相表只有一份**：`frontend/lib/tint-hue.ts` 的 `hashHue()` ——
+    玻璃部件与友链头像共用（以前两个组件各抄一份，加一个色相就分叉）。
 - **持久化**：走 `frontend/lib/persist.ts` 的 `createStore({ key, version, clean, migrate })` ——
   序列化、版本、清洗只有一处。两个 adapter：`floating-bar-state.ts`（像素）与
   `widget-state.ts`（横坐标百分比 + **纵坐标绝对像素**）。落盘格式是 `{ version, data }`，
@@ -521,6 +537,15 @@
   - 同 IP 10 分钟内失败 5 次锁（`login_attempts` 表）。
     ⚠️ **先验口令、再限流**：口令对了就放行（并清掉计数），限流只挡「猜口令」——
     反过来的话，先错几次就再也进不去（正确口令也回 429），最让人抓狂。
+    - ⚠️ **计数必须一条语句原子做完**（`db.ts` 的 `recordLoginFailure`）：
+      「读 count → 加一 → 写回」有竞态 —— 并发请求各读到同一个旧 count、
+      各算出同一个新值，后写覆盖先写，计数停在 1，限流形同虚设。
+      改成一条 `ON CONFLICT ... DO UPDATE SET count = count + 1 ... RETURNING count`，
+      窗口过期也在同一条语句里归零（`CASE WHEN window_at <= ?`）。
+    - ⚠️ **编辑器的并发保护要写在 SQL 里**（`db.ts` 的 `updateDocument`）：
+      `UPDATE ... WHERE id = ? AND updated_at = ?`，靠 `meta.changes` 判冲突。
+      先查后写有缝 —— 两个请求都读到同一个旧令牌、都通过检查、都写入，
+      后写静默覆盖先写，正文就没了。
 - **D1 存稿 → 构建期导出 markdown → 走现有静态管线上线**。
   ⚠️ **发布 ≠ 上线**：后台只改 D1，站点要等下一次构建（Cloudflare Workers Builds）。
   构建靠 `DEPLOY_HOOK_URL` 触发：后台的发布 / 保存已发布文章 / 撤回 / 删除 /
@@ -646,3 +671,7 @@ Five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-fo
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Tech constraints
+
+The short list of invariants that break silently when violated. See `docs/agents/tech-constraints.md`.

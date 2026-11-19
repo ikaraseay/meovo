@@ -397,11 +397,11 @@ const navItems: NavItem[] = [
     defaultMenuX as menuDefaultX,
   } from '../lib/floating-bar-layout'
   import { refreshSquircle } from '../lib/squircle'
+  import { clamp } from '../lib/geometry'
 
   // 用户摆出来的位置属于用户 —— 跨页面、跨刷新都得还在
   const saved = readFloatingBarState()
 
-  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
 
   /* ---------- 桌面端悬浮菜单 ---------- */
 
@@ -503,7 +503,9 @@ const navItems: NavItem[] = [
         menuFy = (startMenuY + s.dy) / window.innerHeight
         placeMenu()
       },
-      onEnd: () => {
+      onEnd: (s) => {
+        // 没拖动就别落盘 —— 碰一下字标不该让栏体永远回不到默认落点
+        if (!s.moved) return
         showReset()
         saveFloatingBarState({ menu: { fx: menuFx, fy: menuFy } })
       },

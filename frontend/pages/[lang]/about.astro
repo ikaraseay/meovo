@@ -29,9 +29,9 @@ const count = resolveItems(posts, locale).length
         <div class="about-head-text">
           <h1 class="page-title">{t(locale, 'about.title')}</h1>
           <p class="page-intro">{t(locale, 'about.intro')}</p>
-          <p class="about-pen-name">{t(locale, 'site.author')}</p>
+          <p class="about-pen-name" data-copy="site.author">{t(locale, 'site.author')}</p>
           <p class="about-pen-name">
-            <a class="about-email" href={`mailto:${t(locale, 'site.email')}`}>{t(locale, 'site.email')}</a>
+            <a class="about-email" href={`mailto:${t(locale, 'site.email')}`} data-copy="site.email">{t(locale, 'site.email')}</a>
           </p>
         </div>
       </div>

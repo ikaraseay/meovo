@@ -23,9 +23,6 @@ const license = LICENSES[post.data.license]
 /** 开源协议（CC 系列）才给原文链接 —— 「保留所有权利」不给 */
 const openLicense = post.data.license !== 'all-rights'
 
-/** 版权年份取发布年 —— 文章的版权从发布那年算 */
-const year = post.data.pubDate.getFullYear()
-
 /** 文章绝对地址 —— 用于归属卡里的链接 */
 const postUrl = new URL(
   `/${getPostLocale(post)}/posts/${getPostSlug(post)}/`,

@@ -6,7 +6,7 @@
  * 探测结果只影响视觉标记（红点），不阻断跳转。
  */
 
-import { ATTR } from './dom-contract'
+import { ATTR, CLASS } from './dom-contract'
 
 export interface LinkStatus {
   ok: boolean
@@ -42,16 +42,16 @@ export async function probeAllLinks(): Promise<void> {
 
     // 手动标过状态的尊重手动值
     if (manual === 'ok') {
-      row.classList.add('link-ok')
+      row.classList.add(CLASS.linkOk)
       return
     }
     if (manual === 'down') {
-      row.classList.add('link-down')
+      row.classList.add(CLASS.linkDown)
       return
     }
 
     const ok = await probe(url)
-    row.classList.add(ok ? 'link-ok' : 'link-down')
+    row.classList.add(ok ? CLASS.linkOk : CLASS.linkDown)
   })
 
   await Promise.all(tasks)

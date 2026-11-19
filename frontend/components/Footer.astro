@@ -24,18 +24,18 @@ const custom = t(locale, 'footer.custom')
 
 <GlassWidget id="footer" width="auto" full locale={locale} minHeight={minHeight}>
   <div class="footer-inner">
-    <p class="footer-copyright">
+    <p class="footer-copyright" data-copy="footer.copyright">
       {t(locale, 'footer.copyright', { year, name: t(locale, 'site.author') })}
     </p>
 
     <div class="footer-links">
       {icpNumber && (
-        <a href={`https://icp.gov.moe/?keyword=${icpNumber}`} target="_blank">{icp}</a>
+        <a href={`https://icp.gov.moe/?keyword=${icpNumber}`} target="_blank" data-copy="footer.icp">{icp}</a>
       )}
-      <span class="footer-note ui-text--muted">{t(locale, 'footer.builtWith')}</span>
+      <span class="footer-note ui-text--muted" data-copy="footer.builtWith">{t(locale, 'footer.builtWith')}</span>
     </div>
     {/* 附加内容按**裸 HTML** 渲染 —— 作者要写链接、图标就写标签 */}
-    {custom && <div class="footer-custom" set:html={custom}></div>}
+    {custom && <div class="footer-custom" data-copy="footer.custom" set:html={custom}></div>}
   </div>
 </GlassWidget>
 

@@ -4,6 +4,9 @@
  *
  * 「默认文字」= 语言包里的全部词条（站点信息、导航、文章、标签、后台……）。
  * 改完存到 D1，构建期导出成 i18n-overrides.json 叠在词典上。
+ *
+ * 左边是表单，右边**就是站点本身** —— 改一个字，预览里立刻变。
+ * 改完离开输入框就落盘，不用再点一次「保存」。
  */
 export const prerender = false
 
@@ -19,21 +22,47 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   title={t(locale, 'admin.settings.title')}
   intro={t(locale, 'admin.settings.intro')}
 >
-  <!-- 站点信息：最常改的几条，摆最上面 -->
-  <section class="admin-card">
-    <h2 class="admin-card__title">{t(locale, 'admin.settings.info')}</h2>
-    <p class="admin-card__hint">{t(locale, 'admin.settings.infoHint')}</p>
-    <div class="admin-settings__info" data-admin-info></div>
-  </section>
+  <div class="admin-settings__top">
+    <div class="admin-settings__stack">
+      <!-- 站点信息：最常改的几条，摆最上面 -->
+      <section class="admin-card">
+        <h2 class="admin-card__title">{t(locale, 'admin.settings.info')}</h2>
+        <p class="admin-card__hint">{t(locale, 'admin.settings.infoHint')}</p>
+        <div class="admin-settings__info" data-admin-info></div>
+      </section>
 
-  <!-- 页脚：页脚上显示的每一句都在这儿改 -->
-  <section class="admin-card">
-    <h2 class="admin-card__title">{t(locale, 'admin.settings.footer')}</h2>
-    <p class="admin-card__hint">{t(locale, 'admin.settings.footerHint')}</p>
-    <div class="admin-settings__info" data-admin-footer-box></div>
-  </section>
+      <!-- 页脚：页脚上显示的每一句都在这儿改 -->
+      <section class="admin-card">
+        <h2 class="admin-card__title">{t(locale, 'admin.settings.footer')}</h2>
+        <p class="admin-card__hint">{t(locale, 'admin.settings.footerHint')}</p>
+        <div class="admin-settings__info" data-admin-footer-box></div>
+      </section>
+    </div>
 
-  <!-- 界面文案：全量词条，可搜索、可按模块筛 -->
+    <!-- 实时预览：真的把站点装进框里，改了什么立刻看得见 -->
+    <section class="admin-card admin-preview">
+      <div class="admin-settings__bar">
+        <h2 class="admin-card__title">{t(locale, 'admin.settings.preview')}</h2>
+        <div class="admin-preview__modes">
+          <button class="ui-btn ui-btn--primary" type="button" data-admin-preview-mode="home">
+            {t(locale, 'admin.settings.previewHome')}
+          </button>
+          <button class="ui-btn" type="button" data-admin-preview-mode="about">
+            {t(locale, 'admin.settings.previewAbout')}
+          </button>
+          <button class="ui-btn" type="button" data-admin-preview-mode="footer">
+            {t(locale, 'admin.settings.previewFooter')}
+          </button>
+        </div>
+      </div>
+      <p class="admin-card__hint">{t(locale, 'admin.settings.previewHint')}</p>
+      <div class="admin-preview__frame" data-admin-preview-box>
+        <iframe class="admin-preview__iframe" data-admin-preview title={t(locale, 'admin.settings.preview')}></iframe>
+      </div>
+    </section>
+  </div>
+
+  <!-- 界面文案：全量词条，可搜索、可按模块筛、分页翻 -->
   <section class="admin-card">
     <div class="admin-settings__bar">
       <h2 class="admin-card__title">{t(locale, 'admin.settings.copy')}</h2>
@@ -46,24 +75,23 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
       <select class="ui-input admin-select" data-admin-module></select>
     </div>
     <div class="admin-settings__list" data-admin-entries></div>
+    <div class="admin-pager" data-admin-pager></div>
   </section>
 
-  <div class="admin-actionbar admin-actionbar--sticky" data-admin-footer hidden>
+  <div class="admin-actionbar admin-actionbar--sticky" data-admin-footer>
     <span class="admin-actionbar__meta" data-admin-count></span>
     <div class="admin-actionbar__buttons">
       <button class="ui-btn" type="button" data-admin-reset-all>
         {t(locale, 'admin.settings.resetAll')}
-      </button>
-      <button class="ui-btn ui-btn--primary" type="button" data-admin-save>
-        {t(locale, 'admin.settings.save')}
       </button>
     </div>
   </div>
 </AdminLayout>
 
 <script>
-  import { t } from '../../../i18n'
+  import { interpolate, t } from '../../../i18n'
   import { api, errorText } from '../../../../backend/lib/admin/client'
+  import { ATTR } from '../../../lib/dom-contract'
   import { FOOTER_HEIGHT_KEY, MAX_FOOTER_HEIGHT, parseFooterMinHeight } from '../../../lib/footer-height.ts'
 
   interface Entry {
@@ -75,35 +103,63 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     overridden: boolean
   }
 
+  /** 预览的三个面：改哪一块就看哪一面 */
+  type PreviewMode = 'home' | 'about' | 'footer'
+
   const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
   const flash = document.querySelector<HTMLElement>('[data-admin-flash]')
   const infoBox = document.querySelector<HTMLElement>('[data-admin-info]')
+  const footerBox = document.querySelector<HTMLElement>('[data-admin-footer-box]')
   const listBox = document.querySelector<HTMLElement>('[data-admin-entries]')
   const searchInput = document.querySelector<HTMLInputElement>('[data-admin-search]')
   const moduleSelect = document.querySelector('[data-admin-module]') as HTMLSelectElement | null
-  const footer = document.querySelector<HTMLElement>('[data-admin-footer]')
+  const pagerBox = document.querySelector<HTMLElement>('[data-admin-pager]')
   const countLabel = document.querySelector<HTMLElement>('[data-admin-count]')
-  const footerBox = document.querySelector<HTMLElement>('[data-admin-footer-box]')
+  const previewBox = document.querySelector<HTMLElement>('[data-admin-preview-box]')
+  const previewFrame = document.querySelector<HTMLIFrameElement>('[data-admin-preview]')
+  const modeButtons = [
+    ...document.querySelectorAll<HTMLButtonElement>('[data-admin-preview-mode]'),
+  ]
+
+  /** 站点信息：这几条最常改，单独摆出来 */
+  const INFO_KEYS = ['site.name', 'site.author', 'site.tagline', 'site.email']
 
   /** 页脚那张卡里的条目 —— 都有自己的控件，不进「界面文案」列表 */
   const FOOTER_TEXT_KEYS = [
     { key: 'footer.icp', placeholder: 'admin.settings.icpHint' },
     { key: 'footer.copyright' },
     { key: 'footer.builtWith' },
-    { key: 'footer.custom', multiline: true },
+    { key: 'footer.custom', multiline: true, placeholder: 'admin.settings.footerCustom' },
   ]
 
-  /** 站点信息：这几条最常改，单独摆出来 */
-  const INFO_KEYS = ['site.name', 'site.author', 'site.tagline', 'site.email']
+  /** 每页多少条 —— 三百多条一次铺开，既慢又找不着 */
+  const PAGE_SIZE = 20
 
-  /** 页脚那几条有自己的卡 —— 不进「界面文案」列表，也不进模块下拉 */
-  function isFooterKey(key: string): boolean {
-    return key === FOOTER_HEIGHT_KEY || FOOTER_TEXT_KEYS.some((item) => item.key === key)
+  /** 预览里的视口尺寸 —— 桌面宽度，缩放后塞进右边的框 */
+  const PREVIEW_WIDTH = 1280
+  const PREVIEW_HEIGHT = 1400
+
+  /** 改哪条 → 预览切到哪一面 */
+  const PREVIEW_MODE_OF: Record<string, PreviewMode> = {
+    'site.name': 'home',
+    'site.author': 'home',
+    'site.tagline': 'home',
+    'site.email': 'about',
+    'footer.icp': 'footer',
+    'footer.copyright': 'footer',
+    'footer.builtWith': 'footer',
+    'footer.custom': 'footer',
   }
 
   let entries: Entry[] = []
-  /** 用户动过的条目：key → 想要的值（等于默认值时保存即删除那行） */
+  let page = 1
+  let previewMode: PreviewMode = 'home'
+  /** 正在落盘的条数 —— 还没存完就别让页面离开 */
+  let saving = 0
+  /** 改了但还没落盘的值 —— key → {zh, en} */
   const touched = new Map<string, { zh: string; en: string }>()
+  /** 保存排队 —— 连着改两个字段时，后一个要等前一个存完 */
+  let saveChain: Promise<void> = Promise.resolve()
 
   function say(message: string, isError = false) {
     if (!flash) return
@@ -113,9 +169,16 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     flash.classList.add('admin-flash--visible')
   }
 
-  /** 当前生效的值（服务端存的值 + 未保存的改动） */
+  /** 当前生效的值（服务端存的值 + 还没落盘的改动） */
   function current(entry: Entry): { zh: string; en: string } {
     return touched.get(entry.key) ?? { zh: entry.zh, en: entry.en }
+  }
+
+  /** 某条的当前值（按界面语言）—— 预览用 */
+  function valueOf(key: string): string {
+    const entry = entries.find((item) => item.key === key)
+    if (!entry) return ''
+    return current(entry)[locale === 'en' ? 'en' : 'zh']
   }
 
   function moduleOf(key: string): string {
@@ -123,58 +186,155 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     return dot === -1 ? key : key.slice(0, dot)
   }
 
-  /** 真正跟「服务端存的值」不一样的条数 */
-  function changedCount(): number {
-    let count = 0
-    for (const [key, value] of touched) {
-      const entry = entries.find((item) => item.key === key)
-      if (!entry || entry.zh !== value.zh || entry.en !== value.en) count += 1
-    }
-    return count
+  /** 页脚那几条有自己的卡 —— 不进「界面文案」列表，也不进模块下拉 */
+  function isFooterKey(key: string): boolean {
+    return key === FOOTER_HEIGHT_KEY || FOOTER_TEXT_KEYS.some((item) => item.key === key)
   }
 
-  function updateFooter() {
-    if (!footer || !countLabel) return
-    const count = changedCount()
-    footer.hidden = count === 0
-    countLabel.textContent = t(locale, 'admin.settings.dirty', { count })
+  /** 站点信息与页脚都有自己的卡 —— 进了文案列表就多一个入口 */
+  function isDedicatedKey(key: string): boolean {
+    return isFooterKey(key) || INFO_KEYS.includes(key)
   }
 
   function markDirty(entry: Entry, zh: string, en: string) {
     touched.set(entry.key, { zh, en })
-    updateFooter()
+    applyPreview()
+    renderCount()
   }
 
-  function field(
-    label: string,
-    value: string,
-    onInput: (next: string) => void,
-    placeholder?: string,
-    multiline = false,
-  ): HTMLElement {
+  /* ---------------- 存 ---------------- */
+
+  /** 存一条 —— 排队，免得连着改两个字段时后一个把前一个盖了 */
+  function saveEntry(entry: Entry): Promise<void> {
+    saveChain = saveChain.then(() => doSave(entry))
+    return saveChain
+  }
+
+  async function doSave(entry: Entry): Promise<void> {
+    const value = current(entry)
+    saving += 1
+    renderCount()
+    try {
+      await api('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ entries: [{ key: entry.key, zh: value.zh, en: value.en }] }),
+      })
+      entry.zh = value.zh
+      entry.en = value.en
+      entry.overridden = value.zh !== entry.defaultZh || value.en !== entry.defaultEn
+      touched.delete(entry.key)
+      clearFieldError(entry)
+      renderBadge(entry)
+    } catch (error) {
+      // 没存上：改好的值留着，标在框上 —— 作者看得见哪儿没存进去
+      markFieldError(entry, errorText(locale, (error as { code?: string }).code ?? 'request_failed'))
+    } finally {
+      saving -= 1
+      renderCount()
+    }
+  }
+
+  /** 没存上：标在对应的输入框上 */
+  function markFieldError(entry: Entry, message: string) {
+    for (const input of document.querySelectorAll<HTMLElement>(
+      '[data-admin-field^="' + entry.key + ':"]',
+    )) {
+      input.setAttribute('aria-invalid', 'true')
+      const wrap = input.closest('.admin-settings__field')
+      if (!wrap) continue
+      let note = wrap.querySelector<HTMLElement>('.admin-field__error')
+      if (!note) {
+        note = document.createElement('span')
+        note.className = 'admin-field__error'
+        wrap.appendChild(note)
+      }
+      note.textContent = message
+    }
+  }
+
+  function clearFieldError(entry: Entry) {
+    for (const input of document.querySelectorAll<HTMLElement>(
+      '[data-admin-field^="' + entry.key + ':"]',
+    )) {
+      input.removeAttribute('aria-invalid')
+      input.closest('.admin-settings__field')?.querySelector('.admin-field__error')?.remove()
+    }
+  }
+
+  /* ---------------- 表单件 ---------------- */
+
+  /**
+   * 一个输入框 —— 改完离开就落盘。
+   * 默认值放进占位符：一眼看得出「原来是什么」。
+   */
+  function entryInput(entry: Entry, lang: 'zh' | 'en', multiline = false): HTMLElement {
     const wrap = document.createElement('label')
     wrap.className = 'admin-settings__field'
     const caption = document.createElement('span')
     caption.className = 'admin-settings__label'
-    caption.textContent = label
-    let input: HTMLInputElement | HTMLTextAreaElement
-    if (multiline) {
-      const area = document.createElement('textarea')
-      area.rows = 3
-      input = area
-    } else {
-      const box = document.createElement('input')
-      box.type = 'text'
-      input = box
-    }
+    caption.textContent =
+      lang === 'zh' ? t(locale, 'admin.settings.hintZh') : t(locale, 'admin.settings.hintEn')
+    const input = multiline ? document.createElement('textarea') : document.createElement('input')
+    if (!multiline) (input as HTMLInputElement).type = 'text'
+    if (multiline) (input as HTMLTextAreaElement).rows = 3
     input.className = 'ui-input'
-    input.value = value
-    if (placeholder) input.placeholder = placeholder
-    input.addEventListener('input', () => onInput(input.value))
+    input.dataset.adminField = entry.key + ':' + lang
+    input.value = current(entry)[lang]
+    const fallback = lang === 'zh' ? entry.defaultZh : entry.defaultEn
+    input.placeholder = fallback
+      ? t(locale, 'admin.settings.defaultPlaceholder', { value: fallback })
+      : ''
+    input.addEventListener('input', () => {
+      const value = current(entry)
+      markDirty(entry, lang === 'zh' ? input.value : value.zh, lang === 'en' ? input.value : value.en)
+    })
+    input.addEventListener('change', () => void saveEntry(entry))
+    input.addEventListener('focus', () => setPreviewMode(PREVIEW_MODE_OF[entry.key] ?? previewMode))
     wrap.appendChild(caption)
     wrap.appendChild(input)
     return wrap
   }
+
+  function keyLabel(key: string): HTMLElement {
+    const label = document.createElement('span')
+    label.className = 'admin-settings__key'
+    label.textContent = key
+    return label
+  }
+
+  /** 恢复默认 —— 送回默认值；服务端看到与默认相同就删掉那一行 */
+  function resetButton(entry: Entry): HTMLElement {
+    const reset = document.createElement('button')
+    reset.className = 'ui-btn admin-settings__reset'
+    reset.type = 'button'
+    reset.textContent = t(locale, 'admin.settings.reset')
+    reset.addEventListener('click', () => {
+      touched.set(entry.key, { zh: entry.defaultZh, en: entry.defaultEn })
+      void saveEntry(entry).then(() => {
+        renderInfo()
+        renderFooterBox()
+        renderList()
+      })
+    })
+    return reset
+  }
+
+  /** 「已修改」标记 —— 改过的条目一眼能挑出来 */
+  function badge(entry: Entry): HTMLElement {
+    const element = document.createElement('span')
+    element.className = 'admin-tag admin-tag--published'
+    element.dataset.adminBadge = entry.key
+    element.textContent = t(locale, 'admin.settings.overridden')
+    element.hidden = !entry.overridden
+    return element
+  }
+
+  function renderBadge(entry: Entry): void {
+    const element = document.querySelector<HTMLElement>('[data-admin-badge="' + entry.key + '"]')
+    if (element) element.hidden = !entry.overridden
+  }
+
+  /* ---------------- 站点信息 / 页脚 ---------------- */
 
   function renderInfo() {
     if (!infoBox) return
@@ -182,44 +342,15 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     for (const key of INFO_KEYS) {
       const entry = entries.find((item) => item.key === key)
       if (!entry) continue
-      const values = current(entry)
       const row = document.createElement('div')
       row.className = 'admin-settings__info-row'
-      const keyLabel = document.createElement('span')
-      keyLabel.className = 'admin-settings__key'
-      keyLabel.textContent = key
-      row.appendChild(keyLabel)
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintZh'), values.zh, (next) => {
-          const other = current(entry).en
-          markDirty(entry, next, other)
-          renderList()
-        }),
-      )
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintEn'), values.en, (next) => {
-          const other = current(entry).zh
-          markDirty(entry, other, next)
-          renderList()
-        }),
-      )
+      row.appendChild(keyLabel(key))
+      row.appendChild(entryInput(entry, 'zh'))
+      row.appendChild(entryInput(entry, 'en'))
+      row.appendChild(resetButton(entry))
+      row.appendChild(badge(entry))
       infoBox.appendChild(row)
     }
-  }
-
-  /** 恢复默认 —— 送回默认值，保存时后端删掉那一行 */
-  function resetButton(entry: Entry): HTMLElement {
-    const reset = document.createElement('button')
-    reset.className = 'ui-btn admin-settings__reset'
-    reset.type = 'button'
-    reset.textContent = t(locale, 'admin.settings.reset')
-    reset.addEventListener('click', () => {
-      markDirty(entry, entry.defaultZh, entry.defaultEn)
-      renderInfo()
-      renderFooterBox()
-      renderList()
-    })
-    return reset
   }
 
   /** 页脚那张卡 —— 页脚上显示的每一句都在这儿改 */
@@ -229,27 +360,13 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     for (const item of FOOTER_TEXT_KEYS) {
       const entry = entries.find((row) => row.key === item.key)
       if (!entry) continue
-      const values = current(entry)
       const row = document.createElement('div')
       row.className = 'admin-settings__info-row'
-      const keyLabel = document.createElement('span')
-      keyLabel.className = 'admin-settings__key'
-      keyLabel.textContent = item.key
-      row.appendChild(keyLabel)
-      const placeholder = item.placeholder ? t(locale, item.placeholder) : undefined
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintZh'), values.zh, (next) => {
-          markDirty(entry, next, current(entry).en)
-          renderList()
-        }, placeholder, item.multiline),
-      )
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintEn'), values.en, (next) => {
-          markDirty(entry, current(entry).zh, next)
-          renderList()
-        }, placeholder, item.multiline),
-      )
+      row.appendChild(keyLabel(item.key))
+      row.appendChild(entryInput(entry, 'zh', item.multiline))
+      row.appendChild(entryInput(entry, 'en', item.multiline))
       row.appendChild(resetButton(entry))
+      row.appendChild(badge(entry))
       footerBox.appendChild(row)
     }
     renderFooterHeight(footerBox)
@@ -264,10 +381,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     const row = document.createElement('div')
     row.className = 'admin-settings__info-row admin-settings__info-row--single'
 
-    const keyLabel = document.createElement('span')
-    keyLabel.className = 'admin-settings__key'
-    keyLabel.textContent = FOOTER_HEIGHT_KEY
-    row.appendChild(keyLabel)
+    row.appendChild(keyLabel(FOOTER_HEIGHT_KEY))
 
     const wrap = document.createElement('label')
     wrap.className = 'admin-settings__field'
@@ -280,12 +394,13 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     input.min = '0'
     input.max = String(MAX_FOOTER_HEIGHT)
     input.step = '10'
+    input.dataset.adminField = entry.key + ':zh'
     input.value = current(entry).zh
     input.addEventListener('input', () => {
       const next = String(parseFooterMinHeight(input.value))
       markDirty(entry, next, next)
-      renderList()
     })
+    input.addEventListener('change', () => void saveEntry(entry))
     const hint = document.createElement('span')
     hint.className = 'admin-settings__hint'
     hint.textContent = t(locale, 'admin.settings.footerHeightHint')
@@ -299,15 +414,13 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     box.appendChild(row)
   }
 
-  function renderList() {
-    if (!listBox) return
+  /* ---------------- 界面文案（分页） ---------------- */
+
+  function visibleEntries(): Entry[] {
     const term = (searchInput?.value ?? '').trim().toLowerCase()
     const moduleName = moduleSelect?.value ?? ''
-    listBox.textContent = ''
-
-    const visible = entries.filter((entry) => {
-      // 页脚那几条有自己的卡 —— 进了文案列表就多出一个入口
-      if (isFooterKey(entry.key)) return false
+    return entries.filter((entry) => {
+      if (isDedicatedKey(entry.key)) return false
       if (moduleName && moduleOf(entry.key) !== moduleName) return false
       if (!term) return true
       const values = current(entry)
@@ -317,64 +430,77 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
         values.en.toLowerCase().includes(term)
       )
     })
+  }
 
-    if (visible.length === 0) {
+  function listRow(entry: Entry): HTMLElement {
+    const row = document.createElement('div')
+    row.className = 'admin-settings__row'
+    row.appendChild(keyLabel(entry.key))
+    row.appendChild(entryInput(entry, 'zh'))
+    row.appendChild(entryInput(entry, 'en'))
+    row.appendChild(resetButton(entry))
+    row.appendChild(badge(entry))
+    return row
+  }
+
+  function renderList() {
+    if (!listBox) return
+    const visible = visibleEntries()
+    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+    if (page > pages) page = pages
+    const start = (page - 1) * PAGE_SIZE
+
+    listBox.textContent = ''
+    const slice = visible.slice(start, start + PAGE_SIZE)
+    if (slice.length === 0) {
       const empty = document.createElement('p')
       empty.className = 'admin__hint'
       empty.textContent = t(locale, 'admin.list.empty')
       listBox.appendChild(empty)
-      return
+    } else {
+      for (const entry of slice) listBox.appendChild(listRow(entry))
     }
-
-    for (const entry of visible) {
-      const values = current(entry)
-      const row = document.createElement('div')
-      row.className = 'admin-settings__row'
-
-      const keyLabel = document.createElement('span')
-      keyLabel.className = 'admin-settings__key'
-      keyLabel.textContent = entry.key
-      row.appendChild(keyLabel)
-
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintZh'), values.zh, (next) => {
-          const other = current(entry).en
-          markDirty(entry, next, other)
-          renderInfo()
-        }),
-      )
-      row.appendChild(
-        field(t(locale, 'admin.settings.hintEn'), values.en, (next) => {
-          const other = current(entry).zh
-          markDirty(entry, other, next)
-          renderInfo()
-        }),
-      )
-
-      row.appendChild(resetButton(entry))
-
-      const changed = changedFor(entry)
-      if (changed) {
-        const badge = document.createElement('span')
-        badge.className = 'admin-tag admin-tag--published'
-        badge.textContent = t(locale, 'admin.settings.overridden')
-        row.appendChild(badge)
-      }
-
-      listBox.appendChild(row)
-    }
+    renderPager(pages, visible.length)
   }
 
-  /** 这一条跟服务端存的值不一样吗 */
-  function changedFor(entry: Entry): boolean {
-    const value = current(entry)
-    return entry.zh !== value.zh || entry.en !== value.en
+  function renderPager(pages: number, total: number) {
+    if (!pagerBox) return
+    pagerBox.textContent = ''
+    if (pages <= 1) return
+
+    const prev = document.createElement('button')
+    prev.className = 'ui-btn'
+    prev.type = 'button'
+    prev.textContent = t(locale, 'admin.settings.prev')
+    prev.disabled = page === 1
+    prev.addEventListener('click', () => {
+      page -= 1
+      renderList()
+    })
+
+    const label = document.createElement('span')
+    label.className = 'admin-pager__label'
+    label.textContent = t(locale, 'admin.settings.page', { page, pages, total })
+
+    const next = document.createElement('button')
+    next.className = 'ui-btn'
+    next.type = 'button'
+    next.textContent = t(locale, 'admin.settings.next')
+    next.disabled = page === pages
+    next.addEventListener('click', () => {
+      page += 1
+      renderList()
+    })
+
+    pagerBox.appendChild(prev)
+    pagerBox.appendChild(label)
+    pagerBox.appendChild(next)
   }
 
   function renderModules() {
     if (!moduleSelect) return
     const modules = [
-      ...new Set(entries.filter((e) => !isFooterKey(e.key)).map((e) => moduleOf(e.key))),
+      ...new Set(entries.filter((e) => !isDedicatedKey(e.key)).map((e) => moduleOf(e.key))),
     ].sort()
     moduleSelect.textContent = ''
     const all = document.createElement('option')
@@ -389,59 +515,173 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     }
   }
 
-  async function save() {
-    if (touched.size === 0) return
-    const payload = [...touched.entries()].map(([key, value]) => ({ key, ...value }))
-    try {
-      await api<{ saved?: number }>(
-        '/api/admin/settings',
-        {
-          method: 'PUT',
-          body: JSON.stringify({ entries: payload }),
-        },
-      )
-      touched.clear()
-      updateFooter()
-      say(t(locale, 'admin.hint.saved'))
-      await load()
-    } catch (error) {
-      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+  function renderCount() {
+    if (!countLabel) return
+    if (saving > 0) {
+      countLabel.textContent = t(locale, 'admin.settings.saving')
+      return
+    }
+    const overridden = entries.filter((entry) => entry.overridden).length
+    countLabel.textContent = t(locale, 'admin.settings.overriddenCount', { count: overridden })
+  }
+
+  /* ---------------- 实时预览 ---------------- */
+
+  /** 把真实页面缩进右边的框里 */
+  function fitPreview(): void {
+    if (!previewFrame || !previewBox) return
+    const width = previewBox.clientWidth
+    const height = previewBox.clientHeight
+    if (width <= 0 || height <= 0) return
+    const scale = Math.min(width / PREVIEW_WIDTH, height / PREVIEW_HEIGHT)
+    previewFrame.style.width = PREVIEW_WIDTH + 'px'
+    previewFrame.style.height = PREVIEW_HEIGHT + 'px'
+    previewFrame.style.transform = 'scale(' + scale + ')'
+  }
+
+  /** 预览：把改过的文案贴回真实页面 */
+  function applyPreview(): void {
+    const doc = previewFrame?.contentDocument
+    if (!doc) return
+    for (const element of doc.querySelectorAll('[' + ATTR.copy + ']')) {
+      const key = element.getAttribute(ATTR.copy)
+      if (!key) continue
+      const entry = entries.find((item) => item.key === key)
+      if (!entry) continue
+      const raw = current(entry)[locale === 'en' ? 'en' : 'zh']
+      const value = interpolate(raw, {
+        year: String(new Date().getFullYear()),
+        name: valueOf('site.author'),
+      })
+      if (key === 'footer.custom') element.innerHTML = value
+      else element.textContent = value
+      // 邮箱的链接也得跟着改
+      if (element instanceof HTMLAnchorElement && element.getAttribute('href')?.startsWith('mailto:')) {
+        element.setAttribute('href', 'mailto:' + raw)
+      }
+    }
+    applyIcpPreview(doc)
+  }
+
+  /**
+   * 备案号：页面上只有填了数字才渲染成链接 —— 预览按同样的规矩来。
+   * 不照抄这条规矩，预览里就会凭空多出一个站点上并不存在的链接。
+   */
+  function applyIcpPreview(doc: Document): void {
+    const entry = entries.find((item) => item.key === 'footer.icp')
+    if (!entry) return
+    const value = current(entry)[locale === 'en' ? 'en' : 'zh']
+    const number = value.match(/\d+/)?.[0] ?? ''
+    const box = doc.querySelector('.footer-links')
+    if (!box) return
+    const link = doc.querySelector('[' + ATTR.copy + '="footer.icp"]')
+    if (!number) {
+      link?.remove()
+      return
+    }
+    const target = link ?? doc.createElement('a')
+    if (!link) {
+      target.setAttribute(ATTR.copy, 'footer.icp')
+      target.setAttribute('target', '_blank')
+      box.appendChild(target)
+    }
+    target.textContent = value
+    target.setAttribute('href', 'https://icp.gov.moe/?keyword=' + number)
+  }
+
+  function scrollPreviewTo(where: 'top' | 'bottom'): void {
+    const win = previewFrame?.contentWindow
+    const doc = win?.document
+    if (!win || !doc) return
+    win.scrollTo(0, where === 'bottom' ? doc.body.scrollHeight : 0)
+  }
+
+  function setPreviewMode(mode: PreviewMode): void {
+    if (mode === previewMode) return
+    previewMode = mode
+    for (const button of modeButtons) {
+      button.classList.toggle('ui-btn--primary', button.dataset.adminPreviewMode === mode)
+    }
+    const src = mode === 'about' ? '/' + locale + '/about/' : '/' + locale + '/'
+    if (previewFrame && previewFrame.getAttribute('src') !== src) {
+      previewFrame.setAttribute('src', src)
+    } else {
+      applyPreview()
+      // 同一页换一面：页脚要滚到底，其余回到顶上
+      scrollPreviewTo(mode === 'footer' ? 'bottom' : 'top')
     }
   }
+
+  /* ---------------- 起手 ---------------- */
 
   async function load() {
     try {
       const data = await api<{ entries: Entry[] }>('/api/admin/settings')
       entries = data.entries
+      touched.clear()
       renderModules()
       renderInfo()
       renderFooterBox()
       renderList()
-      updateFooter()
+      renderCount()
+      applyPreview()
     } catch (error) {
       say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
     }
   }
 
-  searchInput?.addEventListener('input', renderList)
-  moduleSelect?.addEventListener('change', renderList)
-  document.querySelector<HTMLButtonElement>('[data-admin-save]')?.addEventListener('click', save)
-  document.querySelector<HTMLButtonElement>('[data-admin-reset-all]')?.addEventListener('click', async () => {
-    if (!confirm(t(locale, 'admin.settings.confirmResetAll'))) return
-    for (const entry of entries) {
-      if (entry.overridden) touched.set(entry.key, { zh: entry.defaultZh, en: entry.defaultEn })
-    }
-    updateFooter()
-    renderInfo()
-    renderFooterBox()
+  searchInput?.addEventListener('input', () => {
+    page = 1
+    renderList()
+  })
+  moduleSelect?.addEventListener('change', () => {
+    page = 1
     renderList()
   })
 
-  // 未保存就离开 —— 别把改了一半的文案丢掉
+  for (const button of modeButtons) {
+    button.addEventListener('click', () => {
+      setPreviewMode((button.dataset.adminPreviewMode as PreviewMode) ?? 'home')
+    })
+  }
+
+  previewFrame?.addEventListener('load', () => {
+    fitPreview()
+    applyPreview()
+    scrollPreviewTo(previewMode === 'footer' ? 'bottom' : 'top')
+  })
+
+  window.addEventListener('resize', fitPreview)
+
+  document.querySelector<HTMLButtonElement>('[data-admin-reset-all]')?.addEventListener('click', async () => {
+    if (!confirm(t(locale, 'admin.settings.confirmResetAll'))) return
+    const overrides = entries.filter((entry) => entry.overridden)
+    if (overrides.length === 0) return
+    try {
+      await api('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          entries: overrides.map((entry) => ({
+            key: entry.key,
+            zh: entry.defaultZh,
+            en: entry.defaultEn,
+          })),
+        }),
+      })
+      await load()
+      say(t(locale, 'admin.settings.saved'))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  })
+
+  // 还没存完就离开 —— 别把改了一半的文案丢掉
   window.addEventListener('beforeunload', (event) => {
-    if (changedCount() === 0) return
+    if (saving === 0) return
     event.preventDefault()
   })
 
+  previewFrame?.setAttribute('src', '/' + locale + '/')
+  fitPreview()
   void load()
 </script>

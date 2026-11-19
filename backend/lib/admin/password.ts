@@ -45,3 +45,18 @@ export function isRateLimited(
   if (count < LOGIN_MAX_ATTEMPTS) return false
   return now - windowAt < LOGIN_WINDOW_MS
 }
+
+/**
+ * 记完这次失败之后要不要锁。
+ *
+ * count 是**算上这次**的失败数 —— 之前的失败数是 count - 1：
+ * 第 6 次失败（之前已失败 5 次）才锁，前 5 次回「口令错了」。
+ * 计数由 D1 一条语句原子累加，这里只管判定。
+ */
+export function lockAfterFailure(
+  count: number,
+  windowAt: number,
+  now: number = Date.now(),
+): boolean {
+  return isRateLimited(count - 1, windowAt, now)
+}

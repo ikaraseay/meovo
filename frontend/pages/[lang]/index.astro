@@ -13,9 +13,6 @@ export function getStaticPaths() {
 
 const { locale } = Astro.props
 
-/** 终端提示符 —— 用户名取笔名 */
-const prompt = `${t(locale, 'site.author')}@astro`
-
 const posts = await getVisiblePosts()
 
 /** 按翻译组列出：同一篇文章的各语言版本算一条 */
@@ -39,7 +36,7 @@ const newest = items[0]
       <!-- 终端面板：字符画头像 + 命令行文案 -->
       <div class="term hero-term ui-gradient-border">
         <div class="term__bar">
-          <span class="term__path">{prompt}: ~</span>
+          <span class="term__path"><span data-copy="site.author">{t(locale, 'site.author')}</span>@astro: ~</span>
         </div>
 
         <div class="term__body hero-body">
@@ -49,26 +46,26 @@ const newest = items[0]
 
           <div class="term__console">
             <p class="term__line">
-              <span class="term__user">{prompt}</span>
+              <span class="term__user"><span data-copy="site.author">{t(locale, 'site.author')}</span>@astro</span>
               <span class="term__dim">$</span> whoami
             </p>
 
             <h1 class="term__title">
               <span class="term__prompt" aria-hidden="true">&gt;</span>
-              {t(locale, 'site.author')}<span class="term__cursor" aria-hidden="true"></span>
+              <span data-copy="site.author">{t(locale, 'site.author')}</span><span class="term__cursor" aria-hidden="true"></span>
             </h1>
 
             <p class="term__line term__dim">
-              [ <span class="term__accent">{t(locale, 'site.name')}</span> | Astro 7 ]
+              [ <span class="term__accent" data-copy="site.name">{t(locale, 'site.name')}</span> | Astro 7 ]
             </p>
 
             <!-- 流体光标只挂小字区：巨标题要稳定落在部件里 -->
             <div class="hero-sub">
               <p class="term__line hero-quote">
                 <span class="term__violet" aria-hidden="true">▌</span>
-                {t(locale, 'home.subtitle')}
+                <span data-copy="home.subtitle">{t(locale, 'home.subtitle')}</span>
               </p>
-              <p class="term__line term__dim">// {t(locale, 'site.tagline')}</p>
+              <p class="term__line term__dim">// <span data-copy="site.tagline">{t(locale, 'site.tagline')}</span></p>
               <FluidCursor client:visible container=".hero-sub" magnets=".hero-actions a" />
             </div>
 

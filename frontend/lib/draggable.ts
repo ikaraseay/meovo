@@ -612,7 +612,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         entry.el.classList.remove(CLASS.tilted)
         entry.el.style.removeProperty('--ui-widget-tilt')
         // 拖拽时关掉过渡，避免位置变化被动画导致卡顿
-        entry.el.classList.add('is-dragging')
+        entry.el.classList.add(CLASS.isDragging)
       },
       onMove: (s) => {
         const p = clampToViewport(
@@ -648,7 +648,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         }
         // 位置摆好后再恢复过渡 —— 避免 position 切换触发回弹动画
         void entry.el.offsetHeight
-        entry.el.classList.remove('is-dragging')
+        entry.el.classList.remove(CLASS.isDragging)
         persist(entry)
         // 位置换回桌面坐标 → 让位重算 → 正文高度变了，桌面跟着重排
         settle()

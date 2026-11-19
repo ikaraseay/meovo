@@ -25,6 +25,8 @@ export type DocumentErrorCode =
 
 export interface DocumentInput {
   slug?: unknown
+  /** 客户端按标题猜的 slug —— 服务端只在没给 slug 时用它 */
+  slugHint?: unknown
   locale?: unknown
   title?: unknown
   description?: unknown
@@ -66,6 +68,66 @@ export function slugify(input: string): string {
     .replace(/^-|-$/g, '')
 }
 
+/**
+ * 从一组标题派生 slug —— 第一个能变成 ASCII slug 的标题说了算。
+ *
+ * 传多个标题是有原因的：中文标题里没有 ASCII，英文标题才有。
+ * 一个都没有 → 兜底成 post-<日期>-<短码>，省得作者自己想一个。
+ */
+export function deriveSlug(titles: string[], seed?: string): string {
+  for (const title of titles) {
+    const slug = slugify(title)
+    if (SLUG_PATTERN.test(slug)) return slug
+  }
+  return 'post-' + todayDate().replace(/-/g, '') + '-' + (seed ?? randomSeed())
+}
+
+/** 随机短码 —— 同一秒建两篇也不会撞 */
+function randomSeed(): string {
+  const bytes = new Uint8Array(2)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * 找一个没人用的 slug —— 撞了就加数字后缀。
+ * taken 是**全站**用过的 slug：不同语言撞上同一个 slug 会被当成互为翻译，
+ * 那比撞车更麻烦。
+ */
+export function uniqueSlug(base: string, taken: string[]): string {
+  const used = new Set(taken)
+  let candidate = base
+  for (let n = 2; used.has(candidate); n++) candidate = base + '-' + n
+  return candidate
+}
+
+/** 今天 —— 本地日期（作者看到的就是这个） */
+export function todayDate(now: Date = new Date()): string {
+  const offset = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
+
+/** 编辑器这一版的字段 —— 判断「有没有漏填必填项」用 */
+export interface EditorFields {
+  title: string
+  description: string
+  body: string
+}
+
+/**
+ * 这一版能不能存 —— 有内容却没标题就是漏填。
+ * 整版都空不算漏填：另一种语言还没写，很正常。
+ */
+export function checkRequired(fields: EditorFields): DocumentErrorCode | null {
+  if (fields.title.trim()) return null
+  return fields.description.trim() || fields.body.trim() ? 'title_required' : null
+}
+
+/** 像样的 slug —— ASCII、小写字母、数字与连字符 */
+export function isSlug(text: string): boolean {
+  return SLUG_PATTERN.test(text.trim().toLowerCase())
+}
+
 /** 标签：数组或逗号分隔的字符串 → 去空、去重、小写 */
 export function parseTags(input: unknown): string[] {
   const raw = Array.isArray(input) ? input.map(String) : String(input ?? '').split(/[,，]/)
@@ -102,8 +164,9 @@ export function normalizeDocument(input: DocumentInput): {
   const title = asText(input.title).trim()
   if (!title) errors.push('title_required')
 
+  // slug 可以不给 —— 服务端按标题派生（见 deriveSlug）；给了就得是像样的
   const slug = asText(input.slug).trim().toLowerCase()
-  if (!SLUG_PATTERN.test(slug)) errors.push('slug_invalid')
+  if (slug && !SLUG_PATTERN.test(slug)) errors.push('slug_invalid')
 
   const locale = asText(input.locale).trim()
   if (!locales.includes(locale as Locale)) errors.push('locale_invalid')

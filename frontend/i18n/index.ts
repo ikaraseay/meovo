@@ -47,7 +47,7 @@ const dictionary = withOverrides(allText)
  * 没提供对应参数的占位符**原样保留** —— 界面上直接就能看出漏传了什么，
  * 总比悄悄渲染成空字符串好。
  */
-function interpolate(text: string, params?: TranslationParams): string {
+export function interpolate(text: string, params?: TranslationParams): string {
   if (!params) return text
   return text.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
     name in params ? String(params[name]) : placeholder,

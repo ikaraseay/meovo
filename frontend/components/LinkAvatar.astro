@@ -10,6 +10,7 @@
  * 运行时探测：img 加载失败时自动降级到文字头像。
  */
 import type { FriendLink } from '../data/links'
+import { hashHue } from '../lib/tint-hue'
 
 interface Props {
   link: FriendLink
@@ -17,16 +18,6 @@ interface Props {
 }
 
 const { link, size = 32 } = Astro.props
-
-/** 悦目的色相集合 —— 与 GlassWidget 的 TINT_HUES 同源 */
-const TINT_HUES = [12, 24, 206, 262, 338, 158, 186, 322, 42, 288]
-
-/** 字符串哈希 → 0..N-1，同一名字永远同一个色相 */
-function hashHue(key: string): number {
-  let h = 0
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
-  return TINT_HUES[h % TINT_HUES.length]
-}
 
 const hue = hashHue(link.name)
 const initial = link.name.trim().charAt(0) || '?'

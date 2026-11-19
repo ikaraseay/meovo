@@ -281,6 +281,34 @@
   font-weight: 600;
 }
 
+/* 折叠的「更多设置」—— summary 就是标题那行，点一下展开 */
+.admin-card--fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-card--fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 小箭头 —— 展开时转 90 度 */
+.admin-card--fold > summary::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--ui-transition-fast);
+}
+
+.admin-card--fold[open] > summary::before {
+  transform: rotate(45deg);
+}
+
 .admin-card__hint {
   margin-block-start: calc(-1 * var(--ui-space-sm));
   font-size: 0.8125rem;
@@ -359,6 +387,15 @@
 
 .admin-doc__title {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 摘要 —— 扫列表时先看这一行 */
+.admin-doc__excerpt {
+  font-size: 0.8125rem;
+  color: var(--ui-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -457,6 +494,24 @@
 .admin-field__hint {
   font-size: 0.75rem;
   color: var(--ui-text-muted);
+}
+
+/* 链接那栏 —— 系统分配的地址，只读 */
+.admin-url {
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+  color: var(--ui-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* 字段级报错 —— 挨着输入框，别只丢一句飘在上面的消息 */
+.admin-field__error {
+  font-size: 0.75rem;
+  color: var(--ui-danger);
+}
+
+.admin-field [aria-invalid='true'] {
+  border-color: var(--ui-danger);
 }
 
 .admin-input--mono {
@@ -602,7 +657,7 @@
 
 .admin-settings__row {
   display: grid;
-  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto auto;
   align-items: end;
   gap: var(--ui-space-sm);
   padding: var(--ui-space-sm) 0;
@@ -611,7 +666,7 @@
 
 .admin-settings__info-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(0, 1fr) auto auto;
   align-items: end;
   gap: var(--ui-space-sm);
   padding: var(--ui-space-sm) 0;
@@ -660,6 +715,72 @@
   .admin-settings__info-row--single {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* 左边表单，右边实时预览 —— 改一个字段就看得见效果 */
+.admin-settings__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-lg);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .admin-settings__top {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  }
+}
+
+.admin-settings__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-lg);
+}
+
+/* 预览 —— 真的把站点装进框里，改了什么立刻看得见 */
+.admin-preview {
+  position: sticky;
+  inset-block-start: var(--ui-space-lg);
+}
+
+@media not (min-width: 1024px) {
+  .admin-preview {
+    position: static;
+  }
+}
+
+.admin-preview__modes {
+  display: flex;
+  gap: var(--ui-space-xs);
+}
+
+.admin-preview__frame {
+  height: 32rem;
+  overflow: hidden;
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-sunken);
+}
+
+.admin-preview__iframe {
+  display: block;
+  border: 0;
+  transform-origin: top left;
+  background: var(--ui-surface);
+}
+
+/* 分页 —— 三百多条词条一次铺开既慢又找不着 */
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-sm);
+  padding-block-start: var(--ui-space-sm);
+}
+
+.admin-pager__label {
+  font-size: 0.8125rem;
+  color: var(--ui-text-secondary);
 }
 
 /* ---------------- 图库 ---------------- */

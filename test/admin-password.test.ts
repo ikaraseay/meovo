@@ -5,6 +5,7 @@ import {
   LOGIN_WINDOW_MS,
   hashPassword,
   isRateLimited,
+  lockAfterFailure,
   timingSafeEqual,
   verifyPassword,
 } from '../backend/lib/admin/password.ts'
@@ -44,4 +45,13 @@ test('限流：窗口内失败够数就拒，窗口过了放行', () => {
   assert.equal(isRateLimited(LOGIN_MAX_ATTEMPTS - 1, now, now), false)
   assert.equal(isRateLimited(LOGIN_MAX_ATTEMPTS, now, now), true)
   assert.equal(isRateLimited(LOGIN_MAX_ATTEMPTS, now - LOGIN_WINDOW_MS - 1000, now), false)
+})
+
+test('限流：前 5 次失败回「口令错了」，第 6 次才锁', () => {
+  const now = Date.now()
+  // count 是「算上这次」的失败数
+  for (let count = 1; count <= LOGIN_MAX_ATTEMPTS; count++) {
+    assert.equal(lockAfterFailure(count, now, now), false, '第 ' + count + ' 次不该锁')
+  }
+  assert.equal(lockAfterFailure(LOGIN_MAX_ATTEMPTS + 1, now, now), true)
 })

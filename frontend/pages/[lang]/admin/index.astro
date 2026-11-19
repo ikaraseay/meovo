@@ -103,6 +103,18 @@ const base = '/' + locale + '/admin'
     }).format(date)
   }
 
+  /** 保存时间 —— 列表里只到分钟，够认是哪一次改动 */
+  function formatSaved(value: string): string {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+
   function visible(): DocumentRow[] {
     const term = (searchInput?.value ?? '').trim().toLowerCase()
     const status = statusFilter?.value ?? ''
@@ -126,15 +138,29 @@ const base = '/' + locale + '/admin'
     const main = document.createElement('div')
     main.className = 'admin-doc__main'
 
-    const title = document.createElement('span')
+    // 标题就是入口 —— 少一个「编辑」按钮
+    const title = document.createElement('a')
     title.className = 'admin-doc__title'
+    title.href = base + '/documents/' + item.id
     title.textContent = item.title || item.slug
     main.appendChild(title)
+
+    // 摘要 —— 扫列表时先看这一行
+    if (item.description) {
+      const excerpt = document.createElement('span')
+      excerpt.className = 'admin-doc__excerpt'
+      excerpt.textContent = item.description
+      main.appendChild(excerpt)
+    }
 
     const path = document.createElement('span')
     path.className = 'admin-doc__path'
     const date = formatDate(item.pub_date)
-    path.textContent = '/' + item.locale + '/' + item.slug + (date ? ' · ' + date : '')
+    const saved = formatSaved(item.updated_at)
+    path.textContent =
+      '/' + item.locale + '/' + item.slug +
+      (date ? ' · ' + date : '') +
+      (saved ? ' · ' + t(locale, 'admin.list.savedAt', { time: saved }) : '')
     main.appendChild(path)
 
     line.appendChild(main)
@@ -149,12 +175,6 @@ const base = '/' + locale + '/admin'
 
     const actions = document.createElement('div')
     actions.className = 'admin-doc__actions'
-
-    const edit = document.createElement('a')
-    edit.className = 'ui-btn'
-    edit.href = base + '/documents/' + item.id
-    edit.textContent = t(locale, 'admin.action.edit')
-    actions.appendChild(edit)
 
     if (published) {
       const view = document.createElement('a')
@@ -234,7 +254,8 @@ const base = '/' + locale + '/admin'
       const data = await api<{ documents: DocumentRow[] }>('/api/admin/documents')
       documents = data.documents
       const rows = visible()
-      if (countLabel) countLabel.textContent = t(locale, 'admin.list.count', { count: documents.length })
+      // 计数要是筛选后的 —— 筛完还显示总数，等于没筛
+      if (countLabel) countLabel.textContent = t(locale, 'admin.list.count', { count: rows.length })
       list.textContent = ''
       if (documents.length === 0) {
         list.appendChild(
