@@ -390,6 +390,8 @@ export const ui = {
   },
   'admin.hint.tagsPlaceholder': { zh: '添加标签…', en: 'Add a tag…' },
   'admin.tags.remove': { zh: '移除 {tag}', en: 'Remove {tag}' },
+  'admin.editor.previewHide': { zh: '收起预览', en: 'Hide preview' },
+  'admin.editor.previewShow': { zh: '显示预览', en: 'Show preview' },
   'admin.hint.build': {
     zh: '改了文案或文章都要按它才上站。',
     en: 'Changes only reach the site after this.',

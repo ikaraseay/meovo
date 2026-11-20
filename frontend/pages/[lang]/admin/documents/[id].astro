@@ -85,9 +85,6 @@ const langs = ['zh', 'en'] as const
               aria-label={t(locale, 'admin.editor.toolbar')}
             ></div>
             <textarea class="ui-input admin-editor__body" name={`body-${lang}`}></textarea>
-            <span class="admin-field__label admin-editor__label">
-              {t(locale, 'admin.action.preview')}
-            </span>
             <div class="admin-preview prose" data-admin-preview={lang}></div>
           </div>
         </section>
@@ -227,6 +224,8 @@ const langs = ['zh', 'en'] as const
     tools: HTMLElement
     body: HTMLTextAreaElement
     preview: HTMLElement
+    /** 这俩所在的 .admin-editor —— 收起预览时改它的栅格 */
+    editor: HTMLElement
     timer: number
     seq: number
     /** 上次是我们自己写过去的滚动比例 —— 回声不算用户滚动 */
@@ -744,6 +743,25 @@ const langs = ['zh', 'en'] as const
       })
       pane.tools.appendChild(button)
     }
+
+    // 预览开关 —— 写作时把右半边还回来（正文区从半行变成整行）
+    const toggle = document.createElement('button')
+    toggle.className = 'ui-btn admin-editor__toggle'
+    toggle.type = 'button'
+    toggle.dataset.adminPreviewToggle = pane.lang
+    /** 两态都说清楚：光写「预览」看不出现在是开还是关 */
+    const syncToggle = (shown: boolean) => {
+      toggle.setAttribute('aria-pressed', String(shown))
+      toggle.textContent = t(locale, shown ? 'admin.editor.previewHide' : 'admin.editor.previewShow')
+    }
+    syncToggle(true)
+    toggle.addEventListener('click', () => {
+      const off = pane.editor.classList.toggle('is-preview-off')
+      syncToggle(!off)
+      // 收起期间内容可能没刷到最新 —— 打开时补一次
+      if (!off) void refreshPreview(pane)
+    })
+    pane.tools.appendChild(toggle)
   }
 
   /* ---------------- 预览：停手就刷新 ---------------- */
@@ -949,8 +967,9 @@ const langs = ['zh', 'en'] as const
     const tools = document.querySelector<HTMLElement>('[data-admin-tools="' + lang + '"]')
     const body = document.querySelector<HTMLTextAreaElement>('[name="body-' + lang + '"]')
     const preview = document.querySelector<HTMLElement>('[data-admin-preview="' + lang + '"]')
-    if (!tools || !body || !preview) continue
-    const pane: Pane = { lang, tools, body, preview, timer: 0, seq: 0, echo: -1 }
+    const editor = body?.closest<HTMLElement>('.admin-editor')
+    if (!tools || !body || !preview || !editor) continue
+    const pane: Pane = { lang, tools, body, preview, editor, timer: 0, seq: 0, echo: -1 }
     panes.push(pane)
     linkPanes(pane)
     renderTools(pane)

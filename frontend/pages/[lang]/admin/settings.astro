@@ -23,22 +23,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   intro={t(locale, 'admin.settings.intro')}
 >
   <div class="admin-settings__top">
-    <div class="admin-settings__stack">
-      <!-- 站点信息：最常改的几条，摆最上面 -->
-      <section class="admin-card">
-        <h2 class="admin-card__title">{t(locale, 'admin.settings.info')}</h2>
-        <p class="admin-card__hint">{t(locale, 'admin.settings.infoHint')}</p>
-        <div class="admin-settings__info" data-admin-info></div>
-      </section>
-
-      <!-- 页脚：页脚上显示的每一句都在这儿改 -->
-      <section class="admin-card">
-        <h2 class="admin-card__title">{t(locale, 'admin.settings.footer')}</h2>
-        <p class="admin-card__hint">{t(locale, 'admin.settings.footerHint')}</p>
-        <div class="admin-settings__info" data-admin-footer-box></div>
-      </section>
-    </div>
-
+    <!-- 预览占满整行 —— 塞进侧栏只能缩到 6px 的字，等于看不清 -->
     <!-- 实时预览：真的把站点装进框里，改了什么立刻看得见 -->
     <!-- 别用 admin-preview —— 那是编辑器的 markdown 预览，两处同名会互相套样式 -->
     <section class="admin-card admin-live">
@@ -61,6 +46,22 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
         <iframe class="admin-live__iframe" data-admin-preview title={t(locale, 'admin.settings.preview')}></iframe>
       </div>
     </section>
+    <div class="admin-settings__stack">
+      <!-- 站点信息：最常改的几条，摆最上面 -->
+      <section class="admin-card">
+        <h2 class="admin-card__title">{t(locale, 'admin.settings.info')}</h2>
+        <p class="admin-card__hint">{t(locale, 'admin.settings.infoHint')}</p>
+        <div class="admin-settings__info" data-admin-info></div>
+      </section>
+
+      <!-- 页脚：页脚上显示的每一句都在这儿改 -->
+      <section class="admin-card">
+        <h2 class="admin-card__title">{t(locale, 'admin.settings.footer')}</h2>
+        <p class="admin-card__hint">{t(locale, 'admin.settings.footerHint')}</p>
+        <div class="admin-settings__info" data-admin-footer-box></div>
+      </section>
+    </div>
+
   </div>
 
   <!-- 界面文案：全量词条，可搜索、可按模块筛、分页翻 -->
@@ -136,9 +137,16 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   /** 每页多少条 —— 三百多条一次铺开，既慢又找不着 */
   const PAGE_SIZE = 20
 
-  /** 预览里的视口尺寸 —— 桌面宽度，缩放后塞进右边的框 */
-  const PREVIEW_WIDTH = 1280
-  const PREVIEW_HEIGHT = 1400
+  /**
+   * 预览里的视口宽度 —— **按宽度适配**，不按高度。
+   *
+   * 桌面面板一律给 1060：1024 是站点的桌面断点，留出滚动条的十几像素余量，
+   * 否则 clientWidth 掉到 1023 就渲染成移动端布局。缩到 0.85 倍仍然看得清。
+   * 手机面板给面板自己的宽度 —— 看的就是手机版，别再放大。
+   */
+  const PREVIEW_DESKTOP_WIDTH = 1060
+  /** 面板窄于此就按手机版渲染 */
+  const PREVIEW_DESKTOP_PANEL = 640
 
   /** 改哪条 → 预览切到哪一面 */
   const PREVIEW_MODE_OF: Record<string, PreviewMode> = {
@@ -534,15 +542,24 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
 
   /* ---------------- 实时预览 ---------------- */
 
-  /** 把真实页面缩进右边的框里 */
+  /**
+   * 把真实页面缩进框里。
+   *
+   * 只按宽度缩放 —— 按高度取 min 的话，1400 高的页面塞进 480 的框，
+   * 正文会被压到 6px（实测），等于看不见。宽高比交给 iframe 自己滚。
+   */
   function fitPreview(): void {
     if (!previewFrame || !previewBox) return
     const width = previewBox.clientWidth
     const height = previewBox.clientHeight
     if (width <= 0 || height <= 0) return
-    const scale = Math.min(width / PREVIEW_WIDTH, height / PREVIEW_HEIGHT)
-    previewFrame.style.width = PREVIEW_WIDTH + 'px'
-    previewFrame.style.height = PREVIEW_HEIGHT + 'px'
+    // 桌面面板至少 1060；比它还宽就用面板自身宽度 —— 只缩不放，放大只会发虚
+    const frameWidth =
+      width >= PREVIEW_DESKTOP_PANEL ? Math.max(PREVIEW_DESKTOP_WIDTH, width) : Math.max(360, width)
+    const scale = width / frameWidth
+    previewFrame.style.width = frameWidth + 'px'
+    // 缩放后正好填满框高 —— 多出来的内容由 iframe 自己滚
+    previewFrame.style.height = Math.ceil(height / scale) + 'px'
     previewFrame.style.transform = 'scale(' + scale + ')'
   }
 

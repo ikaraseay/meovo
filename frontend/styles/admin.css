@@ -534,7 +534,8 @@
 
 @media (min-width: 1024px) {
   .admin-editor {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* 写作那半边宽一点 —— 预览是参考，正文才是在写的东西 */
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-rows: auto var(--ui-editor-height);
   }
 
@@ -546,13 +547,27 @@
     grid-area: 2 / 1;
   }
 
-  .admin-editor__label {
-    grid-area: 1 / 2;
-  }
-
   .admin-preview {
     grid-area: 2 / 2;
   }
+}
+
+/* 收起预览 —— 正文区独占整行（写作时最需要的就是宽度） */
+.admin-editor.is-preview-off {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-editor.is-preview-off .admin-preview {
+  display: none;
+}
+
+/* 开关跟在工具栏末尾，靠右 */
+.admin-editor__toggle {
+  margin-inline-start: auto;
+}
+
+.admin-editor__toggle[aria-pressed='false'] {
+  color: var(--ui-text-muted);
 }
 
 /* 两边一样高 —— 滚动同步才有着落 */
@@ -584,6 +599,7 @@
 .admin-editor__tools {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--ui-space-xs);
 }
 
@@ -813,8 +829,14 @@
   }
 }
 
-/* 左边表单，右边实时预览 —— 改一个字段就看得见效果 */
+/* 预览占整行，信息与页脚并排在下 —— 预览塞进侧栏会把正文压到 6px */
 .admin-settings__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-lg);
+}
+
+.admin-settings__stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--ui-space-lg);
@@ -822,31 +844,15 @@
 }
 
 @media (min-width: 1024px) {
-  .admin-settings__top {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  .admin-settings__stack {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-}
-
-.admin-settings__stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-lg);
 }
 
 /* 实时预览 —— 真的把站点装进框里，改了什么立刻看得见。
    ⚠️ 类名别用 .admin-preview：那是**编辑器**的 markdown 预览，
    它自带 height + overflow，套到这张卡上会把整页压成一个定高滚动框。 */
-.admin-live {
-  position: sticky;
-  inset-block-start: var(--ui-space-lg);
-}
-
-@media not (min-width: 1024px) {
-  .admin-live {
-    position: static;
-  }
-}
-
+/* 预览卡本身不吸顶 —— 它占整行，吸顶会把下面的表单全盖住 */
 .admin-live__modes {
   display: flex;
   flex-wrap: wrap;
@@ -854,7 +860,8 @@
 }
 
 .admin-live__frame {
-  height: 30rem;
+  /* 视口高的一部分 —— 既装得下首屏，也不至于把表单挤到屏幕外 */
+  height: clamp(22rem, 62vh, 46rem);
   overflow: hidden;
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);
