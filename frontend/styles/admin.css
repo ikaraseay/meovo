@@ -536,7 +536,9 @@
   .admin-editor {
     /* 写作那半边宽一点 —— 预览是参考，正文才是在写的东西 */
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    grid-template-rows: auto var(--ui-editor-height);
+    /* 行高交给内容 —— 预览拖高之后这一行要跟着长 */
+    grid-template-rows: auto auto;
+    align-items: start;
   }
 
   .admin-editor__tools {
@@ -618,6 +620,9 @@
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);
   background: var(--ui-surface-sunken);
+  /* 长文想看更多就往下拖 —— 正文区那侧自己滚，互不影响 */
+  resize: vertical;
+  max-height: 92vh;
 }
 
 /* 底部操作条 —— 编辑器与设置页共用 */
@@ -862,6 +867,13 @@
 .admin-live__frame {
   /* 视口高的一部分 —— 既装得下首屏，也不至于把表单挤到屏幕外 */
   height: clamp(22rem, 62vh, 46rem);
+  min-height: 14rem;
+  max-height: 92vh;
+  /* 右下角可以拖着改大小。底部留一条 padding 给手柄：
+     iframe 铺满的话会把原生手柄压在底下，点不到。
+     fitPreview() 会扣掉这条再算缩放。 */
+  resize: vertical;
+  padding-block-end: 0.75rem;
   overflow: hidden;
   border-radius: var(--ui-radius-md);
   border: 1px solid var(--ui-border-subtle);

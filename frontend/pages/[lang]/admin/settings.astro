@@ -94,6 +94,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   import { interpolate, t } from '../../../i18n'
   import { api, errorText } from '../../../../backend/lib/admin/client'
   import { ATTR } from '../../../lib/dom-contract'
+  import { previewClickAction } from '../../../lib/admin-preview.ts'
   import { FOOTER_HEIGHT_KEY, MAX_FOOTER_HEIGHT, parseFooterMinHeight } from '../../../lib/footer-height.ts'
 
   interface Entry {
@@ -551,7 +552,10 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   function fitPreview(): void {
     if (!previewFrame || !previewBox) return
     const width = previewBox.clientWidth
-    const height = previewBox.clientHeight
+    // 底部留了一条给拖拽手柄 —— clientHeight 含 padding，得扣掉，
+    // 否则 iframe 铺满整块，手柄被压在 iframe 底下点不到
+    const grip = parseFloat(getComputedStyle(previewBox).paddingBlockEnd) || 0
+    const height = previewBox.clientHeight - grip
     if (width <= 0 || height <= 0) return
     // 桌面面板至少 1060；比它还宽就用面板自身宽度 —— 只缩不放，放大只会发虚
     const frameWidth =
@@ -658,14 +662,14 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     doc.head.appendChild(hint)
     doc.addEventListener('click', (event) => {
       const target = event.target as Element | null
-      const marked = target?.closest('[' + ATTR.copy + ']')
-      // 预览用来看效果，不是用来逛站点的 —— 任何链接都不跟随
-      if (target?.closest('a')) event.preventDefault()
-      if (!marked) return
-      // 可改的那句话：连站点自己的跳转也不做，直接跳到词条
-      event.stopPropagation()
-      const key = marked.getAttribute(ATTR.copy)
-      if (key) jumpToEntry(key)
+      const action = previewClickAction({
+        shiftKey: event.shiftKey,
+        copyKey: target?.closest('[' + ATTR.copy + ']')?.getAttribute(ATTR.copy) ?? null,
+        isAnchor: Boolean(target?.closest('a')),
+      })
+      if (action.kind === 'pass') return
+      event.preventDefault()
+      if (action.kind === 'jump') jumpToEntry(action.key)
     })
   }
 
@@ -732,7 +736,12 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     scrollPreviewTo(previewMode === 'footer' ? 'bottom' : 'top')
   })
 
-  window.addEventListener('resize', fitPreview)
+  // 容器尺寸一变就重算缩放 —— 拖动右下角手柄、窗口缩放都是同一条路
+  if (previewBox && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => fitPreview()).observe(previewBox)
+  } else if (previewBox) {
+    window.addEventListener('resize', fitPreview)
+  }
 
   document.querySelector<HTMLButtonElement>('[data-admin-reset-all]')?.addEventListener('click', async () => {
     if (!confirm(t(locale, 'admin.settings.confirmResetAll'))) return

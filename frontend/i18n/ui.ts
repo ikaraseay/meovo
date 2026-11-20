@@ -292,8 +292,8 @@ export const ui = {
   'admin.settings.allModules': { zh: '全部模块', en: 'All modules' },
   'admin.settings.preview': { zh: '实时预览', en: 'Live preview' },
   'admin.settings.previewHint': {
-    zh: '这就是站点本身 —— 改一个字，这边立刻变。点预览里的任意一句话，直接跳到要改的那一条。',
-    en: 'This is the site itself — change a word and it updates here. Click any sentence to jump straight to its field.',
+    zh: '这就是站点本身 —— 改一个字立刻变。点任意一句话跳到要改的那一条；按住 Shift 点链接，就能在预览里翻页检查。',
+    en: 'This is the site itself — edit a word and it updates here. Click any sentence to jump to its field; hold Shift and click a link to browse inside the preview.',
   },
   'admin.settings.previewHome': { zh: '首页', en: 'Home' },
   'admin.settings.previewAbout': { zh: '关于', en: 'About' },

@@ -418,7 +418,13 @@
     - ⚠️ key 写错是**静默失灵**（预览里那句话不动，也没报错）——
       `test/dom-contract.test.ts` 盯着每个 `data-copy` 的 key 都在语言包里
     - **点预览里的任意一句 → 直接跳到对应的词条**（`jumpToEntry`）：先清掉搜索 / 筛选、
-      翻到那一页，再聚焦那个输入框。预览里的链接**一律不跟随** —— 它是用来看效果的，不是逛站点的
+      翻到那一页，再聚焦那个输入框
+    - **按住 Shift 点链接 → 预览真的跟着跳**：顺着站点翻页检查每一处改动；
+      跳过去之后会重新挂监听、重算缩放。普通点击其它链接仍然拦下（预览不是浏览器）
+      三条分支在 `frontend/lib/admin-preview.ts` 的 `previewClickAction()`（纯函数，有单测）
+    - **框可以拖着改大小**（`resize: vertical`）：右下角留 0.75rem 的 padding 当手柄区 ——
+      不留的话 iframe 会把手柄压住点不到；`fitPreview()` 会扣掉这条再算缩放。
+      容器尺寸变化走 `ResizeObserver` 重算，不靠 window resize
     - ⚠️ 预览那张卡的类名是 `.admin-live`，**别写 `.admin-preview`** ——
       那是**编辑器**的 markdown 预览，自带 `height` + `overflow`，
       套到设置页上会把整页压成一个定高滚动框（踩过一次）
@@ -550,6 +556,9 @@
       收起后正文区从半行变成整行（栏宽 945 时 484 → 895）。
       写作时最缺的就是宽度，别把预览做成不可关的常驻栏。
       按钮文案要写「收起预览 / 显示预览」—— 只写「预览」看不出当前是开还是关
+    - **预览还能拖着改高**（`resize: vertical`，上限 `92vh`）：所以编辑器那一行的
+      行高是 `auto auto` —— 写死 `var(--ui-editor-height)` 的话，拖高后预览会顶出卡片。
+      正文区仍按默认高度，两边不必等高（滚动同步按 scrollHeight 比例算，不依赖等高）
   - 列表支持搜索（标题 / slug / 摘要）+ 状态筛选 + 语言筛选
   - 样式全在 `frontend/styles/admin.css` —— 只用 `--ui-*` token，
     层级刻度用 `--ui-z-*`（提示条是 `--ui-z-panel`）
