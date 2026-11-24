@@ -146,7 +146,7 @@ export function contentAnchoredLayout(
 
   // 侧栏卡片放不下（窄桌面）就并进顶部 —— 排在标题卡下面。
   // 别掉到正文末尾：那儿是协议卡 / 上下篇的位置，
-  // 目录与思维导图是「进正文前」要看的东西，掉到最后反而难找。
+  // 目录与关系图谱是「进正文前」要看的东西，掉到最后反而难找。
   const fitsSide = (c: DeskCard) =>
     contentRight + DESK_GAP_X + c.width <= deskWidth - DESK_EDGE
   const side = sideAll.filter(fitsSide)

@@ -1,6 +1,6 @@
 ---
 /**
- * 文章页的外壳 —— 标题卡、正文、目录、结构图、上下篇、页脚。
+ * 文章页的外壳 —— 标题卡、正文、目录、关系图谱、上下篇、页脚。
  * ---------------------------------------------------------
  * 页面只管路由与数据（哪篇文章、哪些语言版本）；chrome 全在这一份：
  * 卡片摆在哪（zone）、目录怎么折叠、复制按钮怎么注入，都归这里。
@@ -21,7 +21,16 @@ import {
   type Post,
 } from '../lib/posts'
 import { tocHeadings, type Heading } from '../lib/content-queries'
-import { postPath } from '../lib/urls'
+import {
+  postPath,
+  tagPath,
+  categoryPath,
+  seriesPath,
+} from '../lib/urls'
+import {
+  getCategoryLabel,
+  getTagLabel,
+} from '../lib/posts'
 
 interface Props {
   /** 这篇文章（内容语言可能与 URL 语言不同） */
@@ -57,13 +66,13 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   <!-- 标题卡：顶部通栏 -->
   <GlassWidget id="article-head" zone="top" width="xl" locale={locale}>
     <div class="post-head">
-      <h1 class="post-title">{post.data.title}</h1>
+      <h1 class="post-title" id="article-title">{post.data.title}</h1>
       <PostMeta post={post} locale={locale} readingMinutes={minutes} />
     </div>
   </GlassWidget>
 
-  <!-- 目录与结构图：桌面排在正文右侧栏；窄屏放不下就落到标题卡下面 ——
-       所以 DOM 顺序 = 窄屏的视觉顺序（标题 → 目录 → 结构图 → 正文） -->
+  <!-- 目录与关系图谱：桌面排在正文右侧栏；窄屏放不下就落到标题卡下面 ——
+       所以 DOM 顺序 = 窄屏的视觉顺序（标题 → 目录 → 关系图谱 → 正文） -->
   {
     tocItems.length > 0 && (
       <GlassWidget id="article-toc" zone="side" width="sm" defaultPin locale={locale}>
@@ -91,13 +100,29 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   {
     tocItems.length > 0 && (
       <GlassWidget id="article-outline" zone="side" width="sm" defaultPin locale={locale}>
-        <OutlineMap headings={headings} title={post.data.title} locale={locale} />
+        <OutlineMap
+          headings={headings}
+          title={post.data.title}
+          locale={locale}
+          category={post.data.category
+            ? { label: getCategoryLabel(locale, post.data.category), href: categoryPath(locale, post.data.category) }
+            : undefined}
+          tags={post.data.tags.map((tag) => ({
+            label: getTagLabel(locale, tag),
+            href: tagPath(locale, tag),
+          }))}
+          series={post.data.series
+            ? { label: post.data.series.title, href: seriesPath(locale, post.data.series.id) }
+            : undefined}
+          prev={prev}
+          next={next}
+        />
       </GlassWidget>
     )
   }
 
-  <!-- 折叠阅读：侧栏卡片，排在思维导图后面 —— 跟目录 / 结构图一样默认固定，
-       窄屏退回文档流时也紧跟结构图（DOM 顺序 = 视觉顺序） -->
+  <!-- 折叠阅读：侧栏卡片，排在关系图谱后面 —— 跟目录 / 关系图谱一样默认固定，
+       窄屏退回文档流时也紧跟关系图谱（DOM 顺序 = 视觉顺序） -->
   <GlassWidget id="article-fold" zone="side" width="sm" defaultPin locale={locale}>
     <TextFoldBar locale={locale} />
   </GlassWidget>

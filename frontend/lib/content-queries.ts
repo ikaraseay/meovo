@@ -103,8 +103,7 @@ export interface Heading {
 }
 
 /**
- * 目录 / 结构图只收 h2 / h3 —— 再深的层级在这两处都没有意义。
- * 页面与 OutlineMap 各写一份的话，改规则要改两处。
+ * 目录只收 h2 / h3；关系图谱按同一层级展示标题与章节关系。
  */
 export function tocHeadings(headings: Heading[]): Heading[] {
   return headings.filter((h) => h.depth === 2 || h.depth === 3)

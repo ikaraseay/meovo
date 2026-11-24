@@ -355,7 +355,8 @@ html.dark .code-block pre.astro-code span {
   border-inline-start: 1px solid var(--ui-border);
   list-style: none;
   /* 章节多了目录自己滚 —— 别把卡片撑出屏幕 */
-  max-height: calc(100vh - 12rem);
+  max-height: min(38vh, 22rem);
+  max-height: min(38dvh, 22rem);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

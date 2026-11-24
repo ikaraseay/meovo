@@ -93,17 +93,17 @@
 - **代码高亮**：Shiki 双主题（`markdown.shikiConfig.themes` + `defaultColor: false`），
   产物里只有 `--shiki-light` / `--shiki-dark` 变量，**Astro 自己不生成切换 CSS** ——
   明暗切换写在 `prose.css` 的 `html.dark` 规则里
-- **文章页**：chrome（标题卡 / 目录 / 结构图 / 协议卡 / 上下篇 / 页脚）+ 目录折叠 / 滚动高亮 /
+- **文章页**：chrome（标题卡 / 目录 / 关系图谱 / 协议卡 / 上下篇 / 页脚）+ 目录折叠 / 滚动高亮 /
   代码块复制按钮，都在 `frontend/components/Article.astro` —— 页面只管路由与数据，正文走插槽。
   标题与元信息（日期 / 阅读时间 / 分类 / 标签）在顶部通栏玻璃卡（`article-head`，`zone="top" width="xl"`）
-  - **窄屏下目录与结构图排在标题卡下面** —— 靠 **DOM 顺序** 实现：窄屏卡片退回文档流，
+  - **窄屏下目录与关系图谱排在标题卡下面** —— 靠 **DOM 顺序** 实现：窄屏卡片退回文档流，
     DOM 顺序 = 视觉顺序。桌面是绝对定位 + zone，落位由 `desk-layout.ts` 算，与 DOM 顺序无关
   - 窄屏上目录卡紧跟标题卡（`global.css` 里 side 区卡片 `margin-block-start` 收紧一档）——
     它们是「进正文前」要看的东西，隔一整个 gap 就跟标题分成两块不相干的卡片了
   - 窄屏的目录折叠头**不要自带边框**（`prose.css` 的 `.toc-toggle`）：卡本身已经有一圈，
-    再套一层就是两层套着的描边 —— 跟结构图那行 `<summary>` 保持同一种素行样式
-  - **章节多了，目录与结构图自己滚** —— 两边都有 `max-height: calc(100vh - 12rem)` +
-    `overflow: auto`（目录在 `prose.css` 的 `.toc-list`，结构图在 `OutlineMap.astro`
+    再套一层就是两层套着的描边 —— 跟关系图谱那行 `<summary>` 保持同一种素行样式
+  - **章节多了，目录与关系图谱自己滚** —— 两边都有独立高度上限 +
+    `overflow: auto`（目录在 `prose.css` 的 `.toc-list`，图谱在 `OutlineMap.astro`
     的 `.outline-scroll`）：别让卡片长到屏幕外面去
   - 目录高亮跟着正文走时，**当前章节要留在目录的可视区里**（`Article.astro`
     的 `keepActiveVisible()`）—— 只滚目录，不动页面
@@ -130,8 +130,8 @@
   没有模型要点时要点档退回简述（露出论断句）。档位 id 是 `full | brief | key`
   （旧的 `two` / `one` 在 `readFoldLevel()` 里迁移，别再沿用旧名）。
   - **默认全文，读者主动选档** —— 控件是独立一张侧栏玻璃卡（`article-fold`，`TextFoldBar.astro`，
-    `zone="side" width="sm" defaultPin`，排在思维导图 `article-outline` 后面，跟目录 / 结构图一样默认固定；
-    窄屏退回文档流时紧跟结构图）。服务端先 `hidden`，脚本处理完正文、确有可折段落才揭开（连卡片一起）；
+    `zone="side" width="sm" defaultPin`，排在关系图谱 `article-outline` 后面，跟目录 / 关系图谱一样默认固定；
+    窄屏退回文档流时紧跟关系图谱）。服务端先 `hidden`，脚本处理完正文、确有可折段落才揭开（连卡片一起）；
     没有可折段落整张卡藏起来（`initTextFold`  toggles `bar.closest([data-widget]).hidden`）。
     选的档位记进偏好（`preferences.ts` 的 `PREFS_KEYS.foldLevel` / `readFoldLevel()`），跨页面跨刷新还原
   - **AI 要点构建期生成** —— `backend/scripts/ai-summary.mjs` 调 Cloudflare Workers AI
@@ -305,7 +305,7 @@
   - **侧栏卡片放不下就并到标题卡下面** —— 760px 正文列 + 300px 侧栏要 1424px 才排得下。
     窄桌面由 `fittedContentWidth` 收窄正文列给侧栏让位（保底 480px），
     收到保底还放不下，侧栏卡片就并进顶部堆 —— **排在标题卡下面**，
-    别掉到正文末尾（那儿是协议卡 / 上下篇的位置，目录与思维导图掉最后反而难找）
+    别掉到正文末尾（那儿是协议卡 / 上下篇的位置，目录与关系图谱掉最后反而难找）
   - **默认固定位置贴着正文列的右缘** —— 不是视口右上角：右上角在窄桌面会正好压在正文上。
     判定「放得下」用**桌面的右缘**（与布局那侧同一把尺），固定 / 取消固定结果一致
 - **卡片压到正文上时，正文逐行绕开**（`frontend/lib/prose-flow.ts` + `frontend/lib/yield-layout.ts`）
