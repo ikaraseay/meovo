@@ -82,9 +82,8 @@ export function getAllSeries(posts: Post[]): string[] {
 /**
  * 标签 / 分类的显示名。
  *
- * 标签与分类在 frontmatter 里是 **ASCII slug**（`design`、`css`）——
- * URL 里用的就是它，所以链接永远是干净的 ASCII。
- * 显示名走词典 `tag.<slug>` / `category.<slug>`；词典里没有就退回 slug 本身。
+ * 分类使用 ASCII slug，标签可直接使用多语言文字。已知词条走词典，
+ * 没有词条时回退到原值。
  */
 export function getTagLabel(locale: Locale, tag: string): string {
   const key = `tag.${tag}`

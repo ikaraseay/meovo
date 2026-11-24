@@ -10,6 +10,7 @@ import { t, type Locale } from '../i18n'
 
 interface Props {
   locale: Locale
+  workspace?: boolean
   /** 页头标题 */
   title: string
   /** 页头副标题 */
@@ -18,7 +19,7 @@ interface Props {
   section: 'documents' | 'gallery' | 'comments' | 'projects' | 'settings'
 }
 
-const { locale, title, intro, section } = Astro.props
+const { locale, title, intro, section, workspace = false } = Astro.props
 const base = '/' + locale + '/admin'
 
 const nav: { id: Props['section']; label: string; href: string; hint: string }[] = [
@@ -29,8 +30,8 @@ const nav: { id: Props['section']; label: string; href: string; hint: string }[]
 ]
 ---
 
-<BaseLayout locale={locale} title={title} noindex chrome={false}>
-  <div class="admin-shell">
+<BaseLayout locale={locale} title={title} noindex chrome={false} wide={workspace}>
+  <div class:list={['admin-shell', { 'admin-shell--workspace': workspace }]}>
     <aside class="admin-side">
       <a class="admin-side__brand" href={base + '/'}>
         <span class="admin-side__logo">{t(locale, 'site.name')}</span>

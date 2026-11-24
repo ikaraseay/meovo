@@ -26,3 +26,39 @@ export function previewClickAction(input: {
   if (input.isAnchor) return { kind: 'block' }
   return { kind: 'pass' }
 }
+
+/* ---------------- 分栏与缩放：尺寸怎么算，界面与测试共用 ---------------- */
+
+/** 分栏的边界 —— 正文再窄也留两成，预览再宽也不吃掉整行 */
+export const SPLIT_MIN = 20
+export const SPLIT_MAX = 80
+
+/** 默认分栏 —— 预览略宽一点：预览是拿来读的，正文是拿来写的 */
+export const SPLIT_DEFAULT = 45
+
+/** 分栏比例（百分比）落在边界内 */
+export function clampSplit(percent: number): number {
+  return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, Math.round(percent)))
+}
+
+/**
+ * 拖分栏条 → 正文占多少（百分比）。
+ *
+ * 分界点就是分栏条的中线 —— 所以直接按整行的宽度换算，
+ * 不用再扣掉分栏条自己那一条。
+ */
+export function splitPercent(clientX: number, left: number, width: number): number {
+  if (width <= 0) return SPLIT_DEFAULT
+  return clampSplit(((clientX - left) / width) * 100)
+}
+
+/** 预览缩放 —— 只缩不放（放大只会发虚） */
+export function previewScale(panelWidth: number, deviceWidth: number): number {
+  if (panelWidth <= 0 || deviceWidth <= 0) return 1
+  return Math.min(1, panelWidth / deviceWidth)
+}
+
+/** 缩放后横向居中的偏移 —— 剩下的空当分给两边 */
+export function previewOffset(panelWidth: number, deviceWidth: number, scale: number): number {
+  return Math.max(0, (panelWidth - deviceWidth * scale) / 2)
+}

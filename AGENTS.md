@@ -18,7 +18,7 @@
 - **内容**：文章放 `frontend/content/blog/<locale>/<slug>.md(x)`，entry.id 形如 `zh/hello-world`。
   - **目录即语言**，语言不写在 frontmatter 里
   - 同一篇文章的不同语言版本**文件名必须一致**，系统据此判定互为翻译
-  - 标签与分类用 **ASCII slug**（`design`、`css`），显示名走词典 `tag.<slug>` / `category.<slug>`
+  - 分类用 **ASCII slug**；标签支持多语言文字（如 `中文`、`design`），未配置词条时直接显示标签原文
   - **slug 规则只有一处**：`frontend/lib/slug.ts` 的 `SLUG_PATTERN` ——
     后台提交（`backend/lib/admin/documents.ts`）与 frontmatter schema
     （`frontend/content.config.ts`）都从那儿拿。手写文章绕过后台，schema 就是那道防线
@@ -558,7 +558,13 @@
       按钮文案要写「收起预览 / 显示预览」—— 只写「预览」看不出当前是开还是关
     - **预览还能拖着改高**（`resize: vertical`，上限 `92vh`）：所以编辑器那一行的
       行高是 `auto auto` —— 写死 `var(--ui-editor-height)` 的话，拖高后预览会顶出卡片。
-      正文区仍按默认高度，两边不必等高（滚动同步按 scrollHeight 比例算，不依赖等高）
+      **正文区跟着长**（桌面端 `height:auto` + `align-self:stretch`）——
+      滚动同步按 scrollHeight 比例算，本来就不依赖等高，等高只是看着稳
+    - **两栏之间有一条能拖的分栏条**（`.admin-editor__gutter`，`role="separator"`）：
+      拖它改预览宽度，键盘方向键也行（Shift 步长更大）。比例写进 `--admin-split`
+      （百分比，夹在 20~80；默认值 `SPLIT_DEFAULT`，**样式与脚本要对齐** ——
+      `test/admin-preview.test.ts` 盯着）。默认 45/55：预览是拿来读的，略宽一点
+      （旧栅格 1.25fr:1fr 时预览只有 387px，现在是 482px）
   - 列表支持搜索（标题 / slug / 摘要）+ 状态筛选 + 语言筛选
   - 样式全在 `frontend/styles/admin.css` —— 只用 `--ui-*` token，
     层级刻度用 `--ui-z-*`（提示条是 `--ui-z-panel`）

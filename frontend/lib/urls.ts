@@ -24,9 +24,9 @@ export function archivePath(locale: Locale): string {
   return `/${locale}/archive/`
 }
 
-/** 单个标签页 URL —— tag 是 ASCII slug，直接拼 */
+/** 单个标签页 URL —— Unicode 标签需要编码进路径 */
 export function tagPath(locale: Locale, tag: string): string {
-  return `/${locale}/tags/${tag}/`
+  return `/${locale}/tags/${encodeURIComponent(tag)}/`
 }
 
 /** 单个分类页 URL —— category 是 ASCII slug，直接拼 */

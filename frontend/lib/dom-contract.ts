@@ -168,6 +168,8 @@ export const ATTR = {
   adminEditor: 'data-admin-editor',
   /** 后台：markdown 预览区 */
   adminPreview: 'data-admin-preview',
+  /** 后台：编辑器的分栏条 —— 拖它改预览宽度 */
+  adminGutter: 'data-admin-gutter',
   /** 后台：图库网格 */
   adminGallery: 'data-admin-gallery',
   /** 后台：选图面板 */

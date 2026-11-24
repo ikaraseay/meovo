@@ -3,6 +3,7 @@ import { z } from 'astro/zod'
 import { glob } from 'astro/loaders'
 import { LICENSE_IDS } from './lib/licenses.ts'
 import { SLUG_PATTERN } from './lib/slug.ts'
+import { TAG_PATTERN } from './lib/tag.ts'
 
 /**
  * 博客文章集合。
@@ -32,9 +33,9 @@ const postSchema = z.object({
     .string()
     .regex(SLUG_PATTERN, '分类必须是 ASCII slug（小写字母、数字、连字符）')
     .optional(),
-  /** 标签，一篇可以有多个 —— 逐项都是 ASCII slug */
+  /** 标签，一篇可以有多个 —— 支持任意语言的字母与数字 */
   tags: z
-    .array(z.string().regex(SLUG_PATTERN, '标签必须是 ASCII slug（小写字母、数字、连字符）'))
+    .array(z.string().regex(TAG_PATTERN, '标签只能包含文字、数字和连字符'))
     .default([]),
   /** 许可协议 —— 不写就用全站默认（CC BY 4.0）；取值见 frontend/lib/licenses.ts */
   license: z.enum(LICENSE_IDS).default('cc-by'),

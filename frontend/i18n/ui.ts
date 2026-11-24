@@ -169,7 +169,7 @@ export const ui = {
     en: 'Found an error or have a suggestion? Email the author:',
   },
 
-  // 标签显示名 —— 标签的**标识**是 ASCII slug，URL 里用的是它，显示名走词典
+  // 常用标签显示名；未列出的标签直接显示原值
   'tag.astro': { zh: 'Astro', en: 'Astro' },
   'tag.css': { zh: 'CSS', en: 'CSS' },
   'tag.mdx': { zh: 'MDX', en: 'MDX' },
@@ -390,8 +390,17 @@ export const ui = {
   },
   'admin.hint.tagsPlaceholder': { zh: '添加标签…', en: 'Add a tag…' },
   'admin.tags.remove': { zh: '移除 {tag}', en: 'Remove {tag}' },
+  'admin.editor.focus': { zh: '全屏编辑', en: 'Full-screen editor' },
+  'admin.editor.focusExit': { zh: '退出全屏', en: 'Exit full screen' },
   'admin.editor.previewHide': { zh: '收起预览', en: 'Hide preview' },
   'admin.editor.previewShow': { zh: '显示预览', en: 'Show preview' },
+  'admin.editor.previewOnly': { zh: '仅预览', en: 'Preview only' },
+  'admin.editor.language': { zh: '文章语言', en: 'Article language' },
+  'admin.editor.settings': { zh: '文章设置', en: 'Article settings' },
+  'admin.editor.viewSplit': { zh: '分栏', en: 'Split view' },
+  'admin.editor.viewWrite': { zh: '仅编辑', en: 'Write only' },
+  'admin.editor.viewPreview': { zh: '仅预览', en: 'Preview only' },
+  'admin.editor.splitLabel': { zh: '拖动调整预览宽度', en: 'Drag to resize the preview' },
   'admin.hint.build': {
     zh: '改了文案或文章都要按它才上站。',
     en: 'Changes only reach the site after this.',
@@ -440,7 +449,7 @@ export const ui = {
   'admin.error.locale_invalid': { zh: '语言只能是 zh 或 en。', en: 'Language must be zh or en.' },
   'admin.error.license_invalid': { zh: '协议取值不对。', en: 'Unknown license.' },
   'admin.error.category_invalid': { zh: '分类要用 ASCII slug。', en: 'Category must be an ASCII slug.' },
-  'admin.error.tag_invalid': { zh: '标签要用 ASCII slug。', en: 'Tags must be ASCII slugs.' },
+  'admin.error.tag_invalid': { zh: '标签只能包含文字、数字和连字符。', en: 'Tags may contain letters, numbers, and hyphens.' },
   'admin.error.date_invalid': { zh: '日期格式不对。', en: 'Invalid date.' },
   'admin.error.series_invalid': { zh: '系列要同时填 ID 与标题。', en: 'A series needs both an ID and a title.' },
   'admin.error.series_order_invalid': { zh: '系列序号要是正整数。', en: 'Series order must be a positive integer.' },

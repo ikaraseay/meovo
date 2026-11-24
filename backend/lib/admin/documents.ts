@@ -1,8 +1,7 @@
 /**
  * 文档字段 —— 规范化与校验（纯函数）。
  * ---------------------------------------------------------
- * 站点的老约定：slug / 分类 / 标签都是 **ASCII slug**，URL 里用的就是它，
- * 显示名走词典。后台沿用同一套，别让后台写出一堆中文 URL。
+ * 链接 slug、分类与系列 id 使用 ASCII slug；标签可用任意语言的字母与数字。
  *
  * 错误用**代码**返回（title_required 这种），不直接返回文案 ——
  * 文案要过 i18n 词典，界面那边按代码查表。
@@ -10,6 +9,7 @@
 
 import { LICENSE_IDS } from '../../../frontend/lib/licenses.ts'
 import { SLUG_PATTERN } from '../../../frontend/lib/slug.ts'
+import { TAG_PATTERN } from '../../../frontend/lib/tag.ts'
 import { locales, type Locale } from '../../../frontend/i18n/index.ts'
 
 export type DocumentErrorCode =
@@ -149,7 +149,7 @@ export function parseTags(input: unknown): string[] {
   const raw = Array.isArray(input) ? input.map(String) : String(input ?? '').split(/[,，]/)
   const tags: string[] = []
   for (const item of raw) {
-    // 空格折成连字符 —— 作者会写「astro blog」，tag 得是 slug
+    // 空格折成连字符，便于生成稳定的标签路径。
     const tag = item.trim().toLowerCase().replace(/\s+/g, '-')
     if (!tag || tags.includes(tag)) continue
     tags.push(tag)
@@ -197,7 +197,7 @@ export function normalizeDocument(input: DocumentInput): {
   if (category && !SLUG_PATTERN.test(category)) errors.push('category_invalid')
 
   const tags = parseTags(input.tags)
-  if (tags.some((tag) => !SLUG_PATTERN.test(tag))) errors.push('tag_invalid')
+  if (tags.some((tag) => !TAG_PATTERN.test(tag))) errors.push('tag_invalid')
 
   const pubDate = asDate(input.pubDate)
   if (input.pubDate && !pubDate) errors.push('date_invalid')

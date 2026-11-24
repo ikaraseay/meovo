@@ -530,27 +530,40 @@
   display: grid;
   gap: var(--ui-space-sm) var(--ui-space-lg);
   grid-template-columns: minmax(0, 1fr);
+  /* 分栏比例（百分比）—— 脚本拖分栏条时改它。默认值与 admin-preview.ts 的 SPLIT_DEFAULT 对齐 */
+  --admin-split: 45;
+  /* 分栏条占的那一条 —— 视觉上就是一道能抓的竖线 */
+  --admin-gutter: 1.25rem;
 }
 
 @media (min-width: 1024px) {
   .admin-editor {
-    /* 写作那半边宽一点 —— 预览是参考，正文才是在写的东西 */
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    /* 三列：正文 | 分栏条 | 预览 —— 分界点落在 --admin-split 上 */
+    grid-template-columns:
+      minmax(0, calc(var(--admin-split) * 1% - var(--admin-gutter) / 2))
+      var(--admin-gutter)
+      minmax(0, calc((100 - var(--admin-split)) * 1% - var(--admin-gutter) / 2));
+    column-gap: 0;
     /* 行高交给内容 —— 预览拖高之后这一行要跟着长 */
     grid-template-rows: auto auto;
     align-items: start;
   }
 
   .admin-editor__tools {
-    grid-area: 1 / 1;
+    /* 工具栏跨满整行 —— 只占正文那一列的话按钮会挤成两排 */
+    grid-area: 1 / 1 / 2 / -1;
   }
 
   .admin-editor__body {
     grid-area: 2 / 1;
   }
 
-  .admin-preview {
+  .admin-editor__gutter {
     grid-area: 2 / 2;
+  }
+
+  .admin-preview {
+    grid-area: 2 / 3;
   }
 }
 
@@ -561,6 +574,21 @@
 
 .admin-editor.is-preview-off .admin-preview {
   display: none;
+}
+
+.admin-editor.is-preview-only .admin-editor__body,
+.admin-editor.is-preview-only:not(.is-preview-off) .admin-editor__gutter {
+  display: none;
+}
+
+.admin-editor.is-preview-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-editor.is-preview-only .admin-preview {
+  grid-area: auto;
+  width: min(100%, 76ch);
+  justify-self: center;
 }
 
 /* 开关跟在工具栏末尾，靠右 */
@@ -578,6 +606,56 @@
   height: var(--ui-editor-height);
   min-height: 18rem;
   overflow: auto;
+}
+
+@media (min-width: 1024px) {
+  /* 正文跟着预览长高 —— 预览拖多高这里就多高。
+     滚动同步按比例算，不依赖两边真的等高。 */
+  .admin-editor__body {
+    height: auto;
+    align-self: stretch;
+  }
+}
+
+/* 分栏条 —— 拖它改预览宽度（方向键也能调） */
+.admin-editor__gutter {
+  display: none;
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  /* 触屏拖动时别顺手滚页面 */
+  touch-action: none;
+  user-select: none;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+@media (min-width: 1024px) {
+  .admin-editor:not(.is-preview-off) .admin-editor__gutter {
+    display: block;
+  }
+}
+
+/* 中间那道竖线 —— 悬停 / 聚焦时更明显 */
+.admin-editor__gutter::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(50% - 1px);
+  width: 2px;
+  background: var(--ui-border-subtle);
+  border-radius: 1px;
+}
+
+.admin-editor__gutter:hover::before,
+.admin-editor__gutter:focus-visible::before {
+  background: var(--ui-accent);
+}
+
+.admin-editor__gutter:focus-visible {
+  outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color);
+  outline-offset: var(--ui-focus-ring-offset);
 }
 
 /* 对版 —— 卡片头：标题 + 开关 */
@@ -1043,4 +1121,267 @@
 
 .admin-project-form {
   gap: var(--ui-space-md);
+}
+
+/* 写作工作台：把站点容器和侧栏占掉的宽度还给文章。 */
+.site-main:has(.admin-shell--workspace) {
+  padding-block: var(--ui-space-md);
+}
+
+.container:has(.admin-shell--workspace) {
+  max-width: none;
+}
+
+.admin-shell--workspace {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ui-space-md);
+}
+
+.admin-shell--workspace .admin-side {
+  position: static;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-block: var(--ui-space-xs);
+}
+
+.admin-shell--workspace .admin-side__nav {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.admin-shell--workspace .admin-side__hint,
+.admin-shell--workspace .admin-side__sub {
+  display: none;
+}
+
+.admin-shell--workspace .admin-side__link {
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+}
+
+.admin-shell--workspace .admin-side__foot {
+  margin-inline-start: auto;
+  margin-block-start: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-shell--workspace .admin-build {
+  display: none;
+}
+
+.admin-shell--workspace .admin-preview {
+  padding: clamp(1rem, 2vw, 2.5rem);
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+}
+
+.admin-shell--workspace .admin-editor__body {
+  padding: var(--ui-space-md);
+  scrollbar-gutter: stable;
+}
+
+.admin-writing {
+  position: relative;
+  gap: var(--ui-space-md);
+}
+
+.admin-writing__bar {
+  inset-block-start: var(--ui-space-xs);
+  inset-block-end: auto;
+  z-index: var(--ui-z-panel);
+  justify-content: space-between;
+  min-height: 3.5rem;
+}
+
+.admin-writing__languages {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2xs, 0.25rem);
+}
+
+.admin-writing__language {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-xs);
+  min-height: 2.5rem;
+  padding: var(--ui-space-xs) var(--ui-space-md);
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-writing__language[aria-pressed='true'] {
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-border-accent);
+}
+
+.admin-writing__language:focus-visible {
+  outline: var(--ui-focus-ring-width) solid var(--ui-focus-ring-color);
+  outline-offset: var(--ui-focus-ring-offset);
+}
+
+.admin-writing__language-status {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--ui-border-subtle);
+}
+
+.admin-writing__language-status[data-status='published'] {
+  background: var(--ui-text-accent);
+}
+
+.admin-writing__settings {
+  position: relative;
+}
+
+.admin-writing__settings > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-writing__settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-writing__settings[open] {
+  position: absolute;
+  inset-block-start: 3.25rem;
+  inset-inline-end: 0;
+  z-index: var(--ui-z-popup);
+  width: min(38rem, calc(100vw - 2rem));
+  padding: var(--ui-space-md);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-raised);
+}
+
+.admin-writing__settings-grid {
+  max-height: min(70vh, 38rem);
+  overflow: auto;
+}
+
+.admin-writing__document {
+  display: none;
+  border: 0;
+  padding: var(--ui-space-md) 0;
+  background: transparent;
+}
+
+.admin-writing__document.is-active {
+  display: flex;
+}
+
+.admin-writing__document > .admin-card__head {
+  display: none;
+}
+
+.admin-writing__document > .admin-grid {
+  gap: var(--ui-space-sm);
+}
+
+.admin-writing__document .admin-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.admin-writing__document [name^='title-'] {
+  min-height: 3.5rem;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.admin-writing__document [name^='description-'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ui-text-secondary);
+  padding-inline: 0;
+}
+
+.admin-writing__document .admin-editor {
+  margin-block-start: var(--ui-space-sm);
+}
+
+.admin-writing__document .admin-editor__body,
+.admin-writing__document .admin-preview {
+  height: max(18rem, calc(100dvh - 19rem));
+}
+
+.admin-writing__import {
+  cursor: pointer;
+}
+
+@media not (min-width: 1024px) {
+  .admin-writing__bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-writing__bar .admin-actionbar__buttons {
+    margin-inline-start: 0;
+  }
+
+  .admin-writing__document .admin-editor__body,
+  .admin-writing__document .admin-preview {
+    height: 55dvh;
+    min-height: 18rem;
+  }
+
+  .admin-writing__settings[open] {
+    position: fixed;
+    inset-block-start: 8rem;
+    inset-inline: var(--ui-space-sm);
+    width: auto;
+  }
+}
+
+/* 全屏仍保留保存、发布与状态，退出不会重建正文或丢失选区。 */
+body:has(.admin-shell--focused) {
+  overflow: hidden;
+}
+
+.admin-shell--focused {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ui-z-expanded);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--ui-space-md);
+  background: var(--ui-surface);
+}
+
+.admin-shell--focused .admin-side,
+.admin-shell--focused .admin-head__intro,
+.admin-shell--focused form > :not(.admin-card--focused, .admin-actionbar, .admin-media-picker) {
+  display: none;
+}
+
+.admin-shell--focused .admin-main,
+.admin-shell--focused form {
+  gap: var(--ui-space-sm);
+}
+
+.admin-shell--focused .admin-editor__body,
+.admin-shell--focused .admin-preview {
+  height: max(18rem, calc(100dvh - 19rem));
+  min-height: 0;
+  resize: none;
+}
+
+@media not (min-width: 1024px) {
+  .admin-shell--focused .admin-editor__body,
+  .admin-shell--focused .admin-preview {
+    height: 55dvh;
+    min-height: 18rem;
+  }
 }

@@ -70,15 +70,18 @@ test('文档：协议取值要认识', () => {
   assert.ok(result.errors.includes('license_invalid'))
 })
 
-test('文档：分类与标签都要 ASCII slug', () => {
+test('文档：分类要 ASCII slug，标签支持中文文字', () => {
   assert.ok(normalizeDocument({ ...valid, category: '公告' }).errors.includes('category_invalid'))
-  assert.ok(normalizeDocument({ ...valid, tags: '中文' }).errors.includes('tag_invalid'))
+  assert.deepEqual(normalizeDocument({ ...valid, tags: '中文' }).value?.tags, ['中文'])
+  assert.deepEqual(normalizeDocument({ ...valid, tags: '前端 开发' }).value?.tags, ['前端-开发'])
+  assert.ok(normalizeDocument({ ...valid, tags: '设计/开发' }).errors.includes('tag_invalid'))
 })
 
 test('文档：标签按逗号拆、空格折连字符、去重', () => {
   // 后台是「一颗颗加」，但接口照样得接得住一串
   const result = normalizeDocument({ ...valid, tags: 'Astro Blog, css，astro blog' })
   assert.deepEqual(result.value?.tags, ['astro-blog', 'css'])
+  assert.deepEqual(parseTags('中文，中文,前端 开发'), ['中文', '前端-开发'])
 })
 
 test('文档：日期坏了要报错', () => {

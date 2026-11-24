@@ -14,6 +14,7 @@ export const prerender = false
 import AdminLayout from '../../../../layouts/AdminLayout.astro'
 import { t, type Locale } from '../../../../i18n'
 import { LICENSES, LICENSE_IDS } from '../../../../lib/licenses'
+import { SPLIT_MIN, SPLIT_MAX, SPLIT_DEFAULT } from '../../../../lib/admin-preview'
 
 const locale = (Astro.params.lang as Locale) ?? 'zh'
 const docId = Astro.params.id ?? 'new'
@@ -24,6 +25,7 @@ const langs = ['zh', 'en'] as const
 <AdminLayout
   locale={locale}
   section="documents"
+  workspace
   title={t(locale, isNew ? 'admin.editor.new' : 'admin.editor.edit')}
   intro={t(locale, isNew ? 'admin.editor.newIntro' : 'admin.editor.editIntro')}
 >
@@ -37,26 +39,77 @@ const langs = ['zh', 'en'] as const
     </button>
   </div>
 
-  <form class="admin" data-admin-editor data-doc-id={docId}>
-    <section class="admin-card">
-      <h2 class="admin-card__title">{t(locale, 'admin.card.basics')}</h2>
-      <div class="admin-grid">
-        <div class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.url')}</span>
-          <span class="admin-url" data-admin-url></span>
-          <span class="admin-field__hint">{t(locale, 'admin.hint.url')}</span>
-        </div>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.pubDate')}</span>
-          <input class="ui-input" type="date" name="pubDate" />
+  <form class="admin admin-writing" data-admin-editor data-doc-id={docId}>
+    <div class="admin-actionbar admin-actionbar--sticky admin-writing__bar">
+      <nav class="admin-writing__languages" aria-label={t(locale, 'admin.editor.language')}>
+        {langs.map((lang) => (
+          <button
+            class="admin-writing__language"
+            type="button"
+            data-editor-lang-tab={lang}
+            aria-pressed={lang === 'zh' ? 'true' : 'false'}
+          >
+            {t(locale, lang === 'zh' ? 'admin.lang.zh' : 'admin.lang.en')}
+            <span class="admin-writing__language-status" data-lang-tab-status={lang}></span>
+          </button>
+        ))}
+      </nav>
+      <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
+      <div class="admin-actionbar__buttons">
+        <details class="admin-writing__settings" data-editor-settings>
+          <summary class="ui-btn">{t(locale, 'admin.editor.settings')}</summary>
+          <div class="admin-grid admin-writing__settings-grid">
+            <div class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.url')}</span>
+              <span class="admin-url" data-admin-url></span>
+              <span class="admin-field__hint">{t(locale, 'admin.hint.url')}</span>
+            </div>
+            <label class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.pubDate')}</span>
+              <input class="ui-input" type="date" name="pubDate" />
+            </label>
+            <label class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.category')}</span>
+              <input class="ui-input admin-input--mono" type="text" name="category" />
+            </label>
+            <div class="admin-field admin-field--wide">
+              <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
+              <div class="admin-tags">
+                <div class="admin-tags__list" data-admin-tags></div>
+                <input class="ui-input admin-tags__input" type="text" name="tags" placeholder={t(locale, 'admin.hint.tagsPlaceholder')} />
+              </div>
+              <span class="admin-field__hint">{t(locale, 'admin.hint.tags')}</span>
+            </div>
+            <label class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
+              <select class="ui-input" name="license">
+                {LICENSE_IDS.map((id) => <option value={id}>{t(locale, LICENSES[id].nameKey)}</option>)}
+              </select>
+            </label>
+            <label class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
+              <input class="ui-input" type="text" name="seriesTitle" />
+              <span class="admin-field__hint">{t(locale, 'admin.hint.series')}</span>
+            </label>
+            <label class="admin-field">
+              <span class="admin-field__label">{t(locale, 'admin.field.seriesOrder')}</span>
+              <input class="ui-input" type="number" name="seriesOrder" min="1" />
+            </label>
+          </div>
+        </details>
+        <button class="ui-btn" type="button" data-admin-media-button>{t(locale, 'admin.action.insertImage')}</button>
+        <label class="ui-btn admin-writing__import">
+          {t(locale, 'admin.action.import')}
+          <input type="file" accept=".md,.markdown" hidden data-admin-import />
         </label>
+        <button class="ui-btn admin-btn--danger" type="button" data-admin-delete hidden>{t(locale, 'admin.action.delete')}</button>
+        <button class="ui-btn ui-btn--primary" type="submit">{t(locale, 'admin.action.save')}</button>
       </div>
-    </section>
+    </div>
 
     {
       langs.map((lang) => (
-        <section class="admin-card" data-admin-lang={lang}>
+        <section class:list={['admin-card', 'admin-writing__document', { 'is-active': lang === 'zh' }]} data-admin-lang={lang}>
           <div class="admin-card__head">
             <h2 class="admin-card__title">
               {t(locale, lang === 'zh' ? 'admin.lang.zh' : 'admin.lang.en')}
@@ -84,78 +137,24 @@ const langs = ['zh', 'en'] as const
               role="toolbar"
               aria-label={t(locale, 'admin.editor.toolbar')}
             ></div>
-            <textarea class="ui-input admin-editor__body" name={`body-${lang}`}></textarea>
+            <textarea class="ui-input admin-editor__body" name={`body-${lang}`} aria-label={t(locale, 'admin.field.body')}></textarea>
+            {/* 分栏条 —— 拖它改预览宽度（方向键也能调） */}
+            <div
+              class="admin-editor__gutter"
+              data-admin-gutter={lang}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t(locale, 'admin.editor.splitLabel')}
+              aria-valuemin={SPLIT_MIN}
+              aria-valuemax={SPLIT_MAX}
+              aria-valuenow={SPLIT_DEFAULT}
+              tabindex="0"
+            ></div>
             <div class="admin-preview prose" data-admin-preview={lang}></div>
           </div>
         </section>
       ))
     }
-
-    {/* 少用的设置折起来 —— 分类、标签、协议、系列都不是每篇都要 */}
-    <details class="admin-card admin-card--fold">
-      <summary class="admin-card__title">{t(locale, 'admin.card.more')}</summary>
-      <div class="admin-grid">
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.category')}</span>
-          <input class="ui-input admin-input--mono" type="text" name="category" />
-        </label>
-
-        {/* 标签是「多个值」，不是一段字符串 —— 一颗颗加，回车或逗号分隔 */}
-        <div class="admin-field admin-field--wide">
-          <span class="admin-field__label">{t(locale, 'admin.field.tags')}</span>
-          <div class="admin-tags">
-            <div class="admin-tags__list" data-admin-tags></div>
-            <input
-              class="ui-input admin-tags__input"
-              type="text"
-              name="tags"
-              placeholder={t(locale, 'admin.hint.tagsPlaceholder')}
-            />
-          </div>
-          <span class="admin-field__hint">{t(locale, 'admin.hint.tags')}</span>
-        </div>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.license')}</span>
-          <select class="ui-input" name="license">
-            {LICENSE_IDS.map((id) => (
-              <option value={id}>{t(locale, LICENSES[id].nameKey)}</option>
-            ))}
-          </select>
-        </label>
-
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesTitle')}</span>
-          <input class="ui-input" type="text" name="seriesTitle" />
-          <span class="admin-field__hint">{t(locale, 'admin.hint.series')}</span>
-        </label>
-
-        <label class="admin-field">
-          <span class="admin-field__label">{t(locale, 'admin.field.seriesOrder')}</span>
-          <input class="ui-input" type="number" name="seriesOrder" min="1" />
-        </label>
-      </div>
-    </details>
-
-    <div class="admin-actionbar admin-actionbar--sticky">
-      <span class="admin-actionbar__meta" data-admin-saved-at hidden></span>
-      <div class="admin-actionbar__buttons">
-        <button class="ui-btn" type="button" data-admin-media-button>
-          {t(locale, 'admin.action.insertImage')}
-        </button>
-        <label class="ui-btn">
-          {t(locale, 'admin.action.import')}
-          <input type="file" accept=".md,.markdown" hidden data-admin-import />
-        </label>
-        <button class="ui-btn admin-btn--danger" type="button" data-admin-delete hidden>
-          {t(locale, 'admin.action.delete')}
-        </button>
-        <button class="ui-btn ui-btn--primary" type="submit">
-          {t(locale, 'admin.action.save')}
-        </button>
-      </div>
-    </div>
 
     <div class="admin-media-picker" data-admin-media-picker hidden></div>
   </form>
@@ -163,16 +162,17 @@ const langs = ['zh', 'en'] as const
 
 <script>
   import { ATTR } from '../../../../lib/dom-contract'
+  import { clampSplit, splitPercent, SPLIT_DEFAULT } from '../../../../lib/admin-preview'
   import { t } from '../../../../i18n'
   import { api, errorText, nextToken } from '../../../../../backend/lib/admin/client'
   import { parseFrontmatter } from '../../../../../backend/lib/admin/frontmatter'
   import {
     checkRequired,
     deriveSlug,
-    isSlug,
     parseTags,
     todayDate,
   } from '../../../../../backend/lib/admin/documents'
+  import { isTag } from '../../../../lib/tag'
   import {
     EDITOR_TOOLS,
     wrapSelection,
@@ -226,6 +226,8 @@ const langs = ['zh', 'en'] as const
     preview: HTMLElement
     /** 这俩所在的 .admin-editor —— 收起预览时改它的栅格 */
     editor: HTMLElement
+    /** 中间那条能拖的分栏线 —— 拖它改预览宽度 */
+    gutter: HTMLElement
     timer: number
     seq: number
     /** 上次是我们自己写过去的滚动比例 —— 回声不算用户滚动 */
@@ -242,6 +244,8 @@ const langs = ['zh', 'en'] as const
   const viewLink = document.querySelector<HTMLAnchorElement>('[data-admin-view]')
   const deleteButton = document.querySelector<HTMLButtonElement>('[data-admin-delete]')
   const publishButton = document.querySelector<HTMLButtonElement>('[data-admin-publish]')
+  const settings = document.querySelector<HTMLDetailsElement>('[data-editor-settings]')
+  const languageTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-editor-lang-tab]')]
 
   const docs: Record<Lang, DocState> = {
     zh: { id: null, status: 'draft', updatedAt: null },
@@ -335,8 +339,7 @@ const langs = ['zh', 'en'] as const
     if (added.length === 0) return
     const tags = readTags()
     for (const tag of added) {
-      // 标签是 ASCII slug（URL 与 i18n 都按它查）—— 中文标签会被服务端拒掉，这里先说清楚
-      if (!isSlug(tag)) {
+      if (!isTag(tag)) {
         say(errorText(locale, 'tag_invalid'), true)
         continue
       }
@@ -401,8 +404,15 @@ const langs = ['zh', 'en'] as const
   /** 某个语言的发布状态药丸 */
   function renderLangStatus(lang: Lang) {
     const tag = document.querySelector<HTMLElement>('[data-admin-lang-status="' + lang + '"]')
-    if (!tag) return
     const state = docs[lang]
+    const tabStatus = document.querySelector<HTMLElement>('[data-lang-tab-status="' + lang + '"]')
+    if (tabStatus) {
+      tabStatus.dataset.status = state.status
+      tabStatus.title = state.status === 'published'
+        ? t(locale, 'admin.status.published')
+        : t(locale, 'admin.status.draft')
+    }
+    if (!tag) return
     tag.hidden = !state.id
     tag.innerHTML =
       '<span class="admin-pill__dot"></span>' +
@@ -437,6 +447,19 @@ const langs = ['zh', 'en'] as const
         : t(locale, 'admin.action.publish')
       publishButton.classList.toggle('ui-btn--primary', !published)
     }
+  }
+
+  function setActiveLanguage(lang: Lang) {
+    currentLang = lang
+    for (const pane of panes) {
+      const active = pane.lang === lang
+      pane.editor.closest<HTMLElement>('[data-admin-lang]')?.classList.toggle('is-active', active)
+      const tab = languageTabs.find((item) => item.dataset.editorLangTab === pane.lang)
+      tab?.setAttribute('aria-pressed', String(active))
+      if (active) activePane = pane
+    }
+    settings?.removeAttribute('open')
+    renderStatus()
   }
 
   function formatTime(value: string): string {
@@ -750,18 +773,45 @@ const langs = ['zh', 'en'] as const
     toggle.type = 'button'
     toggle.dataset.adminPreviewToggle = pane.lang
     /** 两态都说清楚：光写「预览」看不出现在是开还是关 */
-    const syncToggle = (shown: boolean) => {
-      toggle.setAttribute('aria-pressed', String(shown))
-      toggle.textContent = t(locale, shown ? 'admin.editor.previewHide' : 'admin.editor.previewShow')
+    const syncToggle = (mode: 'split' | 'write' | 'preview') => {
+      pane.editor.classList.toggle('is-preview-off', mode === 'write')
+      pane.editor.classList.toggle('is-preview-only', mode === 'preview')
+      toggle.setAttribute('aria-pressed', String(mode !== 'write'))
+      toggle.textContent = t(locale, mode === 'split' ? 'admin.editor.viewSplit' : mode === 'write' ? 'admin.editor.viewWrite' : 'admin.editor.viewPreview')
     }
-    syncToggle(true)
+    let viewMode: 'split' | 'write' | 'preview' = 'split'
+    syncToggle(viewMode)
     toggle.addEventListener('click', () => {
-      const off = pane.editor.classList.toggle('is-preview-off')
-      syncToggle(!off)
-      // 收起期间内容可能没刷到最新 —— 打开时补一次
-      if (!off) void refreshPreview(pane)
+      viewMode = viewMode === 'split' ? 'write' : viewMode === 'write' ? 'preview' : 'split'
+      syncToggle(viewMode)
+      if (viewMode !== 'write') void refreshPreview(pane)
     })
     pane.tools.appendChild(toggle)
+
+    const focus = document.createElement('button')
+    focus.className = 'ui-btn'
+    focus.type = 'button'
+    focus.textContent = t(locale, 'admin.editor.focus')
+    focus.setAttribute('aria-pressed', 'false')
+    const shell = form?.closest<HTMLElement>('.admin-shell')
+    const section = pane.editor.closest<HTMLElement>('[data-admin-lang]')
+    const setFocus = (enabled: boolean) => {
+      shell?.classList.toggle('admin-shell--focused', enabled)
+      section?.classList.toggle('admin-card--focused', enabled)
+      focus.setAttribute('aria-pressed', String(enabled))
+      focus.textContent = t(locale, enabled ? 'admin.editor.focusExit' : 'admin.editor.focus')
+      if (enabled) {
+        activePane = pane
+        pane.body.focus()
+      } else {
+        focus.focus()
+      }
+    }
+    focus.addEventListener('click', () => setFocus(focus.getAttribute('aria-pressed') !== 'true'))
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && focus.getAttribute('aria-pressed') === 'true') setFocus(false)
+    })
+    pane.tools.appendChild(focus)
   }
 
   /* ---------------- 预览：停手就刷新 ---------------- */
@@ -832,6 +882,48 @@ const langs = ['zh', 'en'] as const
     }
     pane.body.addEventListener('keyup', locate)
     pane.body.addEventListener('click', locate)
+  }
+
+  /* ---------------- 分栏：拖动改预览宽度 ---------------- */
+
+  /** 拖分栏条 —— 预览宽度跟着走；键盘方向键也能调 */
+  function initSplit(pane: Pane): void {
+    const apply = (percent: number) => {
+      const value = clampSplit(percent)
+      pane.editor.style.setProperty('--admin-split', String(value))
+      pane.gutter.setAttribute('aria-valuenow', String(value))
+    }
+    pane.gutter.addEventListener('pointerdown', (event) => {
+      event.preventDefault()
+      pane.gutter.focus()
+      // 捕获失败也要能拖 —— 事件挂在元素上照样收
+      try {
+        pane.gutter.setPointerCapture(event.pointerId)
+      } catch {
+        /* 忽略 */
+      }
+      const rect = pane.editor.getBoundingClientRect()
+      const move = (moveEvent: PointerEvent) => {
+        apply(splitPercent(moveEvent.clientX, rect.left, rect.width))
+      }
+      const stop = () => {
+        pane.gutter.removeEventListener('pointermove', move)
+        pane.gutter.removeEventListener('pointerup', stop)
+        pane.gutter.removeEventListener('pointercancel', stop)
+      }
+      pane.gutter.addEventListener('pointermove', move)
+      pane.gutter.addEventListener('pointerup', stop)
+      pane.gutter.addEventListener('pointercancel', stop)
+    })
+    // 键盘：左右各挪 2%，按住 Shift 挪 10%
+    pane.gutter.addEventListener('keydown', (event) => {
+      const step = event.shiftKey ? 10 : 2
+      const current = Number(pane.gutter.getAttribute('aria-valuenow') ?? SPLIT_DEFAULT)
+      if (event.key === 'ArrowLeft') apply(current - step)
+      else if (event.key === 'ArrowRight') apply(current + step)
+      else return
+      event.preventDefault()
+    })
   }
 
   /** 正文改完停 400ms 就刷新一次预览 */
@@ -943,6 +1035,7 @@ const langs = ['zh', 'en'] as const
       const data = await api<{ document: DocumentRow }>('/api/admin/documents/' + docId)
       const doc = data.document
       currentLang = doc.locale === 'en' ? 'en' : 'zh'
+      setActiveLanguage(currentLang)
       fillShared(doc)
       fillDoc(currentLang, doc)
       renderStatus()
@@ -963,21 +1056,34 @@ const langs = ['zh', 'en'] as const
 
   /* ---------------- 起手 ---------------- */
 
+  for (const tab of languageTabs) {
+    tab.addEventListener('click', () => {
+      const lang = tab.dataset.editorLangTab
+      if (lang === 'zh' || lang === 'en') setActiveLanguage(lang)
+    })
+  }
+
   for (const lang of LANGS) {
     const tools = document.querySelector<HTMLElement>('[data-admin-tools="' + lang + '"]')
     const body = document.querySelector<HTMLTextAreaElement>('[name="body-' + lang + '"]')
     const preview = document.querySelector<HTMLElement>('[data-admin-preview="' + lang + '"]')
+    const gutter = document.querySelector<HTMLElement>('[' + ATTR.adminGutter + '="' + lang + '"]')
     const editor = body?.closest<HTMLElement>('.admin-editor')
-    if (!tools || !body || !preview || !editor) continue
-    const pane: Pane = { lang, tools, body, preview, editor, timer: 0, seq: 0, echo: -1 }
+    if (!tools || !body || !preview || !gutter || !editor) continue
+    const pane: Pane = { lang, tools, body, preview, editor, gutter, timer: 0, seq: 0, echo: -1 }
     panes.push(pane)
     linkPanes(pane)
+    initSplit(pane)
     renderTools(pane)
     body.addEventListener('focus', () => {
       activePane = pane
     });
   }
   activePane = panes[0] ?? null
+  for (const pane of panes) {
+    pane.editor.closest<HTMLElement>('[data-admin-lang]')?.classList.toggle('is-active', pane.lang === currentLang)
+    languageTabs.find((tab) => tab.dataset.editorLangTab === pane.lang)?.setAttribute('aria-pressed', String(pane.lang === currentLang))
+  }
 
   void load()
 </script>
