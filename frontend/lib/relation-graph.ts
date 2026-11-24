@@ -3,7 +3,7 @@ import type { Heading } from './content-queries'
 export interface RelationNode {
   id: string
   label: string
-  kind: 'root' | 'h2' | 'h3' | 'category' | 'tag' | 'series' | 'post'
+  kind: 'root' | 'h2' | 'category' | 'tag' | 'series' | 'post'
   x: number
   y: number
   slug?: string
@@ -89,24 +89,6 @@ export function buildRelationGraph(
     nodes.push({ id: h2Id, label: heading.text, kind: 'h2', x, y, slug: heading.slug })
     edges.push({ source: 'root', target: h2Id, curve: jitter / 8 })
 
-    const h2Index = headings.findIndex((item) => item.slug === heading.slug)
-    const h3: Heading[] = []
-    for (let i = h2Index + 1; i < headings.length; i++) {
-      if (headings[i].depth === 2) break
-      if (headings[i].depth === 3) h3.push(headings[i])
-    }
-
-    h3.forEach((child, childIndex) => {
-      const spread = h3.length === 1 ? 0 : (childIndex / (h3.length - 1) - 0.5) * 1.15
-      const childAngle = angle + spread
-      const childRadius = h2.length <= 3 ? 54 : 62
-      const childJitter = ((hash(child.slug) % 9) - 4) * 1.5
-      const childX = Math.max(16, Math.min(width - 16, x + Math.cos(childAngle) * childRadius + childJitter))
-      const childY = Math.max(16, Math.min(height - 16, y + Math.sin(childAngle) * childRadius))
-      const h3Id = `h3:${child.slug}`
-      nodes.push({ id: h3Id, label: child.text, kind: 'h3', x: childX, y: childY, slug: child.slug })
-      edges.push({ source: h2Id, target: h3Id, curve: childJitter / 6 })
-    })
   })
 
   links.forEach((link, index) => {

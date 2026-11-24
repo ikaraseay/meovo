@@ -6,17 +6,20 @@ import {
   driftState,
 } from '../frontend/lib/relation-graph.ts'
 
-test('关系图谱包含根节点、h2/h3 节点与层级边', () => {
+test('关系图谱只为一级章节和外部关系生成节点与连线', () => {
   const graph = buildRelationGraph('文章标题', [
     { depth: 2, slug: 'alpha', text: '第一章' },
     { depth: 3, slug: 'alpha-one', text: '小节一' },
     { depth: 2, slug: 'beta', text: '第二章' },
-  ])
+    { depth: 4, slug: 'detail', text: '细节' },
+  ], [{ kind: 'tag', label: '设计', href: '/zh/tags/design/' }])
   assert.equal(graph.nodes.length, 4)
   assert.equal(graph.edges.length, 3)
   assert.equal(graph.nodes.filter((node) => node.kind === 'root').length, 1)
   assert.equal(graph.nodes.filter((node) => node.kind === 'h2').length, 2)
-  assert.equal(graph.nodes.filter((node) => node.kind === 'h3').length, 1)
+  assert.deepEqual(graph.edges.map(({ source, target }) => [source, target]), [
+    ['root', 'h2:alpha'], ['root', 'h2:beta'], ['root', 'tag:设计'],
+  ])
 })
 
 test('关系图谱布局确定且节点留在视口内', () => {

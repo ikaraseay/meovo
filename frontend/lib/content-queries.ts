@@ -103,7 +103,7 @@ export interface Heading {
 }
 
 /**
- * 目录只收 h2 / h3；关系图谱按同一层级展示标题与章节关系。
+ * 目录收录 h2 / h3，关系图谱只展示 h2 章节。
  */
 export function tocHeadings(headings: Heading[]): Heading[] {
   return headings.filter((h) => h.depth === 2 || h.depth === 3)
