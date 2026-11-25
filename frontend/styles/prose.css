@@ -350,9 +350,7 @@ html.dark .code-block pre.astro-code span {
   transform: rotate(180deg);
 }
 
-/* 目录默认收起（窄屏）—— 桌面由下面那条媒体查询改成默认展开。
-   用户手动切换过就以 data-open 为准：'true' 展开、'false' 收起。
-   两条属性规则都比「桌面默认展开」更具体，所以压得住它。 */
+/* 目录默认收起（窄屏）—— 桌面由下面那条媒体查询改成默认展开 */
 .toc-list {
   display: none;
   margin: var(--ui-space-sm) 0 0;
@@ -367,12 +365,83 @@ html.dark .code-block pre.astro-code span {
   scrollbar-width: thin;
 }
 
-.toc[data-open='true'] .toc-list {
+.toc[data-open] .toc-list {
   display: block;
 }
 
-/* 用户手动收起 —— 桌面那条「默认展开」也得让路 */
-.toc[data-open='false'] .toc-list {
+/* ==================== 一级章节折叠 ==================== */
+/* details/summary 是平台原生的 —— 不用手搓展开状态，
+   点章节名跳转，点行里别处收起 / 展开 */
+
+.toc-group {
+  list-style: none;
+}
+
+.toc-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-sm);
+  margin-inline-start: -1px;
+  padding: var(--ui-space-xs) var(--ui-space-sm);
+  border-inline-start: 2px solid transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  list-style: none;
+  transition:
+    color var(--ui-transition-fast),
+    border-color var(--ui-transition-fast);
+}
+
+/* 系统自带的小三角 —— 我们自己画箭头 */
+.toc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-summary:hover {
+  color: var(--ui-text);
+}
+
+/* 当前章节在一级章节上 —— 整行亮起来 */
+.toc-summary:has(.toc-link.is-active) {
+  border-inline-start-color: var(--ui-text-accent);
+  color: var(--ui-text-accent);
+}
+
+/* 章节名是链接（跳转用）—— 缩进跟描边交给摘要行 */
+.toc-summary .toc-link {
+  flex: 1;
+  min-width: 0;
+  margin-inline-start: 0;
+  padding: 0;
+  border-inline-start: none;
+  color: inherit;
+  font-weight: 600;
+}
+
+.toc-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  transition: rotate var(--ui-transition-fast);
+}
+
+.toc-details[open] > .toc-summary .toc-chevron {
+  rotate: 180deg;
+}
+
+/* 子章节缩进一级 —— 收起时整块藏起来 */
+.toc-sublist {
+  /* 用 margin 缩进：这条竖线要落在子章节自己的位置上 */
+  margin: 0 0 0 var(--ui-space-md);
+  padding: 0;
+  border-inline-start: 1px solid var(--ui-border-subtle);
+  list-style: none;
+}
+
+/* 收起时真藏掉 —— details 自带的隐藏只藏「画出来」，
+   位置还留着（卡片不会矮一截） */
+.toc-details:not([open]) > .toc-sublist {
   display: none;
 }
 
@@ -533,9 +602,13 @@ html.dark .code-block pre.astro-code span {
   color: var(--ui-text-accent);
 }
 
-/* 桌面端目录常驻右侧 —— 默认展开；折叠头留着，桌面也能收起 */
+/* 桌面端目录常驻右侧 —— 选择器比上面的 .toc-list 更具体，压得住 */
 @media (min-width: 1024px) {
   .toc .toc-list {
     display: block;
+  }
+
+  .toc-toggle {
+    display: none;
   }
 }

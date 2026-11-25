@@ -109,6 +109,34 @@ export function tocHeadings(headings: Heading[]): Heading[] {
   return headings.filter((h) => h.depth === 2 || h.depth === 3)
 }
 
+/** 目录里的一组：一级章节 + 它的子章节 */
+export interface TocGroup {
+  /** 一级章节（h2）—— 开头没有 h2 的那几项没有它 */
+  heading?: Heading
+  /** 这一组里的子章节（h3） */
+  children: Heading[]
+}
+
+/**
+ * 目录按一级章节分组 —— 每个一级章节自己可折叠，收起就只剩章节名。
+ *
+ * 目录只收 h2 / h3（`tocHeadings`），所以 h3 一定跟着它上面那个 h2。
+ */
+export function tocGroups(headings: Heading[]): TocGroup[] {
+  const groups: TocGroup[] = []
+  for (const heading of headings) {
+    if (heading.depth === 2) {
+      groups.push({ heading, children: [] })
+      continue
+    }
+    // 还没遇到 h2 就先来了 h3 —— 归到「没有章节名」的那一组
+    const last = groups[groups.length - 1]
+    if (last) last.children.push(heading)
+    else groups.push({ children: [heading] })
+  }
+  return groups
+}
+
 export interface PostItem {
   post: Post
   /** 展示的是原文（当前语言还没有这个版本） */

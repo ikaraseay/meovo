@@ -16,6 +16,7 @@ import {
   groupByTranslation,
   resolveItems,
   sortSeriesItems,
+  tocGroups,
   type PostItem,
 } from '../frontend/lib/content-queries.ts'
 import { readingTime } from '../frontend/lib/reading-time.ts'
@@ -153,6 +154,32 @@ test('readingTime：中文按字数、英文按词数，至少 1 分钟', () => 
     1,
   )
   assert.equal(readingTime('', 'zh'), 1)
+})
+
+test('目录分组：每个一级章节一组，子章节跟着它', () => {
+  const groups = tocGroups([
+    { depth: 2, slug: 'a', text: 'A' },
+    { depth: 3, slug: 'a1', text: 'A1' },
+    { depth: 3, slug: 'a2', text: 'A2' },
+    { depth: 2, slug: 'b', text: 'B' },
+    { depth: 3, slug: 'b1', text: 'B1' },
+  ])
+  assert.equal(groups.length, 2)
+  assert.equal(groups[0].heading?.slug, 'a')
+  assert.deepEqual(groups[0].children.map((c) => c.slug), ['a1', 'a2'])
+  assert.equal(groups[1].heading?.slug, 'b')
+  assert.deepEqual(groups[1].children.map((c) => c.slug), ['b1'])
+})
+
+test('目录分组：开头没有一级章节时，那几项自己一组', () => {
+  const groups = tocGroups([
+    { depth: 3, slug: 'x', text: 'X' },
+    { depth: 2, slug: 'a', text: 'A' },
+  ])
+  assert.equal(groups.length, 2)
+  assert.equal(groups[0].heading, undefined)
+  assert.deepEqual(groups[0].children.map((c) => c.slug), ['x'])
+  assert.equal(groups[1].heading?.slug, 'a')
 })
 
 test('readingTime：代码块不计入正文', () => {

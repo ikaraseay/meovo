@@ -146,21 +146,72 @@ const graph = buildRelationGraph(links)
       return best
     }
 
+    /**
+     * 缩放的锚点：鼠标底下那个节点（没有就取最近的）。
+     *
+     * 变换是「先缩放、再平移」，原点取 (0,0)（图表坐标的原点）。
+     * 原点写成 center 的话，渲染跟下面的平移数学对不上 ——
+     * 缩放会绕着画布中心走，而不是绕着指针走。
+     */
+    /** 缩放上下限 */
+    const MIN_SCALE = 0.65
+    const MAX_SCALE = 3.5
+
     const apply = () => {
       transform.setAttribute('transform', `translate(${panX} ${panY}) scale(${scale})`)
-      transform.style.transformOrigin = 'center'
+      transform.style.transformOrigin = '0 0'
     }
+    /**
+     * 视野里至少要有一个节点 —— 缩到空白处就把最近的那个带回中心。
+     * 没有这一步，缩小到某个角落就只剩一片空画布。
+     */
+    const ensureNodeVisible = () => {
+      if (nodes.length === 0) return
+      const rect = viewport.getBoundingClientRect()
+      const visible = nodes.some((node) => {
+        const r = node.getBoundingClientRect()
+        return r.right > rect.left && r.left < rect.right && r.bottom > rect.top && r.top < rect.bottom
+      })
+      if (visible) return
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      let best: SVGElement | null = null
+      let bestDistance = Infinity
+      for (const node of nodes) {
+        const r = node.getBoundingClientRect()
+        const distance = Math.hypot(r.left + r.width / 2 - centerX, r.top + r.height / 2 - centerY)
+        if (distance < bestDistance) {
+          bestDistance = distance
+          best = node
+        }
+      }
+      if (!best) return
+      const r = best.getBoundingClientRect()
+      // 屏幕位移 → 图表坐标位移（走 viewBox 的 CTM，缩放 / 倾斜都算得准）
+      const matrix = svg.getScreenCTM()
+      if (!matrix) return
+      const inverse = matrix.inverse()
+      const center = new DOMPoint(centerX, centerY).matrixTransform(inverse)
+      const spot = new DOMPoint(r.left + r.width / 2, r.top + r.height / 2).matrixTransform(inverse)
+      panX += center.x - spot.x
+      panY += center.y - spot.y
+      apply()
+    }
+
     viewport.addEventListener('wheel', (event: WheelEvent) => {
       event.preventDefault()
-      const rect = viewport.getBoundingClientRect()
-      const pointX = event.clientX - rect.left
-      const pointY = event.clientY - rect.top
-      const oldScale = scale
-      const nextScale = Math.max(0.65, Math.min(3.5, scale * (event.deltaY < 0 ? 1.12 : 0.89)))
-      panX = pointX - ((pointX - panX) * nextScale / oldScale)
-      panY = pointY - ((pointY - panY) * nextScale / oldScale)
+      const nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (event.deltaY < 0 ? 1.12 : 0.89)))
+      if (nextScale === scale) return
+      // 锚点 = 指针下的那个节点（没有就取最近的）—— 缩放围着它转
+      const anchorId = nearestByScreen(event.clientX, event.clientY)
+      const anchor = anchorId ? visualPos(anchorId) : toGraph(event.clientX, event.clientY)
+      // 同一个图表坐标点，缩放前后落在同一个屏幕位置：
+      // 变换是「先缩放、再平移」，所以平移要补上 (旧比例 − 新比例) × 锚点
+      panX += (scale - nextScale) * anchor.x
+      panY += (scale - nextScale) * anchor.y
       scale = nextScale
       apply()
+      ensureNodeVisible()
     }, { passive: false })
     const nodes = [...el.querySelectorAll<SVGElement>('[data-node]')]
     const edges = [...el.querySelectorAll<SVGPathElement>('[data-edge-source]')]
@@ -200,6 +251,18 @@ const graph = buildRelationGraph(links)
     }
     let driftTime = 0
     const physicsOffset = new Map<string, { x: number; y: number }>()
+
+    /** 节点此刻在图表坐标里的位置（基准 + 飘动 + 受力） */
+    const visualPos = (id: string): { x: number; y: number } => {
+      const base = nodeBase.get(id)
+      if (!base) return { x: 0, y: 0 }
+      const drift = offsetOf(id, driftTime)
+      const push = physicsOffset.get(id)
+      return {
+        x: base.x + drift.x + (push?.x ?? 0),
+        y: base.y + drift.y + (push?.y ?? 0),
+      }
+    }
     const tick = () => {
       requestAnimationFrame(tick)
       if (reduceMotion.matches || !viewport.isConnected) return

@@ -20,7 +20,7 @@ import {
   readingTime,
   type Post,
 } from '../lib/posts'
-import { tocHeadings, type Heading } from '../lib/content-queries'
+import { tocGroups, tocHeadings, type Heading } from '../lib/content-queries'
 import {
   postPath,
   tagPath,
@@ -49,6 +49,9 @@ const { post, headings, locale, isFallback, variants, prev, next } = Astro.props
 
 /** 目录只收 h2 / h3 —— 再深的层级在侧栏里没有意义 */
 const tocItems = tocHeadings(headings)
+
+/** 目录按一级章节分组 —— 每个一级章节自己可折叠 */
+const groups = tocGroups(tocItems)
 
 /** 阅读时间按**内容语言**算，不是按 URL 上的语言 */
 const minutes = readingTime(post.body ?? '', getPostLocale(post))
@@ -82,11 +85,56 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
             </svg>
           </button>
           <ul class="toc-list">
-            {tocItems.map((item) => (
-              <li class:list={['toc-item', `toc-item--depth-${item.depth}`]}>
-                <a class="toc-link" href={`#${item.slug}`} data-toc-link={item.slug}>
-                  {item.text}
-                </a>
+            {groups.map((group) => (
+              <li class="toc-group">
+                {group.heading ? (
+                  /* 一级章节自己可折叠 —— details/summary 是平台原生的，
+                     不用手搓状态：点章节名跳转，点行里别处收起 / 展开 */
+                  <details class="toc-details" open>
+                    <summary class="toc-summary">
+                      <a
+                        class="toc-link toc-link--section"
+                        href={`#${group.heading.slug}`}
+                        data-toc-link={group.heading.slug}
+                      >
+                        {group.heading.text}
+                      </a>
+                      <svg
+                        class="toc-chevron"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </summary>
+                    {group.children.length > 0 && (
+                      <ul class="toc-sublist">
+                        {group.children.map((item) => (
+                          <li class="toc-item">
+                            <a class="toc-link" href={`#${item.slug}`} data-toc-link={item.slug}>
+                              {item.text}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </details>
+                ) : (
+                  group.children.map((item) => (
+                    <li class="toc-item toc-item--depth-3">
+                      <a class="toc-link" href={`#${item.slug}`} data-toc-link={item.slug}>
+                        {item.text}
+                      </a>
+                    </li>
+                  ))
+                )}
               </li>
             ))}
           </ul>
@@ -197,7 +245,6 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   import { initTextFold, type TextFoldLabels } from '../lib/text-fold'
   import { relayoutDesks } from '../lib/draggable'
   import { activeHeadingId, contentInset, MIN_INSET } from '../lib/toc'
-  import { isDesktop } from '../lib/breakpoint'
   import { ATTR } from '../lib/dom-contract'
 
   /* ---------- 目录：折叠 + 精确跳转 + 滚动高亮 ---------- */
@@ -240,24 +287,18 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
   }
 
-  /** 目录是不是展开着 —— 没记过选择时按视口算（桌面展开、窄屏收起） */
-  const tocOpen = (): boolean => {
-    const state = toc?.getAttribute('data-open')
-    if (state === 'true') return true
-    if (state === 'false') return false
-    return isDesktop()
-  }
-
-  tocToggle?.setAttribute('aria-expanded', String(tocOpen()))
-
+  /* 窄屏那行折叠头：收起 / 展开整张目录（桌面看不到它） */
   tocToggle?.addEventListener('click', () => {
     if (!toc) return
-    const open = !tocOpen()
-    toc.setAttribute('data-open', String(open))
-    tocToggle.setAttribute('aria-expanded', String(open))
-    // 卡片高度变了 —— 固定卡那一摞要重排，别互相压着
-    relayoutDesks()
+    const open = toc.hasAttribute('data-open')
+    toc.toggleAttribute('data-open', !open)
+    tocToggle.setAttribute('aria-expanded', String(!open))
   })
+
+  /* 一级章节折叠 —— 卡片高度变了，固定卡那一摞要重排 */
+  for (const details of document.querySelectorAll<HTMLDetailsElement>('.toc-details')) {
+    details.addEventListener('toggle', () => relayoutDesks())
+  }
 
   const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')]
   const tocHeadings = tocLinks
@@ -269,6 +310,8 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     const list = link.closest('.toc-list')
     if (!list) return
     const rect = link.getBoundingClientRect()
+    // 收起的组里 —— 那条链接没有位置，别把目录滚歪
+    if (rect.height === 0) return
     const box = list.getBoundingClientRect()
     if (rect.top < box.top) list.scrollTop -= box.top - rect.top
     else if (rect.bottom > box.bottom) list.scrollTop += rect.bottom - box.bottom

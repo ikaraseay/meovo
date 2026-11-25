@@ -133,11 +133,17 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
   }
 
-  /** 压在正文上的卡片（文档坐标）—— 隐藏的卡量不到，跳过 */
+  /**
+   * 压在正文上的卡片（文档坐标）—— 隐藏的卡量不到，跳过。
+   *
+   * 展开态的卡不算：它是盖在页面上的浮层，不是正文旁边的障碍 ——
+   * 让正文绕着它排，整篇就成了一片空白。
+   */
   function collectObstacles(): Obstacle[] {
     const obstacles: Obstacle[] = []
     for (const entry of entries) {
       if (entry.el.getClientRects().length === 0) continue
+      if (entry.el.classList.contains(CLASS.expanded)) continue
       obstacles.push({ id: entry.id, rect: rectOf(entry.el) })
     }
     return obstacles
@@ -300,13 +306,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   /* ---------- 散开：布局数学在 lib/desk-layout.ts ---------- */
   function layoutScatter() {
     const deskW = desk.clientWidth
-    const cards: DeskCard[] = entries.map((e) => ({
-      id: e.id,
-      width: e.w,
-      height: e.h,
-      full: e.el.hasAttribute(ATTR.widgetFull),
-      pinned: e.pinned,
-    }))
+    const cards = layoutCards()
     const { positions, refHeight } = scatterLayout(cards, {
       deskWidth: deskW,
       viewportHeight: window.innerHeight,
@@ -335,13 +335,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   /* ---------- 内容锚定：布局数学在 lib/desk-layout.ts ---------- */
   function layoutContentAnchored(content: HTMLElement) {
     const deskW = desk.clientWidth
-    const cards: DeskCard[] = entries.map((e) => ({
-      id: e.id,
-      width: e.w,
-      height: e.h,
-      zone: (e.el.getAttribute(ATTR.zone) || 'top') as 'top' | 'side' | 'tail',
-      pinned: e.pinned,
-    }))
+    const cards = layoutCards()
     const result = contentAnchoredLayout(cards, {
       deskWidth: deskW,
       topOffset: topOffset(),
@@ -437,10 +431,31 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
   }
 
+  /**
+   * 布局用的卡片清单 —— 展开态的卡是浮层，不参与布局。
+   *
+   * 它的尺寸是 90vw × 90vh，进了布局就会把正文列挤成最窄的一档；
+   * 展开时它是盖在页上的浮层，不该占正文旁边的位置。
+   */
+  function layoutCards(): DeskCard[] {
+    return entries
+      .filter((entry) => !entry.el.classList.contains(CLASS.expanded))
+      .map((entry) => ({
+        id: entry.id,
+        width: entry.w,
+        height: entry.h,
+        full: entry.el.hasAttribute(ATTR.widgetFull),
+        zone: (entry.el.getAttribute(ATTR.zone) || 'top') as 'top' | 'side' | 'tail',
+        pinned: entry.pinned,
+      }))
+  }
+
   /** 侧栏卡片里最宽的那张 —— 正文列要给它们让位 */
   function railCardWidth(): number {
     let w = 0
     for (const entry of entries) {
+      // 展开态是浮层 —— 不占侧栏的位
+      if (entry.el.classList.contains(CLASS.expanded)) continue
       if ((entry.el.getAttribute(ATTR.zone) || 'top') !== 'side') continue
       w = Math.max(w, entry.w)
     }
@@ -763,6 +778,8 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
     // 展开/收起后重新检测溢出
     checkOverflow(entry)
+    // 正文重算 —— 卡片占的位置变了，绕排得跟着重排
+    relayoutDesks()
   }
 
   /** 检测卡片内容是否溢出，添加滚动提示渐变 */

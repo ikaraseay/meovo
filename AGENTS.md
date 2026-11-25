@@ -102,13 +102,21 @@
     它们是「进正文前」要看的东西，隔一整个 gap 就跟标题分成两块不相干的卡片了
   - 窄屏的目录折叠头**不要自带边框**（`prose.css` 的 `.toc-toggle`）：卡本身已经有一圈，
     再套一层就是两层套着的描边 —— 跟关系图谱那行 `<summary>` 保持同一种素行样式
-  - **目录在桌面也能折叠** —— 复用那行折叠头，**不加新按钮**：折叠头一直显示，
-    状态记在 `data-open="true|false"`；没记过时按视口默认（桌面展开、窄屏收起）。
-    两条属性规则都比「桌面默认展开」那条更具体，所以压得住它
+  - **目录按一级章节分组，每组自己可折叠** —— 用平台原生的 `<details>` / `<summary>`
+    （别手搓展开状态）：分组在 `content-queries.ts` 的 `tocGroups()`，样式在 `prose.css`。
+    点章节名是跳转，点行里别处（箭头）才收起 —— summary 里的链接不会被 summary 的
+    激活行为接管。**收起时子章节要真藏掉**（`display: none`）—— details 自带的隐藏
+    只藏「画出来」，位置还留着，卡片不会矮一截
+  - **窄屏那行折叠头仍是「整表收起」** —— 桌面看不到它（`prose.css` 的媒体查询）；
+    状态记在 `data-open` 属性上（有属性就展开）
   - **章节跳转按悬浮栏实测的高度让位** —— 不写死 120px：`Article.astro` 量出悬浮栏
     下沿写进 `--ui-content-offset`，正文的 `scroll-margin-top`（`prose.css`）用它，
     目录高亮用同一条线（`frontend/lib/toc.ts` 的 `contentInset()` / `activeHeadingId()`）。
     悬浮栏被拖走时让位跟着变（`resize` + `pointerup` 各量一次）
+  - **图谱缩放围着鼠标下的那个节点转** —— 变换是「先缩放、再平移」，原点取 (0,0)
+    （`transform-origin` 写成 center 就跟平移数学对不上，缩放会绕着画布中心走）。
+    锚点用节点的**当前**位置（基准 + 飘动 + 受力）；缩完视野里至少要有一个节点，
+    没有就把最近的那个带回中心
   - **章节多了，目录与关系图谱自己滚** —— 两边都有独立高度上限 +
     `overflow: auto`（目录在 `prose.css` 的 `.toc-list`，图谱在 `OutlineMap.astro`
     的 `.outline-scroll`）：别让卡片长到屏幕外面去
@@ -118,6 +126,10 @@
   内容在 `frontend/components/PostLicense.astro`。协议取值来自 frontmatter `license`，
   `frontend/lib/licenses.ts` 是唯一事实来源（`LICENSE_IDS` 同时供 schema 派生），缺省 CC BY 4.0；
   协议名与说明走 i18n
+  - **加协议只改 `frontend/lib/licenses.ts` 一处** —— `LICENSE_IDS` 加 id、`LICENSES`
+    加条目（协议名 / 说明的词条写在 `frontend/i18n/ui.ts` 的 `post.license.*`）。
+    frontmatter schema、后台下拉、后台校验都从那份列表派生，不用另外改；
+    `test/licenses.test.ts` 守住「加了 id 忘了补文案」
   - **开源协议（CC 系列）才给「Markdown 原文」链接** —— 指向
     `/<内容语言>/raw/<slug>.md`（端点 `frontend/pages/[lang]/raw/[...slug].md.ts`，
     静态输出每篇一个 .md，内容是正文原文，不含 frontmatter）
@@ -321,6 +333,10 @@
     存档记的是用户摆的那张，刷新后重算一遍还是这个摞法
   - **固定卡底色更实** —— 固定卡浮在正文之上压着滚动的字，普通玻璃底读不清：
     `.ui-widget.is-pinned` 用 `--ui-widget-pinned-bg`（主题里浅色 / 深色 / 高对比各一套）
+  - **展开态的卡是浮层，不进布局也不当正文障碍** —— 它是 90vw × 90vh，进了布局就把
+    正文列挤成最窄的一档；当障碍更糟：正文绕着它排，整篇成一片空白。
+    `draggable.ts` 的 `layoutCards()` / `collectObstacles()` 都跳过它，
+    展开 / 收起后 `relayoutDesks()` 重排一次，正文自己算回来
 - **卡片压到正文上时，正文逐行绕开**（`frontend/lib/prose-flow.ts` + `frontend/lib/yield-layout.ts`）
   - **pretext 算断行，DOM 画字** —— 做法照 pretext 官方 demo（龙形 / 伞形）：
     每一行自己算走廊（能占多宽、往哪边挪），pretext 按走廊宽度断行，浏览器把这一行画出来。
