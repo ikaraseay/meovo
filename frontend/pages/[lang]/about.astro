@@ -113,7 +113,6 @@ const count = resolveItems(posts, locale).length
 
         <form class="link-exchange" data-link-exchange>
           <h3 class="link-exchange__title">{t(locale, 'links.exchange.title')}</h3>
-          <p class="link-exchange__hint">{t(locale, 'links.exchange.hint')}</p>
           <div class="link-exchange__grid">
             <label class="link-exchange__field">
               <span class="link-exchange__label">{t(locale, 'links.exchange.name')}</span>
@@ -397,11 +396,6 @@ const count = resolveItems(posts, locale).length
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--ui-text);
-  }
-
-  .link-exchange__hint {
-    font-size: 0.8125rem;
-    color: var(--ui-text-secondary);
   }
 
   .link-exchange__grid {

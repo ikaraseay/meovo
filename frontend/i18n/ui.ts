@@ -216,15 +216,11 @@ export const ui = {
   'links.title': { zh: '友情链接', en: 'Friend links' },
   'links.intro': { zh: '这些是我常读的站点。', en: 'Sites I read often.' },
   'links.empty': { zh: '还没有友链。', en: 'No friend links yet.' },
-  'links.exchange.title': { zh: '联系我交换友链', en: 'Exchange links with me' },
-  'links.exchange.hint': {
-    zh: '填好下面四项，邮件会发到我的邮箱，我看到就加上。',
-    en: 'Fill in the four fields below — the email goes to my inbox, and I will add your site.',
-  },
+  'links.exchange.title': { zh: '交换友链', en: 'Exchange links' },
   'links.exchange.name': { zh: '网站名称', en: 'Site name' },
   'links.exchange.url': { zh: '网站地址', en: 'Site URL' },
   'links.exchange.avatar': { zh: '头像地址', en: 'Avatar URL' },
-  'links.exchange.description': { zh: '一句话简介', en: 'Short description' },
+  'links.exchange.description': { zh: '简介', en: 'Description' },
   'links.exchange.submit': { zh: '发到邮箱', en: 'Send by email' },
   'links.exchange.subject': { zh: '友链申请：{site}', en: 'Friend link request: {site}' },
 
