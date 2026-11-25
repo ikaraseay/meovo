@@ -276,6 +276,8 @@ const webSiteLd = {
         .querySelector<HTMLElement>(`[${ATTR.layoutReset}]`)
         ?.addEventListener('click', () => {
           for (const desk of desks) desk?.reset()
+          // 等同一次点击的悬浮栏复位也完成，再重新加载当前页面。
+          window.setTimeout(() => window.location.reload(), 0)
         })
       // 布局摆好后再撤掉加载遮罩（等两帧，让淡入跟遮罩淡出衔接上）
       requestAnimationFrame(() => {

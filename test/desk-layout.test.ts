@@ -5,6 +5,7 @@ import {
   clampToViewport,
   contentAnchoredLayout,
   fittedContentWidth,
+  fitPinnedRail,
   fromPct,
   restoreFromPct,
   scatterLayout,
@@ -220,3 +221,10 @@ test('存档坐标还原 —— 百分比 → 像素，并夹回范围', () => {
   assert.deepEqual(restoreFromPct({ xPct: 200, yPct: 200 }, size, ref), { x: 800, y: 700 })
 })
 
+
+test('切换文章时按当前目录高度给默认侧卡留位；矮屏整组回退', () => {
+  const layout = (tocHeight: number) => fitPinnedRail(60, 650, [180, 90], [{ top: 60, bottom: 60 + tocHeight }])
+  assert.deepEqual(layout(100), [204, 428])
+  assert.equal(layout(300), null)
+  assert.deepEqual(fitPinnedRail(60, 700, [120, 90], [{ top: 300, bottom: 450 }]), [60, 494])
+})

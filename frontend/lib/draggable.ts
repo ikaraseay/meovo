@@ -26,12 +26,12 @@ import {
   clampToViewport,
   contentAnchoredLayout,
   fittedContentWidth,
+  fitPinnedRail,
   fromPct,
   restoreFromPct,
   scatterLayout,
   toPct,
   DESK_GAP_X,
-  DESK_GAP_Y,
   type DeskCard,
   type Position,
 } from './desk-layout'
@@ -102,6 +102,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   let zCounter = entries.length
   /** 上一次布局用的参考尺寸 —— 存档百分比按它换算，读 / 写必须用同一套基准 */
   let refW = 0
+  let leftRail = false
   let refH = 0
   const topOffset = () => Math.round(window.innerHeight * 0.1)
 
@@ -343,6 +344,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       topOffset: topOffset(),
       contentWidth: content.offsetWidth,
       contentHeight: content.offsetHeight,
+      leftRail,
     })
 
     content.style.marginTop = `${result.contentMarginTop}px`
@@ -445,24 +447,35 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     const defaults = entries.filter(({ el, id }) => el.hasAttribute(ATTR.defaultPin) && !saved[id] && el.getClientRects().length > 0)
     const viewportHeight = window.innerHeight
     top = Math.max(top, viewportHeight * 0.01)
-    const stackHeight = defaults.reduce((height, entry) => height + entry.h, 0)
-      + Math.max(0, defaults.length - 1) * DESK_GAP_Y
-    // 整列放不下时一起交给正文侧栏排布，随页面滚动。
-    if (top + stackHeight > viewportHeight * 0.99) return
-    for (const entry of defaults) {
+    const railX = right + DESK_GAP_X
+    const occupied = entries.filter(({ el, pinned, x, w }) => pinned && el.getClientRects().length > 0
+      && x < railX + railCardWidth() && x + w > railX)
+    const occupiedSlots = occupied.map(entry => ({ top: entry.y, bottom: entry.y + entry.h }))
+    let candidates = defaults
+    const fit = (cards: Entry[]) => fitPinnedRail(top, viewportHeight * 0.99, cards.map(entry => entry.h), occupiedSlots)
+    let positions = fit(candidates)
+    leftRail = occupied.length > 0
+    if (!positions) {
+      candidates = defaults.filter(entry => entry.id === 'article-toc')
+      positions = fit(candidates)
+      if (!positions) return
+      // 目录留在右边，其余随页面滚动的卡片走另一侧。
+      if (candidates.length && (!right || railX + candidates[0].w <= deskRight - 16)) leftRail = true
+    }
+    for (const [index, entry] of candidates.entries()) {
       // 视口右上角会压在正文上 —— 贴着正文列的右缘放
       const x = right ? right + DESK_GAP_X : window.innerWidth - entry.w - 16
       // 窄桌面放不下就不固定：让它回到正文旁边（排不下就掉到正文下面）
       if (right && x + entry.w > deskRight - 16) continue
       entry.pinned = true
       const p = clampToViewport(
-        { x, y: top },
+        { x, y: positions[index] },
         { width: entry.w, height: entry.h },
         { width: window.innerWidth, height: window.innerHeight },
       )
       entry.x = p.x
       entry.y = p.y
-      top = p.y + entry.h + DESK_GAP_Y
+      placePinned(entry)
       entry.el.classList.add(CLASS.pinned)
       entry.el
         .querySelector<HTMLElement>(`[${ATTR.widgetPin}]`)
@@ -496,13 +509,12 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     measure()
     syncPinnedState()
     fitContentWidth()
+    syncPinned()
     applyDefaultPins()
 
     if (contentEl) layoutContentAnchored(contentEl)
     else if (flow) layoutFlowLift()
     else layoutScatter()
-
-    syncPinned()
 
     // 让位：卡片压到正文上时正文让开 —— 正文高度变了，桌面跟着重排
     settle()
@@ -534,7 +546,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
   }
 
   function reset() {
-    const keepPinned = entries.filter((e) => e.pinned)
+    const keepPinned = entries.filter((e) => e.pinned && saved[e.id]?.pinned)
     clearWidgetPositions()
     saved = readWidgetPositions()
     for (const e of keepPinned) persist(e)
@@ -575,8 +587,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
       placeAbsolute(entry)
     }
     persist(entry)
-    // 固定 / 取消固定都要重排 —— 固定卡也是障碍，文字得绕开它
-    settle()
+    apply()
   }
 
   /** 复原：删除存档、取消固定、重新布局回默认落位 */
@@ -655,8 +666,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
         void entry.el.offsetHeight
         entry.el.classList.remove(CLASS.isDragging)
         persist(entry)
-        // 位置换回桌面坐标 → 让位重算 → 正文高度变了，桌面跟着重排
-        settle()
+        apply()
       },
     })
   }

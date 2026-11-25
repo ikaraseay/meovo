@@ -115,6 +115,22 @@ export function scatterLayout(
   }
 }
 
+/** 在默认侧栏中为整组卡片找空位，优先保留用户已固定卡片的位置。 */
+export function fitPinnedRail(top: number, bottom: number, heights: number[], occupied: { top: number; bottom: number }[]): number[] | null {
+  const slots = occupied.toSorted((a, b) => a.top - b.top)
+  const positions: number[] = []
+  for (const height of heights) {
+    for (const slot of slots) {
+      if (top + height + DESK_GAP_Y <= slot.top) break
+      top = Math.max(top, slot.bottom + DESK_GAP_Y)
+    }
+    if (top + height > bottom) return null
+    positions.push(top)
+    top += height + DESK_GAP_Y
+  }
+  return positions
+}
+
 export interface ContentAnchoredResult {
   positions: Map<string, Position>
   /** 正文顶部要留的 margin-top（给顶部卡片让位） */
@@ -133,6 +149,7 @@ export function contentAnchoredLayout(
     contentWidth: number
     /** 正文内容高度（不含 margin） */
     contentHeight: number
+    leftRail?: boolean
   },
 ): ContentAnchoredResult {
   const { deskWidth, topOffset, contentWidth, contentHeight } = opts
@@ -172,7 +189,8 @@ export function contentAnchoredLayout(
 
   let sideY = contentTop
   for (const c of side) {
-    positions.set(c.id, { x: contentRight + DESK_GAP_X, y: sideY, width: c.width })
+    const x = opts.leftRail ? contentLeft - DESK_GAP_X - c.width : contentRight + DESK_GAP_X
+    positions.set(c.id, { x, y: sideY, width: c.width })
     sideY += c.height + DESK_GAP_Y
   }
 
