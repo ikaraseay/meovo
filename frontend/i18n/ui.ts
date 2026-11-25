@@ -97,6 +97,7 @@ export const ui = {
   'post.noTranslationShort': { zh: '暂无{locale}版', en: 'No {locale} version' },
   'post.translations': { zh: '语言版本', en: 'Language versions' },
   'post.toc': { zh: '目录', en: 'Contents' },
+  'post.tocToggle': { zh: '展开或收起这一节', en: 'Expand or collapse this section' },
   'post.structure': { zh: '关系图谱', en: 'Graph' },
   'post.readingTime': { zh: '阅读约 {minutes} 分钟', en: '{minutes} min read' },
   'post.prev': { zh: '上一篇', en: 'Previous' },

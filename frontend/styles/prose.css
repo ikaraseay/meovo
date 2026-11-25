@@ -350,28 +350,34 @@ html.dark .code-block pre.astro-code span {
   transform: rotate(180deg);
 }
 
-/* 目录默认收起（窄屏）—— 桌面由下面那条媒体查询改成默认展开 */
+/* 目录默认收起（窄屏）—— 桌面由下面那条媒体查询改成默认展开。
+   收起用 max-height（不是 display: none）—— 那样才有动画。 */
 .toc-list {
-  display: none;
   margin: var(--ui-space-sm) 0 0;
   padding: 0;
   border-inline-start: 1px solid var(--ui-border);
   list-style: none;
+  /* 收起时高度真的是 0（位置不留） */
+  max-height: 0;
+  opacity: 0;
   /* 章节多了目录自己滚 —— 别把卡片撑出屏幕 */
-  max-height: min(38vh, 22rem);
-  max-height: min(38dvh, 22rem);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  transition:
+    max-height var(--ui-transition-normal),
+    opacity var(--ui-transition-fast);
 }
 
 .toc[data-open] .toc-list {
-  display: block;
+  max-height: min(38vh, 22rem);
+  max-height: min(38dvh, 22rem);
+  opacity: 1;
 }
 
 /* ==================== 一级章节折叠 ==================== */
-/* details/summary 是平台原生的 —— 不用手搓展开状态，
-   点章节名跳转，点行里别处收起 / 展开 */
+/* 不用原生 details —— 它的开合是「一下子」的，藏不住动画。
+   状态自己管：组上记 data-open，子章节那层的 grid 轨道从 0fr 走到 1fr。 */
 
 .toc-group {
   list-style: none;
@@ -387,15 +393,9 @@ html.dark .code-block pre.astro-code span {
   border-inline-start: 2px solid transparent;
   color: var(--ui-text-muted);
   cursor: pointer;
-  list-style: none;
   transition:
     color var(--ui-transition-fast),
     border-color var(--ui-transition-fast);
-}
-
-/* 系统自带的小三角 —— 我们自己画箭头 */
-.toc-summary::-webkit-details-marker {
-  display: none;
 }
 
 .toc-summary:hover {
@@ -424,22 +424,53 @@ html.dark .code-block pre.astro-code span {
   font-weight: 600;
 }
 
-/* 右侧那个箭头只在「用户手动展开」时出现 ——
-   折叠只认双击，箭头是个记号，不是常驻按钮 */
+/* 右侧那个箭头 —— 悬停才现身，点它开 / 收这一组。
+   鼠标移开 1 秒后再淡出（移进来是立刻显形）—— 离手那一瞬还点得到。 */
 .toc-chevron {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
+  width: 22px;
+  height: 22px;
+  margin-inline-end: -4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ui-transition-fast) 1s;
+}
+
+.toc-group:hover .toc-chevron,
+.toc-chevron:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--ui-transition-fast);
+}
+
+.toc-chevron svg {
   width: 14px;
   height: 14px;
   transition: rotate var(--ui-transition-fast);
 }
 
-.toc-group.is-manual .toc-chevron {
-  display: block;
+/* 展开时箭头朝上 */
+.toc-group[data-open='true'] .toc-chevron svg {
+  rotate: 180deg;
 }
 
-.toc-details[open] > .toc-summary .toc-chevron {
-  rotate: 180deg;
+/* 子章节那层 —— 轨道从 0fr 走到 1fr：收起时高度真的是 0（位置不留） */
+.toc-sublist-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--ui-transition-normal);
+}
+
+.toc-group[data-open='true'] .toc-sublist-wrap {
+  grid-template-rows: 1fr;
 }
 
 /* 子章节缩进一级 —— 收起时整块藏起来 */
@@ -449,12 +480,9 @@ html.dark .code-block pre.astro-code span {
   padding: 0;
   border-inline-start: 1px solid var(--ui-border-subtle);
   list-style: none;
-}
-
-/* 收起时真藏掉 —— details 自带的隐藏只藏「画出来」，
-   位置还留着（卡片不会矮一截） */
-.toc-details:not([open]) > .toc-sublist {
-  display: none;
+  /* 轨道塌到 0 时内容要真藏掉 —— overflow 不是 visible，min-height 才到 0 */
+  min-height: 0;
+  overflow: hidden;
 }
 
 [data-widget='article-toc'].is-expanded {
@@ -617,7 +645,9 @@ html.dark .code-block pre.astro-code span {
 /* 桌面端目录常驻右侧 —— 选择器比上面的 .toc-list 更具体，压得住 */
 @media (min-width: 1024px) {
   .toc .toc-list {
-    display: block;
+    max-height: min(38vh, 22rem);
+    max-height: min(38dvh, 22rem);
+    opacity: 1;
   }
 
   .toc-toggle {

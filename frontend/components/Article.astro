@@ -86,22 +86,32 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
           </button>
           <ul class="toc-list">
             {groups.map((group) => (
-              <li class="toc-group" data-toc-group={group.heading?.slug ?? ''}>
+              <li
+                class="toc-group"
+                data-toc-group={group.heading?.slug ?? ''}
+                data-open="false"
+              >
                 {group.heading ? (
                   group.children.length > 0 ? (
                     /* 一级章节自己可折叠 —— 默认收起：浏览位置到了自动展开，
                        双击手动展开（这时右边才留那个箭头） */
-                    <details class="toc-details">
-                      <summary class="toc-summary">
-                        <a
-                          class="toc-link toc-link--section"
-                          href={`#${group.heading.slug}`}
-                          data-toc-link={group.heading.slug}
-                        >
-                          {group.heading.text}
-                        </a>
+                    <div class="toc-summary">
+                      <a
+                        class="toc-link toc-link--section"
+                        href={`#${group.heading.slug}`}
+                        data-toc-link={group.heading.slug}
+                      >
+                        {group.heading.text}
+                      </a>
+                      <button
+                        class="toc-chevron"
+                        type="button"
+                        data-toc-chevron
+                        aria-expanded="false"
+                        aria-controls={`toc-sub-${group.heading.slug}`}
+                        aria-label={t(locale, 'post.tocToggle')}
+                      >
                         <svg
-                          class="toc-chevron"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -114,7 +124,14 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
                             d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                           />
                         </svg>
-                      </summary>
+                      </button>
+                    </div>
+                    <div
+                      class="toc-sublist-wrap"
+                      id={`toc-sub-${group.heading.slug}`}
+                      data-toc-sublist
+                      inert
+                    >
                       <ul class="toc-sublist">
                         {group.children.map((item) => (
                           <li class="toc-item">
@@ -124,7 +141,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
                           </li>
                         ))}
                       </ul>
-                    </details>
+                    </div>
                   ) : (
                     /* 没有子章节 —— 不可折叠，就是一行链接 */
                     <div class="toc-summary toc-summary--plain">
@@ -324,9 +341,14 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   /** 当前章节的链接 —— 位置驱动的展开跟着它 */
   let activeLink: HTMLAnchorElement | null = null
 
-  /** 组里那对 details —— 没有子章节的组没有它，也就不可折叠 */
-  function groupDetails(group: HTMLElement): HTMLDetailsElement | null {
-    return group.querySelector('details')
+  /** 组里那层子章节 —— 没有子章节的组没有它，也就不可折叠 */
+  function groupSublist(group: HTMLElement): HTMLElement | null {
+    return group.querySelector('[data-toc-sublist]')
+  }
+
+  /** 这一组现在是开着还是收着 */
+  function groupIsOpen(group: HTMLElement): boolean {
+    return group.dataset.open === 'true'
   }
 
   /** 哪些组该展开 —— 位置规则 + 手动覆盖 */
@@ -337,7 +359,7 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       openGroupIds(
         tocGroups.map((group) => ({
           id: group.dataset.tocGroup ?? '',
-          collapsible: Boolean(groupDetails(group)),
+          collapsible: Boolean(groupSublist(group)),
         })),
         activeGroupId,
         groupModes,
@@ -345,44 +367,43 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     )
     for (const group of tocGroups) {
       const id = group.dataset.tocGroup ?? ''
-      // 手动展开的才留右侧那个箭头
-      group.classList.toggle('is-manual', groupModes.get(id) === 'open')
-      const details = groupDetails(group)
-      if (!details) continue
+      const wrap = groupSublist(group)
+      if (!wrap) continue
       const wantOpen = open.has(id)
-      if (details.open !== wantOpen) details.open = wantOpen
+      if (groupIsOpen(group) === wantOpen) continue
+      group.dataset.open = String(wantOpen)
+      // 收起时子章节真藏掉 —— 不可聚焦、不可点
+      wrap.toggleAttribute('inert', !wantOpen)
+      group.querySelector('[data-toc-chevron]')?.setAttribute('aria-expanded', String(wantOpen))
+      // 卡片高度变了，固定卡那一摞要重排（动完了还会再排一次）
+      relayoutDesks()
     }
   }
 
-  /** 双击切换 —— 当前开着就收起，收着就展开（手动过就不再跟位置走） */
+  /** 手动切换 —— 当前开着就收起，收着就展开（手动过就不再跟位置走） */
   function toggleGroup(group: HTMLElement, wasOpen: boolean) {
     const id = group.dataset.tocGroup ?? ''
-    const details = groupDetails(group)
-    if (!details) return
+    if (!groupSublist(group)) return
     const mode = groupModes.get(id) ?? 'auto'
     groupModes.set(id, toggleGroupMode(mode, wasOpen))
     syncGroups()
   }
 
   for (const group of tocGroups) {
-    const details = groupDetails(group)
-    const summary = group.querySelector('summary')
-    if (!details || !summary) continue
+    const wrap = groupSublist(group)
+    const summary = group.querySelector('.toc-summary')
+    if (!wrap || !summary) continue
 
-    // 卡片高度变了，固定卡那一摞要重排
-    details.addEventListener('toggle', () => relayoutDesks())
-
-    // 单击行里别处不切换 —— 折叠只认双击（点章节名是跳转）
-    summary.addEventListener('click', (event) => {
-      if ((event.target as HTMLElement).closest('a')) return
-      event.preventDefault()
+    // 收起 / 展开都有动画 —— 高度动完了再重排一次（这时卡片高度才定下来）
+    wrap.addEventListener('transitionend', (event) => {
+      if ((event as TransitionEvent).propertyName === 'grid-template-rows') relayoutDesks()
     })
 
     // 双击按「点下去那一刻」的状态算 —— 点章节名会跳转，
     // 跳转可能顺手把这一组展开，那时再读就晚了
     let openBeforeClick = false
     summary.addEventListener('mousedown', () => {
-      openBeforeClick = details.open
+      openBeforeClick = groupIsOpen(group)
     })
 
     summary.addEventListener('dblclick', (event) => {
@@ -390,12 +411,17 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       toggleGroup(group, openBeforeClick)
     })
 
-    // 键盘：Enter / 空格等价于双击
-    summary.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      toggleGroup(group, details.open)
+    // 箭头：点它开 / 收这一组（悬停才现身，鼠标移开 1 秒后淡出）
+    const chevron = group.querySelector('[data-toc-chevron]')
+    chevron?.addEventListener('click', (event) => {
+      const click = event as MouseEvent
+      // 双击的第二次点击 —— 别连着切两次
+      if (click.detail > 1) return
+      event.stopPropagation()
+      toggleGroup(group, groupIsOpen(group))
     })
+    // 双击箭头别再冒到行上（行上双击也是切换）
+    chevron?.addEventListener('dblclick', (event) => event.stopPropagation())
   }
 
   const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')]

@@ -19,6 +19,8 @@
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+    /* 延迟也一并归零 —— 免得淡出还等一秒才发生 */
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
