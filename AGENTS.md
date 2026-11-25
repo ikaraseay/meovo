@@ -375,6 +375,8 @@
     的话，正文会盖住卡片 —— 手把抓不到，卡片拖不动
 - **部署**：Cloudflare **Workers**（适配器 v14 已移除 Pages 支持）。构建 `pnpm build` → `dist/client`（静态资源）+ `dist/server`（Worker）；Node 钉在 `.node-version`，
   pnpm 钉在 `package.json` 的 `packageManager`（Workers Builds 的镜像会读这个字段装对应版本）。
+  Node 版本 Workers Builds 从 `.node-version` / `.nvmrc` / `NODE_VERSION` 三处任一取，
+  任意**已发布**版本都能装（不限于镜像预装的 22 / 24）—— 构建失败先看日志卡在哪一步，别先怀疑 Node 版本。
   - **部署有两条等价路径，共用一个账户级 Token**：Cloudflare Workers Builds 直连 GitHub
     （push 自动构建 + 部署）、本地 `bash scripts/ops.sh deploy`。GitHub Actions 只跑
     check / test / build / check:i18n / check:seo，不部署、不放凭据。
@@ -395,6 +397,13 @@
     **没有 D1** —— 而 `pnpm build` 的第一步就是从 D1 导出内容。不换 token 的话导出会失败
     （Workers Builds 注入 `WORKERS_CI=1`，导出脚本据此把「必须导出成功」打开 ——
     不会静默部署一个没有后台文章的站点）。
+  - **预览构建（PR 分支）是另一套配置** —— Settings → Builds 里 Preview 那份有自己的
+    Preview command 和自己的 build token，两处都要跟生产对齐：
+    ① 那支 token 同样要带 D1 权限（否则 `WORKERS_CI=1` 的导出会直接失败）；
+    ② Preview command 不能留默认的 `npx wrangler preview` —— 仓库根目录没有 wrangler 配置
+    （输入在 `cloudflare/wrangler.jsonc`，产物在 `dist/server/wrangler.json`），
+    要显式指过去：`npx wrangler versions upload --config dist/server/wrangler.json`
+    （只传版本、不提升到生产；`wrangler deploy` 会提升，别用在预览上）。
   - **后台改内容靠 Deploy Hook 触发构建**（D1 不在 git 里，push 永远不会发生）：见下面「改内容即构建」。
   - **缓存策略**在 `cloudflare/public/_headers` —— 带哈希的 `/_astro/*` 永久缓存；HTML 走 Pages 默认；
     pages.dev 域名被标 noindex（临时地址不参与收录）
@@ -657,6 +666,12 @@
   - `pnpm clean` —— 把本地的内容副本清掉（本地不留文章）
   - `pnpm check` / `pnpm test` / `pnpm dev` 前会自动补空壳（`--ensure`），
     所以新克隆的仓库不用先拉内容也能跑检查
+  - ⚠️ **`frontend/data/` 目录整个不在 git 里**（里面那几个 .ts 都 gitignored）——
+    干净克隆 / CI / 构建机上压根没有这个目录。导出脚本写文件前**自己 mkdir**，
+    别指望它存在（少了这一步：本地 pretest 挂、部署构建 ENOENT 崩掉）。
+    守着这条的是 `test/export-generated.test.ts`（拿临时目录演一遍干净克隆）
+  - ⚠️ **同步进本地 D1 只在本地开发跑** —— CI / 部署构建（`WORKERS_CI=1` 或 `CI=true`）
+    直接跳过：构建机上没人读那个本地库，库也还没建表（跑起来只会报 `no such table`）
 - **构建是手动的一步（Deploy Hook）**：`DEPLOY_HOOK_URL` 填在 `config.env`，
   `ops.sh secrets` 写入 Worker secret（Cloudflare Workers Builds 的 Deploy Hook，
   `Settings → Builds → Deploy Hooks` 建），后台页头的「构建上线」敲一下 → 构建 → 上线。

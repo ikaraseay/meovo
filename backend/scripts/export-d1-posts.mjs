@@ -41,6 +41,12 @@ const SUMMARIES_FILE = join(ROOT, 'frontend/data/article-summaries.ts')
 /** 友链 —— 关于页那张卡片（内容在 D1，构建期导出成静态数据） */
 const LINKS_FILE = join(ROOT, 'frontend/data/links.ts')
 
+/**
+ * 生成的数据目录不在 git 里（projects.ts / links.ts / article-summaries.ts 都 gitignored）——
+ * 干净克隆、CI、构建机上压根没有这个目录。写之前自己建。
+ */
+mkdirSync(join(ROOT, 'frontend/data'), { recursive: true })
+
 /** 环境在 config.env（从 config.env.example 复制，不入库）—— 没有就只用进程里的变量 */
 try {
   process.loadEnvFile(join(ROOT, 'config.env'))
@@ -412,9 +418,16 @@ async function syncFriendLinks() {
   }
 }
 
+/**
+ * CI / 部署构建里没有「本地库」可言 —— 那一步只为本地 dev 准备数据。
+ * 构建机上既没人读那个库，库也还没建表（跑起来只会报 no such table）—— 直接跳过。
+ */
+const isBuildEnv =
+  process.env.WORKERS_CI === '1' || /^(1|true)$/i.test(process.env.CI ?? '')
+
 // 远端导出时顺手把项目与友链同步进本地库 —— 本地开发才能看到后台的改动
 // （先同步再写清单：清单里的项目快照才拿得到远端那几行）
-if (!useLocal) {
+if (!useLocal && !isBuildEnv) {
   await syncProjects()
   await syncFriendLinks()
 }
