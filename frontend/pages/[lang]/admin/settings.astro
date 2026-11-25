@@ -40,6 +40,26 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
             {t(locale, 'admin.settings.previewFooter')}
           </button>
         </div>
+        <!-- 预览宽度 —— 面板已经是满宽的，能调的是「模拟多宽的设备」 -->
+        <div
+          class="admin-live__devices"
+          role="group"
+          aria-label={t(locale, 'admin.settings.previewWidth')}
+        >
+          <span class="admin-live__label">{t(locale, 'admin.settings.previewWidth')}</span>
+          <button class="ui-btn" type="button" data-admin-preview-device="phone">
+            {t(locale, 'admin.settings.devicePhone')}
+          </button>
+          <button class="ui-btn" type="button" data-admin-preview-device="tablet">
+            {t(locale, 'admin.settings.deviceTablet')}
+          </button>
+          <button class="ui-btn ui-btn--primary" type="button" data-admin-preview-device="desktop">
+            {t(locale, 'admin.settings.deviceDesktop')}
+          </button>
+          <button class="ui-btn" type="button" data-admin-preview-device="wide">
+            {t(locale, 'admin.settings.deviceWide')}
+          </button>
+        </div>
       </div>
       <p class="admin-card__hint">{t(locale, 'admin.settings.previewHint')}</p>
       <div class="admin-live__frame" data-admin-preview-box>
@@ -94,7 +114,7 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   import { interpolate, t } from '../../../i18n'
   import { api, errorText } from '../../../../backend/lib/admin/client'
   import { ATTR } from '../../../lib/dom-contract'
-  import { previewClickAction } from '../../../lib/admin-preview.ts'
+  import { previewClickAction, previewOffset, previewScale } from '../../../lib/admin-preview.ts'
   import { FOOTER_HEIGHT_KEY, MAX_FOOTER_HEIGHT, parseFooterMinHeight } from '../../../lib/footer-height.ts'
 
   interface Entry {
@@ -123,6 +143,9 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   const modeButtons = [
     ...document.querySelectorAll<HTMLButtonElement>('[data-admin-preview-mode]'),
   ]
+  const deviceButtons = [
+    ...document.querySelectorAll<HTMLButtonElement>('[data-admin-preview-device]'),
+  ]
 
   /** 站点信息：这几条最常改，单独摆出来 */
   const INFO_KEYS = ['site.name', 'site.author', 'site.tagline', 'site.email']
@@ -139,14 +162,18 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   const PAGE_SIZE = 20
 
   /**
-   * 预览里的视口宽度 —— **按宽度适配**，不按高度。
+   * 预览的四种视口 —— 面板宽度是满的，能调的是「模拟多宽的设备」。
    *
-   * 桌面面板一律给 1060：1024 是站点的桌面断点，留出滚动条的十几像素余量，
-   * 否则 clientWidth 掉到 1023 就渲染成移动端布局。缩到 0.85 倍仍然看得清。
-   * 手机面板给面板自己的宽度 —— 看的就是手机版，别再放大。
+   * 桌面给 1060：1024 是站点的桌面断点，留出滚动条的十几像素余量，
+   * 否则 clientWidth 掉到 1023 就渲染成移动端布局。
    */
-  const PREVIEW_DESKTOP_WIDTH = 1060
-  /** 面板窄于此就按手机版渲染 */
+  const DEVICE_WIDTH: Record<string, number> = {
+    phone: 390,
+    tablet: 768,
+    desktop: 1060,
+    wide: 1440,
+  }
+  /** 面板窄于此就按面板自己的宽度渲染 —— 桌面视口缩进去只剩蚂蚁字 */
   const PREVIEW_DESKTOP_PANEL = 640
 
   /** 改哪条 → 预览切到哪一面 */
@@ -164,6 +191,8 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   let entries: Entry[] = []
   let page = 1
   let previewMode: PreviewMode = 'home'
+  /** 当前模拟的设备宽度 —— 默认桌面 */
+  let previewDevice = 'desktop'
   /** 正在落盘的条数 —— 还没存完就别让页面离开 */
   let saving = 0
   /** 改了但还没落盘的值 —— key → {zh, en} */
@@ -557,14 +586,16 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
     const grip = parseFloat(getComputedStyle(previewBox).paddingBlockEnd) || 0
     const height = previewBox.clientHeight - grip
     if (width <= 0 || height <= 0) return
-    // 桌面面板至少 1060；比它还宽就用面板自身宽度 —— 只缩不放，放大只会发虚
-    const frameWidth =
-      width >= PREVIEW_DESKTOP_PANEL ? Math.max(PREVIEW_DESKTOP_WIDTH, width) : Math.max(360, width)
-    const scale = width / frameWidth
-    previewFrame.style.width = frameWidth + 'px'
+    // 面板窄（手机上的后台）—— 按面板自己的宽度渲染，别缩成蚂蚁字
+    const deviceWidth =
+      width >= PREVIEW_DESKTOP_PANEL ? DEVICE_WIDTH[previewDevice] : Math.max(360, width)
+    // 只缩不放 —— 放大只会发虚；缩完剩下的空当分给两边
+    const scale = previewScale(width, deviceWidth)
+    const offset = previewOffset(width, deviceWidth, scale)
+    previewFrame.style.width = deviceWidth + 'px'
     // 缩放后正好填满框高 —— 多出来的内容由 iframe 自己滚
     previewFrame.style.height = Math.ceil(height / scale) + 'px'
-    previewFrame.style.transform = 'scale(' + scale + ')'
+    previewFrame.style.transform = 'translateX(' + offset + 'px) scale(' + scale + ')'
   }
 
   /** 预览：把改过的文案贴回真实页面 */
@@ -726,6 +757,19 @@ const locale = (Astro.params.lang as Locale) ?? 'zh'
   for (const button of modeButtons) {
     button.addEventListener('click', () => {
       setPreviewMode((button.dataset.adminPreviewMode as PreviewMode) ?? 'home')
+    })
+  }
+
+  // 换设备宽度 —— 面板不动，只换模拟的视口
+  for (const button of deviceButtons) {
+    button.addEventListener('click', () => {
+      const id = button.dataset.adminPreviewDevice
+      if (!id || !(id in DEVICE_WIDTH)) return
+      previewDevice = id
+      for (const other of deviceButtons) {
+        other.classList.toggle('ui-btn--primary', other === button)
+      }
+      fitPreview()
     })
   }
 

@@ -936,10 +936,18 @@
    ⚠️ 类名别用 .admin-preview：那是**编辑器**的 markdown 预览，
    它自带 height + overflow，套到这张卡上会把整页压成一个定高滚动框。 */
 /* 预览卡本身不吸顶 —— 它占整行，吸顶会把下面的表单全盖住 */
-.admin-live__modes {
+.admin-live__modes,
+.admin-live__devices {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--ui-space-xs);
+}
+
+/* 预览宽度那一组前面的小标签 —— 两组按钮长得一样，不标出来会点错 */
+.admin-live__label {
+  font-size: 0.75rem;
+  color: var(--ui-text-muted);
 }
 
 .admin-live__frame {
