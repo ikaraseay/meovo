@@ -442,9 +442,14 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     const right = contentRightEdge()
     // 判定「放得下」用桌面的右缘 —— 与布局那侧同一把尺，固定 / 取消固定结果一致
     const deskRight = desk.getBoundingClientRect().left + desk.clientWidth
-    for (const entry of entries) {
-      if (!entry.el.hasAttribute(ATTR.defaultPin)) continue
-      if (saved[entry.id]) continue // 已有存档（用户 pin/拖过），尊重用户
+    const defaults = entries.filter(({ el, id }) => el.hasAttribute(ATTR.defaultPin) && !saved[id] && el.getClientRects().length > 0)
+    const viewportHeight = window.innerHeight
+    top = Math.max(top, viewportHeight * 0.01)
+    const stackHeight = defaults.reduce((height, entry) => height + entry.h, 0)
+      + Math.max(0, defaults.length - 1) * DESK_GAP_Y
+    // 整列放不下时一起交给正文侧栏排布，随页面滚动。
+    if (top + stackHeight > viewportHeight * 0.99) return
+    for (const entry of defaults) {
       // 视口右上角会压在正文上 —— 贴着正文列的右缘放
       const x = right ? right + DESK_GAP_X : window.innerWidth - entry.w - 16
       // 窄桌面放不下就不固定：让它回到正文旁边（排不下就掉到正文下面）

@@ -24,11 +24,9 @@ import { tocHeadings, type Heading } from '../lib/content-queries'
 import {
   postPath,
   tagPath,
-  categoryPath,
   seriesPath,
 } from '../lib/urls'
 import {
-  getCategoryLabel,
   getTagLabel,
 } from '../lib/posts'
 
@@ -98,15 +96,10 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   }
 
   {
-    tocItems.length > 0 && (
+    (post.data.tags.length > 0 || post.data.series) && (
       <GlassWidget id="article-outline" zone="side" width="sm" defaultPin locale={locale}>
         <OutlineMap
-          headings={headings}
-          title={post.data.title}
           locale={locale}
-          category={post.data.category
-            ? { label: getCategoryLabel(locale, post.data.category), href: categoryPath(locale, post.data.category) }
-            : undefined}
           tags={post.data.tags.map((tag) => ({
             label: getTagLabel(locale, tag),
             href: tagPath(locale, tag),
@@ -114,8 +107,6 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
           series={post.data.series
             ? { label: post.data.series.title, href: seriesPath(locale, post.data.series.id) }
             : undefined}
-          prev={prev}
-          next={next}
         />
       </GlassWidget>
     )

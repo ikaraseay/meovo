@@ -1,30 +1,21 @@
 ---
-/** 图谱展示文章、一级章节及外部关系。 */
+/** 图谱展示当前文章的标签和系列关系。 */
 import { t, type Locale } from '../i18n'
 import { DESKTOP_MIN_WIDTH } from '../lib/breakpoint'
 import { buildRelationGraph } from '../lib/relation-graph'
-import type { Heading } from '../lib/content-queries'
 
 interface Props {
-  headings: Heading[]
-  title: string
   locale: Locale
-  category?: { label: string; href: string }
   tags?: Array<{ label: string; href: string }>
   series?: { label: string; href: string }
-  prev?: { title: string; href: string }
-  next?: { title: string; href: string }
 }
 
-const { headings, title, locale, category, tags = [], series, prev, next } = Astro.props
+const { locale, tags = [], series } = Astro.props
 const links = [
-  ...(category ? [{ kind: 'category' as const, label: category.label, href: category.href }] : []),
   ...tags.map((tag) => ({ kind: 'tag' as const, label: tag.label, href: tag.href })),
   ...(series ? [{ kind: 'series' as const, label: series.label, href: series.href }] : []),
-  ...(prev ? [{ kind: 'post' as const, label: prev.title, href: prev.href, slug: 'prev' }] : []),
-  ...(next ? [{ kind: 'post' as const, label: next.title, href: next.href, slug: 'next' }] : []),
 ]
-const graph = buildRelationGraph(title, headings, links)
+const graph = buildRelationGraph(links)
 ---
 
 <details class="outline-map" data-outline data-desktop-min={DESKTOP_MIN_WIDTH}>
@@ -39,7 +30,7 @@ const graph = buildRelationGraph(title, headings, links)
             width={graph.width}
             height={graph.height}
             role="img"
-            aria-label={`${title} — ${t(locale, 'post.structure')}`}
+            aria-label={t(locale, 'post.structure')}
           >
             <g data-graph-transform>
               {graph.edges.map((edge) => {
@@ -50,16 +41,15 @@ const graph = buildRelationGraph(title, headings, links)
                 return <path class="outline-line" data-edge-source={source.id} data-edge-target={target.id} data-curve={edge.curve} d={`M ${source.x} ${source.y} Q ${mx} ${my} ${target.x} ${target.y}`} />
               })}
               {graph.nodes.map((node) => {
-                // 根节点是文章本身 —— 点它回到文章开头
-                const href = node.slug ? `#${node.slug}` : node.href ?? (node.kind === 'root' ? '#article-title' : undefined)
+                const href = node.href
                 const content = (
                   <>
                     <circle class="outline-hit" cx={node.x} cy={node.y} r={14} />
-                    <circle cx={node.x} cy={node.y} r={node.kind === 'h2' ? 7 : node.kind === 'root' ? 10 : 5} />
-                    <text x={node.x} y={node.y + (node.kind === 'h2' ? 18 : 14)} text-anchor="middle">
+                    <circle cx={node.x} cy={node.y} r={node.kind === 'root' ? 10 : 5} />
+                    {node.label && <text x={node.x} y={node.y + 14} text-anchor="middle">
                       {node.label.length > 14 ? `${node.label.slice(0, 13)}…` : node.label}
-                    </text>
-                    <title>{node.label}</title>
+                    </text>}
+                    {node.label && <title>{node.label}</title>}
                   </>
                 )
                 return href ? (
@@ -429,7 +419,6 @@ const graph = buildRelationGraph(title, headings, links)
   .outline-node:hover circle:not(.outline-hit) {
     r: 8;
   }
-  .outline-node--h2:hover circle:not(.outline-hit) { r: 10; }
   .outline-node--root:hover circle:not(.outline-hit) { r: 12; }
   .outline-node.is-dragging circle:not(.outline-hit) {
     r: 11;
@@ -455,7 +444,6 @@ const graph = buildRelationGraph(title, headings, links)
     stroke: var(--ui-accent);
     stroke-width: 2;
   }
-  .outline-node--h2 circle:not(.outline-hit) { fill: var(--ui-text); }
   .outline-node--root circle:not(.outline-hit) { fill: var(--ui-accent); }
   .outline-node--root circle:not(.outline-hit) {
     animation: graph-root-pulse var(--ui-duration-slow) ease-in-out infinite alternate;
@@ -464,22 +452,15 @@ const graph = buildRelationGraph(title, headings, links)
     from { filter: drop-shadow(0 0 0 transparent); }
     to { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ui-accent) 45%, transparent)); }
   }
-  .outline-node--category circle:not(.outline-hit) { fill: var(--ui-accent); }
   .outline-node--series circle:not(.outline-hit) { fill: var(--ui-text-accent); }
   .outline-node--tag circle:not(.outline-hit) { fill: transparent; stroke: var(--ui-text-accent); stroke-width: 2; }
-  .outline-node--post circle:not(.outline-hit) { fill: var(--ui-text-secondary); }
   .outline-node text {
     fill: var(--ui-text-secondary);
     font-family: var(--ui-font-body);
     font-size: 8.5px;
     user-select: none;
-    /* 文字要能点（跳章节）—— 靠 user-select 挡住拖选，不靠 pointer-events */
+    /* 文字要能点（打开标签或系列）—— 靠 user-select 挡住拖选，不靠 pointer-events */
     pointer-events: auto;
-  }
-  .outline-node--h2 text {
-    fill: var(--ui-text);
-    font-size: 9.5px;
-    font-weight: 600;
   }
   @media (min-width: 1024px) {
     .outline-summary { display: none; }

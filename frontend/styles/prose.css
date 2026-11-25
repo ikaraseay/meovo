@@ -366,6 +366,23 @@ html.dark .code-block pre.astro-code span {
   display: block;
 }
 
+[data-widget='article-toc'].is-expanded {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-widget='article-toc'].is-expanded :is(.ui-widget__body, .toc) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+[data-widget='article-toc'].is-expanded .toc-list {
+  flex: 1;
+  max-height: none;
+}
+
 .toc-item--depth-3 {
   padding-inline-start: var(--ui-space-md);
 }

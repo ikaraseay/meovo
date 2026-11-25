@@ -1,12 +1,9 @@
-import type { Heading } from './content-queries'
-
 export interface RelationNode {
   id: string
   label: string
-  kind: 'root' | 'h2' | 'category' | 'tag' | 'series' | 'post'
+  kind: 'root' | 'tag' | 'series'
   x: number
   y: number
-  slug?: string
   href?: string
 }
 
@@ -26,8 +23,7 @@ export interface RelationGraph {
 export interface RelationLink {
   label: string
   href: string
-  kind: 'category' | 'tag' | 'series' | 'post'
-  slug?: string
+  kind: 'tag' | 'series'
 }
 
 function hash(value: string): number {
@@ -65,32 +61,14 @@ export function driftOffset(state: DriftState, time: number): { x: number; y: nu
 
 /** 构建期确定性关系图谱；slug 哈希只负责稳定、有机的分布。 */
 export function buildRelationGraph(
-  title: string,
-  headings: Heading[],
-  links: RelationLink[] = [],
+  links: RelationLink[],
 ): RelationGraph {
   const width = 360
   const height = 300
   const cx = width / 2
   const cy = height / 2
-  const nodes: RelationNode[] = [{ id: 'root', label: title, kind: 'root', x: cx, y: cy }]
+  const nodes: RelationNode[] = [{ id: 'root', label: '', kind: 'root', x: cx, y: cy }]
   const edges: RelationEdge[] = []
-  const h2 = headings.filter((heading) => heading.depth === 2)
-
-  h2.forEach((heading, index) => {
-    const angle = h2.length === 1
-      ? -Math.PI / 2
-      : -Math.PI / 2 + (Math.PI * 2 * index) / h2.length
-    const jitter = ((hash(heading.slug) % 13) - 6) * 1.8
-    const radius = h2.length <= 3 ? 102 : 118
-    const x = Math.max(24, Math.min(width - 24, cx + Math.cos(angle) * radius + jitter))
-    const y = Math.max(24, Math.min(height - 24, cy + Math.sin(angle) * radius))
-    const h2Id = `h2:${heading.slug}`
-    nodes.push({ id: h2Id, label: heading.text, kind: 'h2', x, y, slug: heading.slug })
-    edges.push({ source: 'root', target: h2Id, curve: jitter / 8 })
-
-  })
-
   links.forEach((link, index) => {
     const angle = links.length === 1
       ? -Math.PI / 2
@@ -98,8 +76,7 @@ export function buildRelationGraph(
     const radius = 148
     const x = Math.max(24, Math.min(width - 24, cx + Math.cos(angle) * radius))
     const y = Math.max(24, Math.min(height - 24, cy + Math.sin(angle) * radius))
-    const id = `${link.kind}:${link.slug ?? link.label}`
-    // 外部节点只带 href —— slug 是章节锚点，别把 prev / next 变成 `#prev`
+    const id = `${link.kind}:${link.href}`
     nodes.push({ id, label: link.label, kind: link.kind, x, y, href: link.href })
     edges.push({ source: 'root', target: id, curve: 10 * (index % 2 ? 1 : -1) })
   })
