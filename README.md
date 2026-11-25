@@ -54,9 +54,9 @@
 Meovo 是一个中英双语的个人博客，采用静态生成 + 运行时 Worker 的混合架构：
 
 - **前台纯静态**：页面在构建期就渲染好了，**运行时不查 D1** —— D1 只服务后台与构建流程；
-- **内容即数据**：后台（D1）写稿，构建期导出 markdown + 文案覆盖 + 项目清单；
+- **内容即数据**：后台（D1）写稿，构建期导出 markdown + 文案覆盖 + 项目清单 + 友链清单；
 - **双语对称**：`/zh/` 与 `/en/` 对称路由；同 slug 的两个文件互为翻译，缺一版时另一版顶上并标注；
-- **自建后台**：`/<lang>/admin/` —— 文章 / 项目 / 界面文案 / 图库，单管理员，一个口令；
+- **自建后台**：`/<lang>/admin/` —— 文章 / 项目 / 友链 / 界面文案 / 图库，单管理员，一个口令；
 - **液态玻璃主题**：卡片画布 + 折射玻璃 + 明暗跟随系统；
 - **纯静态搜索**：归档页内联一份索引，浏览器端匹配 + 高亮；
 - **零工具类**：样式是原生 CSS + `--ui-*` token 契约，没有 Tailwind、没有 UI 库。
@@ -69,7 +69,7 @@ Meovo 是一个中英双语的个人博客，采用静态生成 + 运行时 Work
 
 ### 内容管理
 
-- **D1 驱动**：文章、项目、界面文案都存在 Cloudflare D1，后台改完一键构建上线；
+- **D1 驱动**：文章、项目、友链、界面文案都存在 Cloudflare D1，后台改完一键构建上线；
 - **构建期导出**：`pnpm build` 自动从 D1 拉取内容，生成 markdown 文件，静态输出纯 HTML；
 - **发布 ≠ 上线**：后台只改数据库，站点要等下一次构建（手动或 Deploy Hook 触发）；
 - **图库管理**：图片二进制进 R2，元数据进 D1，公开地址 `/media/<key>` 带 uuid 永久缓存；
@@ -102,7 +102,7 @@ Meovo 是一个中英双语的个人博客，采用静态生成 + 运行时 Work
 |---|---|
 | 框架 | Astro 7 · 静态输出 + `@astrojs/cloudflare` 适配器 |
 | 运行时 | Cloudflare Workers · 静态资源与接口一次部署，同域无跨域 |
-| 数据库 | Cloudflare D1（SQLite）· 文章、项目、文案覆盖 |
+| 数据库 | Cloudflare D1（SQLite）· 文章、项目、友链、文案覆盖 |
 | 对象存储 | Cloudflare R2 · 图库二进制（`/media/<key>` 公开可永久缓存） |
 | 样式 | 原生 CSS + `--ui-*` token · 结构刻度（tokens.css）与语义色层（主题文件）分开 |
 | 包管理 | pnpm · Node 钉在 `.node-version` |
@@ -118,7 +118,7 @@ Meovo 是一个中英双语的个人博客，采用静态生成 + 运行时 Work
 ```mermaid
 flowchart TB
     subgraph Content["内容层"]
-        D1[("Cloudflare D1<br/>文章 / 项目 / 文案")]
+        D1[("Cloudflare D1<br/>文章 / 项目 / 友链 / 文案")]
         R2[("Cloudflare R2<br/>图库二进制")]
     end
 
@@ -134,7 +134,7 @@ flowchart TB
     end
 
     subgraph Admin["后台"]
-        CMS["/<lang>/admin/<br/>文章 / 项目 / 文案 / 图库"]
+        CMS["/<lang>/admin/<br/>文章 / 项目 / 友链 / 文案 / 图库"]
         DeployHook["Deploy Hook<br/>触发构建"]
     end
 
@@ -202,7 +202,9 @@ pnpm check:i18n       # 语言包完整性 + 硬编码文案扫描
 pnpm check:seo        # canonical / hreflang / sitemap / RSS 一致性
 pnpm sync             # 从 D1 拉最新内容到本地
 pnpm clean            # 清掉本地的内容副本（本地不留文章）
-pnpm ops              # 运维脚本：doctor / status / secrets / config / env / check / deploy / login / logout
+pnpm ops              # 运维脚本：doctor / status / secrets / config / env / check / db / deploy / login / logout
+bash scripts/ops.sh db migrate    # 应用 D1 迁移（远端库；--local 走本地库）
+bash scripts/ops.sh db check      # 查 D1 的表齐不齐（缺表会点名）
 pnpm run deploy       # 部署到 Cloudflare Workers
 ```
 
@@ -230,11 +232,11 @@ pnpm wrangler d1 create meovo-content
 pnpm wrangler r2 bucket create meovo-media
 # 桶名填进 config.env 的 R2_BUCKET_NAME
 
-# 初始化数据库表
-pnpm wrangler d1 execute meovo-content --remote --file=backend/db/migrations/0001_initial.sql
-pnpm wrangler d1 execute meovo-content --remote --file=backend/db/migrations/0002_settings.sql
-pnpm wrangler d1 execute meovo-content --remote --file=backend/db/migrations/0003_comments.sql
-pnpm wrangler d1 execute meovo-content --remote --file=backend/db/migrations/0004_projects.sql
+# 初始化数据库表（迁移一次全跑完 —— 文章 / 文案 / 项目 / 友链 / 摘要缓存）
+bash scripts/ops.sh db migrate
+
+# 查一下表齐不齐 —— 缺表会点名，并告诉你怎么补
+bash scripts/ops.sh db check
 ```
 
 ### 2. Workers Builds 配置
@@ -333,7 +335,7 @@ meovo/
 │   ├── lib/                        # 通用逻辑（拖拽画布 / 布局数学 / 偏好 / 断点 / 搜索）
 │   └── layouts/                    # 布局（BaseLayout / AdminLayout / PostLayout）
 ├── backend/                        # 后台逻辑
-│   ├── lib/admin/                  # 会话 / 口令 / 文档 / 项目 / 图库 / 导出
+│   ├── lib/admin/                  # 会话 / 口令 / 文档 / 项目 / 友链 / 图库 / 导出
 │   ├── middleware.ts               # 鉴权（拦 /<lang>/admin/* 与 /api/admin/*）
 │   ├── db/migrations/              # D1 表结构
 │   └── scripts/                    # 构建期导出（内容 → markdown / 文案 / 项目）
@@ -358,6 +360,7 @@ D1 是唯一真身，仓库里不留内容：
 | 文章 | D1 `documents` | 构建期导出 `frontend/content/generated/<locale>/<slug>.md` |
 | 界面文案 | D1 `settings` | 构建期写 `frontend/i18n/overrides.ts`，叠在词典上 |
 | 项目 | D1 `projects` | 构建期写 `frontend/data/projects.ts`，关于页直接 import |
+| 友链 | D1 `friend_links` | 构建期写 `frontend/data/links.ts`，关于页直接 import |
 | 图片 | R2 | 后台上传，公开地址 `/media/<key>` |
 
 后台在 `/<lang>/admin/`（口令 = Worker secret `ADMIN_PASSWORD_HASH` 里的 SHA-256）。
@@ -419,6 +422,7 @@ D1 是唯一真身，仓库里不留内容：
 | 现象 | 排查方向 |
 |---|---|
 | 构建失败「拉不到 D1」 | Workers Builds 的 API token 没有 D1 权限，去 Settings → Builds 换一支带 D1: Edit 的 user token |
+| 后台「友链」页是空的 / 站上友链没了 | D1 缺 `friend_links` 表：`bash scripts/ops.sh db migrate` 补表，`bash scripts/ops.sh db check` 确认 |
 | 本地 dev server 看不到后台文章 | 没跑 `pnpm sync`，或 `cloudflare/.dev.vars` 没配好（要跟 wrangler 配置同目录） |
 | 提交时报「远端有更新」 | 线上 D1 与本地快照不一致，先 `pnpm sync` 再提交 |
 | 折射效果消失 | 检查是否同时写了 `-webkit-backdrop-filter`，会被 CSS 压缩流程合并掉 |
@@ -440,7 +444,7 @@ D1 是唯一真身，仓库里不留内容：
 - [x] 中英双语对称路由
 - [x] 液态玻璃主题（折射 + 降级）
 - [x] 纯静态搜索（中文切分）
-- [x] 自建后台（文章 / 项目 / 文案 / 图库）
+- [x] 自建后台（文章 / 项目 / 友链 / 文案 / 图库）
 - [x] 无障碍三档（焦点环 / 下划线 / 点击目标）
 - [x] SEO 一致性检查（canonical / hreflang / sitemap / RSS / OG）
 - [ ] RSS 订阅（已实现，待完善）

@@ -7,6 +7,7 @@
 #   bash scripts/ops.sh secrets     从 config.env 同步密钥到 Cloudflare
 #   bash scripts/ops.sh config      配置的查看 / 修改 / 校验
 #   bash scripts/ops.sh env         把 config.env 的后台凭据写进 cloudflare/.dev.vars
+#   bash scripts/ops.sh db          数据库：迁移（migrate）与表检查（check）
 #   bash scripts/ops.sh check       本地校验：类型 / 测试 / i18n / seo
 #   bash scripts/ops.sh deploy      构建并部署到 Cloudflare Workers
 #   bash scripts/ops.sh login       登录 Cloudflare
@@ -18,7 +19,8 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # 顶部那段用法说明就是一段注释 —— 加命令不用改行号
+  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"
   exit 0
 }
 
@@ -160,6 +162,105 @@ cmd_env() {
   } > "$DEV_VARS"
   ok "已写入 $DEV_VARS"
   note "线上用：bash scripts/ops.sh secrets"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# D1：迁移与表检查
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 库名 —— config.env 优先，没有就从 wrangler.jsonc 里读
+db_name() {
+  local name="${D1_DATABASE_NAME:-}"
+  if [ -z "$name" ]; then
+    name="$(sed -n 's/.*"database_name": *"\([^"]*\)".*/\1/p' "$WRANGLER_CONFIG" | head -1)"
+  fi
+  printf '%s' "$name"
+}
+
+# 期望的表 —— 直接从迁移文件读（CREATE TABLE）：加一条迁移就自动多一项
+expected_tables() {
+  grep -hoE 'CREATE TABLE( IF NOT EXISTS)?[[:space:]]+[A-Za-z_]+' \
+    "$PROJECT_ROOT"/backend/db/migrations/*.sql 2>/dev/null \
+    | awk '{print tolower($NF)}' | sort -u
+}
+
+# 库里的表 —— 查 sqlite_master
+db_tables() {
+  local db="$1" target="$2" out
+  out="$(wrangler d1 execute "$db" "--$target" \
+    --command "SELECT name FROM sqlite_master WHERE type = 'table'" 2>/dev/null || true)"
+  { printf '%s' "$out" \
+    | grep -oE '"name":[[:space:]]*"[A-Za-z_]+"' \
+    | sed -E 's/.*"([A-Za-z_]+)"$/\1/' | sort -u; } || true
+}
+
+# 缺哪些表 —— 空 = 都齐了；__failed__ = 查不到（没权限 / 库不存在）
+missing_tables() {
+  local target="$1" db have want
+  db="$(db_name)"
+  if [ -z "$db" ]; then printf '__failed__'; return; fi
+  have="$(db_tables "$db" "$target")"
+  if [ -z "$have" ]; then printf '__failed__'; return; fi
+  want="$(expected_tables)"
+  comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$have") || true
+}
+
+cmd_db_check() {
+  local target="${1:-remote}" db want have missing t
+  db="$(db_name)"
+  [ -n "$db" ] || die "没配置 D1 库名（config.env 的 D1_DATABASE_NAME 或 wrangler.jsonc）"
+  step "D1 表（${target}）：${db}"
+  want="$(expected_tables)"
+  have="$(db_tables "$db" "$target")"
+  if [ -z "$have" ]; then
+    warn "查不到库里的表 —— 没有 D1 权限，或库还不存在"
+    return 1
+  fi
+  missing="$(comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$have") || true)"
+  for t in $want; do
+    if printf '%s\n' "$missing" | grep -qx "$t"; then
+      err "$t 缺"
+    else
+      ok "$t"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    note "缺表：$(printf '%s' "$missing" | tr '\n' ' ')"
+    if [ "$target" = "local" ]; then
+      note "补表：bash scripts/ops.sh db migrate --local"
+    else
+      note "补表：bash scripts/ops.sh db migrate"
+    fi
+    return 1
+  fi
+  ok "表齐全"
+}
+
+cmd_db() {
+  load_config
+  local cmd="${1:-check}"
+  shift || true
+  case "$cmd" in
+    migrate)
+      local target="remote" db
+      if [ "${1:-}" = "--local" ]; then target="local"; fi
+      db="$(db_name)"
+      [ -n "$db" ] || die "没配置 D1 库名（config.env 的 D1_DATABASE_NAME 或 wrangler.jsonc）"
+      step "应用迁移（${target}）：${db}"
+      if [ "$target" = "remote" ]; then
+        ask_yes_no "确认把迁移应用到远端库 ${db}？" || { note "已取消"; exit 0; }
+      fi
+      wrangler d1 migrations apply "$db" "--$target"
+      ;;
+    check)
+      local target="remote"
+      if [ "${1:-}" = "--local" ]; then target="local"; fi
+      cmd_db_check "$target"
+      ;;
+    *)
+      die "未知命令：${cmd}（可用 migrate / check）"
+      ;;
+  esac
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -308,6 +409,18 @@ cmd_doctor() {
     mark_fail "没有凭据：在 config.env 填 CLOUDFLARE_API_TOKEN，或 bash scripts/ops.sh login"
   fi
 
+  # D1 的表 —— 少一张表，站点就少一块内容（文章 / 文案 / 项目 / 友链 / 摘要缓存）
+  step "D1 表"
+  local missing
+  missing="$(missing_tables remote)"
+  if [ "$missing" = "__failed__" ]; then
+    mark_warn "查不到 D1 的表（没有 D1 权限，或库还不存在）"
+  elif [ -n "$missing" ]; then
+    mark_fail "D1 缺表：$(printf '%s' "$missing" | tr '\n' ' ') → bash scripts/ops.sh db migrate"
+  else
+    mark_ok "D1 表齐全"
+  fi
+
   step "Worker secret"
   local secrets
   secrets="$(wrangler secret list 2>/dev/null || true)"
@@ -368,9 +481,10 @@ case "${1:-doctor}" in
   config)  shift; cmd_config "$@" ;;
   env)     cmd_env ;;
   check)   cmd_check ;;
+  db)      shift; cmd_db "$@" ;;
   deploy)  cmd_deploy ;;
   login)   cmd_login ;;
   logout)  cmd_logout ;;
   -h|--help) usage ;;
-  *)       die "未知命令：$1（可用 doctor / status / secrets / config / env / check / deploy / login / logout）" ;;
+  *)       die "未知命令：$1（可用 doctor / status / secrets / config / env / check / db / deploy / login / logout）" ;;
 esac

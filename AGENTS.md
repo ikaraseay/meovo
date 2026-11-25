@@ -715,8 +715,10 @@
     `cloudflare/wrangler.jsonc`（库 id / 桶名 / 域名）/ `astro.config.mjs`。
     别手改那两个文件（会漂）。
 - **运维脚本 `scripts/ops.sh`**（等价 `pnpm ops`）：
-  - `doctor` —— 体检：工具链 / 依赖 / 配置 / D1 id 一致性 / Cloudflare 登录 / Worker secret /
-    站点可达，汇总「通过 / 提醒 / 阻断」，有阻断项 exit 1
+  - `doctor` —— 体检：工具链 / 依赖 / 配置 / D1 id 一致性 / Cloudflare 登录 / **D1 表齐不齐** /
+    Worker secret / 站点可达，汇总「通过 / 提醒 / 阻断」，有阻断项 exit 1
+  - `db migrate [--local]` —— 应用 D1 迁移（远端要确认一次）；`db check` 看表齐不齐
+    —— **期望的表直接从 `backend/db/migrations/*.sql` 里读**，加一条迁移就自动多一项
   - `config show|get|set|unset|edit|check` —— 配置的查看与修改（保留注释与其它行）
   - `env` —— 把 `config.env` 的后台凭据写进 `cloudflare/.dev.vars`
     （wrangler 只认配置同目录的那个）
