@@ -222,7 +222,7 @@ export const ui = {
   'links.exchange.url': { zh: '网站地址', en: 'Site URL' },
   'links.exchange.avatar': { zh: '头像地址', en: 'Avatar URL' },
   'links.exchange.description': { zh: '简介', en: 'Description' },
-  'links.exchange.submit': { zh: '发到邮箱', en: 'Send by email' },
+  'links.exchange.submit': { zh: '点击通过电子邮箱发送给我～', en: 'Click to send it to me by email' },
   'links.exchange.subject': { zh: '友链申请：{site}', en: 'Friend link request: {site}' },
 
   'list.postCount': { zh: '{count} 篇文章', en: '{count} posts' },
