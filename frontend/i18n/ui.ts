@@ -216,6 +216,17 @@ export const ui = {
   'links.title': { zh: '友情链接', en: 'Friend links' },
   'links.intro': { zh: '这些是我常读的站点。', en: 'Sites I read often.' },
   'links.empty': { zh: '还没有友链。', en: 'No friend links yet.' },
+  'links.exchange.title': { zh: '联系我交换友链', en: 'Exchange links with me' },
+  'links.exchange.hint': {
+    zh: '填好下面四项，邮件会发到我的邮箱，我看到就加上。',
+    en: 'Fill in the four fields below — the email goes to my inbox, and I will add your site.',
+  },
+  'links.exchange.name': { zh: '网站名称', en: 'Site name' },
+  'links.exchange.url': { zh: '网站地址', en: 'Site URL' },
+  'links.exchange.avatar': { zh: '头像地址', en: 'Avatar URL' },
+  'links.exchange.description': { zh: '一句话简介', en: 'Short description' },
+  'links.exchange.submit': { zh: '发到邮箱', en: 'Send by email' },
+  'links.exchange.subject': { zh: '友链申请：{site}', en: 'Friend link request: {site}' },
 
   'list.postCount': { zh: '{count} 篇文章', en: '{count} posts' },
 
@@ -272,6 +283,22 @@ export const ui = {
   'admin.projects.url': { zh: '地址', en: 'URL' },
   'admin.projects.create': { zh: '添加', en: 'Add' },
   'admin.projects.empty': { zh: '还没有项目。', en: 'No projects yet.' },
+  // 友链页
+  'admin.nav.links': { zh: '友链', en: 'Friend links' },
+  'admin.nav.linksHint': { zh: '关于页的友链', en: 'About page friend links' },
+  'admin.links.title': { zh: '友链', en: 'Friend links' },
+  'admin.links.intro': {
+    zh: '关于页那张卡片里的友情链接 —— 名称、地址、头像与简介。',
+    en: 'Friend links on the About page — name, URL, avatar and description.',
+  },
+  'admin.links.new': { zh: '新建友链', en: 'New friend link' },
+  'admin.links.name': { zh: '网站名称', en: 'Site name' },
+  'admin.links.url': { zh: '网站地址', en: 'Site URL' },
+  'admin.links.avatar': { zh: '头像地址', en: 'Avatar URL' },
+  'admin.links.avatarHint': { zh: '留空则用对方的 favicon。', en: 'Leave empty to use the site favicon.' },
+  'admin.links.description': { zh: '简介', en: 'Description' },
+  'admin.links.create': { zh: '添加', en: 'Add' },
+  'admin.links.empty': { zh: '还没有友链。', en: 'No friend links yet.' },
   // 设置页
   'admin.settings.title': { zh: '站点设置', en: 'Site settings' },
   'admin.settings.intro': {
@@ -450,6 +477,7 @@ export const ui = {
   'admin.error.description_too_long': { zh: '简介太长了。', en: 'That description is too long.' },
   'admin.error.url_required': { zh: '地址不能为空。', en: 'The URL is required.' },
   'admin.error.url_invalid': { zh: '地址不对（只收 http / https）。', en: 'That URL is not valid (http / https only).' },
+  'admin.error.avatar_invalid': { zh: '头像地址不对（只收 http / https）。', en: 'That avatar URL is not valid (http / https only).' },
   'admin.error.slug_taken': { zh: '这个 slug 在该语言下已经有一篇了。', en: 'This slug is already used in that language.' },
   'admin.error.conflict': { zh: '别处刚改过这篇 —— 刷新页面再保存。', en: 'This document changed elsewhere — reload before saving.' },
   'admin.error.file_required': { zh: '没收到文件。', en: 'No file received.' },

@@ -6,6 +6,7 @@
  *   frontend/content/generated/   导出的文章 markdown
  *   frontend/i18n/overrides.ts     后台改过的文案
  *   frontend/data/projects.ts     项目
+ *   frontend/data/links.ts        友链
  * 清掉之后 `pnpm sync` / `pnpm build` 会重新生成。
  */
 import { existsSync, readdirSync, rmSync } from 'node:fs'
@@ -17,6 +18,7 @@ const GENERATED = join(ROOT, 'frontend/content/generated')
 const FILES = [
   join(ROOT, 'frontend/i18n/overrides.ts'),
   join(ROOT, 'frontend/data/projects.ts'),
+  join(ROOT, 'frontend/data/links.ts'),
 ]
 
 let removed = 0

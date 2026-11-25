@@ -180,6 +180,10 @@ export const ATTR = {
   adminComments: 'data-admin-comments',
   /** 后台：项目列表容器 */
   adminProjects: 'data-admin-projects',
+  /** 后台：友链列表容器 */
+  adminFriendLinks: 'data-admin-friend-links',
+  /** 关于页：友链申请表（填完走 mailto 发信） */
+  linkExchange: 'data-link-exchange',
   /** 友链行 */
   linkRow: 'data-link-row',
   /** 这一段文字对应哪个可改文案 —— 后台预览靠它把改动贴回真实页面 */

@@ -1110,8 +1110,9 @@
   line-height: 1;
 }
 
-/* 项目 —— 关于页那张卡片的条目（后台可编辑） */
-.admin-project {
+/* 项目 / 友链 —— 关于页那张卡片的条目（后台可编辑） */
+.admin-project,
+.admin-link {
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-sm);
@@ -1121,13 +1122,15 @@
   background: var(--ui-surface);
 }
 
-.admin-project__actions {
+.admin-project__actions,
+.admin-link__actions {
   display: flex;
   gap: var(--ui-space-sm);
   flex-wrap: wrap;
 }
 
-.admin-project-form {
+.admin-project-form,
+.admin-link-form {
   gap: var(--ui-space-md);
 }
 

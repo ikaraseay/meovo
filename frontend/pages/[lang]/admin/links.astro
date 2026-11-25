@@ -1,0 +1,206 @@
+---
+/**
+ * 后台友链 —— 关于页那张卡片里的友情链接（名称 / 地址 / 头像 / 简介）。
+ * ---------------------------------------------------------
+ * 数据在 D1，页面是 on-demand 的：内容由脚本去接口取。
+ */
+export const prerender = false
+
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import { t, type Locale } from '../../../i18n'
+
+const locale = (Astro.params.lang as Locale) ?? 'zh'
+---
+
+<AdminLayout
+  locale={locale}
+  section="links"
+  title={t(locale, 'admin.links.title')}
+  intro={t(locale, 'admin.links.intro')}
+>
+  <form class="admin-card admin-link-form" data-admin-link-form>
+    <h2 class="admin-card__title">{t(locale, 'admin.links.new')}</h2>
+    <div class="admin-grid">
+      <label class="admin-field">
+        <span class="admin-field__label">{t(locale, 'admin.links.name')}</span>
+        <input class="ui-input" type="text" name="name" maxlength="80" required />
+      </label>
+      <label class="admin-field admin-field--wide">
+        <span class="admin-field__label">{t(locale, 'admin.links.url')}</span>
+        <input class="ui-input" type="text" name="url" required />
+      </label>
+      <label class="admin-field admin-field--wide">
+        <span class="admin-field__label">{t(locale, 'admin.links.avatar')}</span>
+        <input class="ui-input" type="text" name="avatar" maxlength="500" />
+        <span class="admin-field__hint">{t(locale, 'admin.links.avatarHint')}</span>
+      </label>
+      <label class="admin-field admin-field--wide">
+        <span class="admin-field__label">{t(locale, 'admin.links.description')}</span>
+        <input class="ui-input" type="text" name="description" maxlength="200" />
+      </label>
+    </div>
+    <button class="ui-btn ui-btn--primary" type="submit">{t(locale, 'admin.links.create')}</button>
+  </form>
+
+  <div class="admin-list" data-admin-friend-links></div>
+</AdminLayout>
+
+<script>
+  import { ATTR } from '../../../lib/dom-contract'
+  import { t } from '../../../i18n'
+  import { api, errorText } from '../../../../backend/lib/admin/client'
+
+  interface LinkRow {
+    id: string
+    name: string
+    url: string
+    avatar: string
+    description: string
+  }
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const list = document.querySelector<HTMLElement>('[' + ATTR.adminFriendLinks + ']')
+  const flash = document.querySelector<HTMLElement>('[' + ATTR.adminFlash + ']')
+  const form = document.querySelector<HTMLFormElement>('[data-admin-link-form]')
+
+  function say(message: string, isError = false) {
+    if (!flash) return
+    flash.textContent = message
+    flash.classList.toggle('admin-flash--error', isError)
+    flash.hidden = false
+    flash.classList.add('admin-flash--visible')
+  }
+
+  function field(
+    parent: HTMLElement,
+    name: string,
+    value: string,
+    label: string,
+  ): HTMLInputElement {
+    const wrap = document.createElement('label')
+    wrap.className = 'admin-field'
+    const caption = document.createElement('span')
+    caption.className = 'admin-field__label'
+    caption.textContent = label
+    wrap.appendChild(caption)
+    const input = document.createElement('input')
+    input.className = 'ui-input'
+    input.type = 'text'
+    input.name = name
+    input.value = value
+    wrap.appendChild(input)
+    parent.appendChild(wrap)
+    return input
+  }
+
+  function row(item: LinkRow): HTMLElement {
+    const box = document.createElement('div')
+    box.className = 'admin-link'
+
+    const fields = document.createElement('div')
+    fields.className = 'admin-grid'
+    const name = field(fields, 'name', item.name, t(locale, 'admin.links.name'))
+    const url = field(fields, 'url', item.url, t(locale, 'admin.links.url'))
+    const avatar = field(fields, 'avatar', item.avatar, t(locale, 'admin.links.avatar'))
+    const description = field(
+      fields,
+      'description',
+      item.description,
+      t(locale, 'admin.links.description'),
+    )
+    box.appendChild(fields)
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-link__actions'
+
+    const save = document.createElement('button')
+    save.className = 'ui-btn ui-btn--primary'
+    save.type = 'button'
+    save.textContent = t(locale, 'admin.action.save')
+    save.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/friend-links/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: name.value,
+            url: url.value,
+            avatar: avatar.value,
+            description: description.value,
+          }),
+        })
+        say(t(locale, 'admin.hint.saved'))
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    actions.appendChild(save)
+
+    const remove = document.createElement('button')
+    remove.className = 'ui-btn admin-btn--danger'
+    remove.type = 'button'
+    remove.textContent = t(locale, 'admin.action.delete')
+    remove.addEventListener('click', async () => {
+      if (!confirm(t(locale, 'admin.confirm.delete'))) return
+      try {
+        await api('/api/admin/friend-links/' + item.id, { method: 'DELETE' })
+        await render()
+      } catch (error) {
+        say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+      }
+    })
+    actions.appendChild(remove)
+
+    box.appendChild(actions)
+    return box
+  }
+
+  async function render() {
+    if (!list) return
+    try {
+      const data = await api<{ links: LinkRow[] }>('/api/admin/friend-links')
+      list.textContent = ''
+      if (data.links.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const mark = document.createElement('span')
+        mark.className = 'admin-empty__mark'
+        mark.setAttribute('aria-hidden', 'true')
+        mark.textContent = '◈'
+        empty.appendChild(mark)
+        const label = document.createElement('p')
+        label.className = 'admin-empty__text'
+        label.textContent = t(locale, 'admin.links.empty')
+        empty.appendChild(label)
+        list.appendChild(empty)
+        return
+      }
+      for (const item of data.links) list.appendChild(row(item))
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  }
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = new FormData(form)
+    try {
+      await api('/api/admin/friend-links', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: String(data.get('name') ?? ''),
+          url: String(data.get('url') ?? ''),
+          avatar: String(data.get('avatar') ?? ''),
+          description: String(data.get('description') ?? ''),
+        }),
+      })
+      form.reset()
+      say(t(locale, 'admin.hint.saved'))
+      await render()
+    } catch (error) {
+      say(errorText(locale, (error as { code?: string }).code ?? 'request_failed'), true)
+    }
+  })
+
+  void render()
+</script>

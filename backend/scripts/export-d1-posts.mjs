@@ -38,6 +38,8 @@ const OVERRIDES = join(ROOT, 'frontend/i18n/overrides.ts')
 const PROJECTS_FILE = join(ROOT, 'frontend/data/projects.ts')
 /** AI 要点 + 理由 —— 折叠阅读的「要点」档读这份（构建期生成，运行时不调 AI） */
 const SUMMARIES_FILE = join(ROOT, 'frontend/data/article-summaries.ts')
+/** 友链 —— 关于页那张卡片（内容在 D1，构建期导出成静态数据） */
+const LINKS_FILE = join(ROOT, 'frontend/data/links.ts')
 
 /** 环境在 config.env（从 config.env.example 复制，不入库）—— 没有就只用进程里的变量 */
 try {
@@ -104,6 +106,7 @@ if (ensureOnly) {
   if (!existsSync(OVERRIDES)) writeOverrides({})
   if (!existsSync(PROJECTS_FILE)) writeProjects([])
   if (!existsSync(SUMMARIES_FILE)) writeSummariesFile({})
+  if (!existsSync(LINKS_FILE)) writeLinksFile([])
   process.exit(0)
 }
 
@@ -122,6 +125,7 @@ try {
   console.warn('[export] ' + message + ' —— 跳过导出，站点里没有后台发布的文章')
   writeOverrides({})
   writeProjects([])
+  if (!existsSync(LINKS_FILE)) writeLinksFile([])
   process.exit(0)
 }
 
@@ -299,6 +303,24 @@ writeOverrides(overrides)
 let projectRows = []
 
 
+/** 在本地 D1 上跑一条命令 —— 项目与友链共用 */
+function runLocalD1(commands) {
+  execFileSync(
+    join(ROOT, 'node_modules/.bin/wrangler'),
+    [
+      'd1',
+      'execute',
+      readD1Config(WRANGLER_CONFIG).name || 'meovo-content',
+      '--local',
+      '--config',
+      WRANGLER_CONFIG,
+      '--command',
+      commands.join('; '),
+    ],
+    { encoding: 'utf8', cwd: ROOT },
+  )
+}
+
 /**
  * 把远端的项目同步进**本地 D1**。
  *
@@ -335,20 +357,7 @@ async function syncProjects() {
   }
 
   try {
-    execFileSync(
-      join(ROOT, 'node_modules/.bin/wrangler'),
-      [
-        'd1',
-        'execute',
-        readD1Config(WRANGLER_CONFIG).name || 'meovo-content',
-        '--local',
-        '--config',
-        WRANGLER_CONFIG,
-        '--command',
-        commands.join('; '),
-      ],
-      { encoding: 'utf8', cwd: ROOT },
-    )
+    runLocalD1(commands)
     console.log('[export] 项目已同步进本地 D1：' + rows.length + ' 条')
   } catch (error) {
     // 本地库还没建表之类 —— 不该因此拦住整次导出
@@ -356,9 +365,59 @@ async function syncProjects() {
   }
 }
 
-// 远端导出时顺手把项目同步进本地库 —— 本地开发才能看到后台的改动
+/**
+ * 把远端的友链同步进**本地 D1** —— 与项目同理：
+ * 本地开发时后台页面读的是本地库，不同步就看不到线上那份。
+ */
+async function syncFriendLinks() {
+  let rows = []
+  try {
+    rows = await query(
+      'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links',
+    )
+  } catch {
+    console.warn('[export] friend_links 表不存在，跳过友链同步（跑一次 d1 migrations apply）')
+    return
+  }
+
+  const now = new Date().toISOString()
+  const values = rows.map((row) =>
+    '(' +
+    [row.id, row.name, row.url, row.avatar, row.description, row.sort_order, row.created_at ?? now]
+      .map(sqlText)
+      .join(', ') +
+    ')',
+  )
+
+  const commands = []
+  if (rows.length > 0) {
+    commands.push(
+      'DELETE FROM friend_links WHERE id NOT IN (' +
+        rows.map((row) => sqlText(row.id)).join(', ') +
+        ')',
+    )
+    commands.push(
+      'INSERT OR REPLACE INTO friend_links (id, name, url, avatar, description, sort_order, created_at) VALUES ' +
+        values.join(', '),
+    )
+  } else {
+    commands.push('DELETE FROM friend_links')
+  }
+
+  try {
+    runLocalD1(commands)
+    console.log('[export] 友链已同步进本地 D1：' + rows.length + ' 条')
+  } catch (error) {
+    console.warn('[export] 友链同步失败（不影响文章导出）：' + error.message)
+  }
+}
+
+// 远端导出时顺手把项目与友链同步进本地库 —— 本地开发才能看到后台的改动
 // （先同步再写清单：清单里的项目快照才拿得到远端那几行）
-if (!useLocal) await syncProjects()
+if (!useLocal) {
+  await syncProjects()
+  await syncFriendLinks()
+}
 
 /**
  * 清单 —— 除了统计，还记三份**本地快照**：
@@ -389,7 +448,61 @@ writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2), 'utf8')
  * 项目数据 —— 写成源码（跟 overrides.ts 一个道理）：
  * 静态页在构建期 import 它，运行时**完全不碰 D1**。
  */
+/**
+ * 友链 —— 拉得到就写，拉不到就**保留原来的文件**：
+ * 表还没建的时候别把站上的友链清空。
+ */
+let linkRows = null
+try {
+  linkRows = await query(
+    'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links ' +
+      'ORDER BY sort_order ASC, created_at ASC',
+  )
+} catch (error) {
+  console.warn('[export] 友链拉不到（表还没建？）—— 保留原来的：' + error.message)
+}
+if (linkRows) writeLinksFile(linkRows)
+else if (!existsSync(LINKS_FILE)) writeLinksFile([])
+
 writeProjects(projectRows)
+
+/**
+ * 友链 —— 写成源码（跟 projects 一个道理）。
+ * 站上是静态的：关于页那张卡片在构建期就渲染好了，运行时完全不碰 D1。
+ */
+function writeLinksFile(rows) {
+  const links = rows.map((row) => ({
+    name: row.name,
+    url: row.url,
+    description: row.description || undefined,
+    avatar: row.avatar || undefined,
+  }))
+  writeFileSync(
+    LINKS_FILE,
+    `/**
+ * 友链数据 —— **生成的，别手改**。
+ *
+ * 由 backend/scripts/export-d1-posts.mjs 在构建前写入（内容 = D1 的 friend_links 表）。
+ * 空表 = 关于页那张卡片显示「还没有友链」。
+ */
+export interface FriendLink {
+  /** 站点名 */
+  name: string
+  /** 站点地址 */
+  url: string
+  /** 一句话介绍 */
+  description?: string
+  /** 头像地址（留空则用站点 favicon） */
+  avatar?: string
+  /** 手动标注状态：'ok' | 'down' | 'unknown'（留空 = 运行时探测） */
+  status?: 'ok' | 'down' | 'unknown'
+}
+
+export const friendLinks: FriendLink[] = ${JSON.stringify(links, null, 2)}
+`,
+    'utf8',
+  )
+}
 
 /* ---- AI 摘要：TextFold 用 ---- */
 

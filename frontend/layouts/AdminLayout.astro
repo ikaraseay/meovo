@@ -16,7 +16,7 @@ interface Props {
   /** 页头副标题 */
   intro?: string
   /** 当前分区 */
-  section: 'documents' | 'gallery' | 'comments' | 'projects' | 'settings'
+  section: 'documents' | 'gallery' | 'comments' | 'projects' | 'links' | 'settings'
 }
 
 const { locale, title, intro, section, workspace = false } = Astro.props
@@ -26,6 +26,7 @@ const nav: { id: Props['section']; label: string; href: string; hint: string }[]
   { id: 'documents', label: t(locale, 'admin.nav.documents'), href: base + '/', hint: t(locale, 'admin.nav.documentsHint') },
   { id: 'gallery', label: t(locale, 'admin.nav.gallery'), href: base + '/gallery', hint: t(locale, 'admin.nav.galleryHint') },
   { id: 'projects', label: t(locale, 'admin.nav.projects'), href: base + '/projects', hint: t(locale, 'admin.nav.projectsHint') },
+  { id: 'links', label: t(locale, 'admin.nav.links'), href: base + '/links', hint: t(locale, 'admin.nav.linksHint') },
   { id: 'settings', label: t(locale, 'admin.nav.settings'), href: base + '/settings', hint: t(locale, 'admin.nav.settingsHint') },
 ]
 ---

@@ -319,6 +319,62 @@ export async function deleteProject(id: string): Promise<void> {
   await env.DB.prepare('DELETE FROM projects WHERE id = ?').bind(id).run()
 }
 
+/* ---------------- 友链 ---------------- */
+
+export interface FriendLinkRecord {
+  id: string
+  name: string
+  url: string
+  avatar: string
+  description: string
+  sort_order: number
+  created_at: string
+}
+
+export async function listFriendLinks(): Promise<FriendLinkRecord[]> {
+  const result = await env.DB.prepare(
+    'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links ' +
+      'ORDER BY sort_order ASC, created_at ASC',
+  ).all<FriendLinkRecord>()
+  return result.results ?? []
+}
+
+export async function createFriendLink(record: FriendLinkRecord): Promise<void> {
+  await env.DB.prepare(
+    'INSERT INTO friend_links (id, name, url, avatar, description, sort_order, created_at) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+  )
+    .bind(
+      record.id,
+      record.name,
+      record.url,
+      record.avatar,
+      record.description,
+      record.sort_order,
+      record.created_at,
+    )
+    .run()
+}
+
+export async function updateFriendLink(record: FriendLinkRecord): Promise<void> {
+  await env.DB.prepare(
+    'UPDATE friend_links SET name = ?, url = ?, avatar = ?, description = ?, sort_order = ? WHERE id = ?',
+  )
+    .bind(
+      record.name,
+      record.url,
+      record.avatar,
+      record.description,
+      record.sort_order,
+      record.id,
+    )
+    .run()
+}
+
+export async function deleteFriendLink(id: string): Promise<void> {
+  await env.DB.prepare('DELETE FROM friend_links WHERE id = ?').bind(id).run()
+}
+
 /* ---------------- 登录限流 ---------------- */
 
 /**

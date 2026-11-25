@@ -110,6 +110,32 @@ const count = resolveItems(posts, locale).length
             </ul>
           )
         }
+
+        <form class="link-exchange" data-link-exchange>
+          <h3 class="link-exchange__title">{t(locale, 'links.exchange.title')}</h3>
+          <p class="link-exchange__hint">{t(locale, 'links.exchange.hint')}</p>
+          <div class="link-exchange__grid">
+            <label class="link-exchange__field">
+              <span class="link-exchange__label">{t(locale, 'links.exchange.name')}</span>
+              <input class="ui-input" type="text" name="name" maxlength="80" required />
+            </label>
+            <label class="link-exchange__field">
+              <span class="link-exchange__label">{t(locale, 'links.exchange.url')}</span>
+              <input class="ui-input" type="text" name="url" required />
+            </label>
+            <label class="link-exchange__field">
+              <span class="link-exchange__label">{t(locale, 'links.exchange.avatar')}</span>
+              <input class="ui-input" type="text" name="avatar" maxlength="500" />
+            </label>
+            <label class="link-exchange__field">
+              <span class="link-exchange__label">{t(locale, 'links.exchange.description')}</span>
+              <input class="ui-input" type="text" name="description" maxlength="200" />
+            </label>
+          </div>
+          <button class="ui-btn ui-btn--primary" type="submit">
+            {t(locale, 'links.exchange.submit')}
+          </button>
+        </form>
       </div>
     </GlassWidget>
   </div>
@@ -117,7 +143,35 @@ const count = resolveItems(posts, locale).length
 
 <script>
   import { probeAllLinks } from '../../lib/link-status'
+  import { buildRequestMailto, requestBody } from '../../lib/link-exchange'
+  import { t } from '../../i18n'
+
   probeAllLinks()
+
+  const locale = document.documentElement.lang === 'en' ? 'en' : 'zh'
+  const form = document.querySelector<HTMLFormElement>('[data-link-exchange]')
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const data = new FormData(form)
+    const request = {
+      name: String(data.get('name') ?? '').trim(),
+      url: String(data.get('url') ?? '').trim(),
+      avatar: String(data.get('avatar') ?? '').trim(),
+      description: String(data.get('description') ?? '').trim(),
+    }
+    const labels = {
+      name: t(locale, 'links.exchange.name'),
+      url: t(locale, 'links.exchange.url'),
+      avatar: t(locale, 'links.exchange.avatar'),
+      description: t(locale, 'links.exchange.description'),
+    }
+    location.href = buildRequestMailto(
+      t(locale, 'site.email'),
+      t(locale, 'links.exchange.subject', { site: request.name }),
+      requestBody(request, labels),
+    )
+  })
 </script>
 
 <style>
@@ -327,6 +381,50 @@ const count = resolveItems(posts, locale).length
   .about-links__empty {
     color: var(--ui-text-muted);
     font-size: 0.875rem;
+  }
+
+  /* 友链申请 —— 填完走 mailto 发信 */
+  .link-exchange {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-sm);
+    margin-block-start: var(--ui-space-md);
+    padding-block-start: var(--ui-space-md);
+    border-block-start: 1px solid var(--ui-border-subtle);
+  }
+
+  .link-exchange__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ui-text);
+  }
+
+  .link-exchange__hint {
+    font-size: 0.8125rem;
+    color: var(--ui-text-secondary);
+  }
+
+  .link-exchange__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-space-sm);
+  }
+
+  .link-exchange__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-xs);
+  }
+
+  .link-exchange__label {
+    font-size: 0.75rem;
+    color: var(--ui-text-muted);
+  }
+
+  @media not (min-width: 1024px) {
+    .link-exchange__grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media not (min-width: 1024px) {
