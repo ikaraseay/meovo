@@ -131,6 +131,48 @@ export function fitPinnedRail(top: number, bottom: number, heights: number[], oc
   return positions
 }
 
+/** 固定卡在视口里的矩形 */
+export interface PinnedBox {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** 两张卡横向是否交叠 —— 不交叠就是两列，互不干涉 */
+function sameColumn(a: PinnedBox, b: PinnedBox): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width
+}
+
+/**
+ * 固定卡排成一摞 —— 同列的互不重叠。
+ *
+ * 按纵向位置排序，一个接一个往下摞：压上了就让到下面那张的下沿 + 间距。
+ * 只调纵向 —— 横向挪会压到正文列上（正文绕排只认障碍矩形）。
+ *
+ * shortcut: 一列塞不下（卡片总高超过视口）时，最后那张会被挤出视口下沿 ——
+ * 想全摞下就收起目录（卡片矮一截）。
+ */
+export function stackPinned(boxes: PinnedBox[], gap: number): Map<string, Point> {
+  const spots = new Map<string, Point>()
+  const placed: PinnedBox[] = []
+  for (const box of boxes.toSorted((a, b) => a.y - b.y)) {
+    let y = box.y
+    // 压到哪张就挪到哪张下面；挪完可能又压到别的，再挪（最多挪 placed.length 次）
+    for (let i = 0; i <= placed.length; i++) {
+      const hit = placed.find(
+        (p) => sameColumn(p, box) && y < p.y + p.height + gap && y + box.height + gap > p.y,
+      )
+      if (!hit) break
+      y = hit.y + hit.height + gap
+    }
+    spots.set(box.id, { x: box.x, y })
+    placed.push({ ...box, y })
+  }
+  return spots
+}
+
 export interface ContentAnchoredResult {
   positions: Map<string, Position>
   /** 正文顶部要留的 margin-top（给顶部卡片让位） */

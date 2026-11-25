@@ -129,6 +129,8 @@ export const ATTR = {
   defaultPin: 'data-default-pin',
   /** 导航分组（二级菜单的归属） */
   navGroup: 'data-nav-group',
+  /** 悬浮状态栏本体（顶部的玻璃条） */
+  floatMenu: 'data-float-menu',
   /** 二级菜单的触发器 */
   navTrigger: 'data-nav-trigger',
   /** 二级面板本体 */

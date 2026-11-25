@@ -196,26 +196,73 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   import { initImageZoom } from '../lib/image-zoom'
   import { initTextFold, type TextFoldLabels } from '../lib/text-fold'
   import { relayoutDesks } from '../lib/draggable'
+  import { activeHeadingId, contentInset, MIN_INSET } from '../lib/toc'
+  import { isDesktop } from '../lib/breakpoint'
+  import { ATTR } from '../lib/dom-contract'
 
-  /* ---------- 目录：折叠 + 滚动高亮 ---------- */
+  /* ---------- 目录：折叠 + 精确跳转 + 滚动高亮 ---------- */
 
   const toc = document.querySelector<HTMLElement>('[data-toc]')
   const tocToggle = document.querySelector<HTMLButtonElement>('[data-toc-toggle]')
 
+  /**
+   * 让位高度 —— 悬浮栏下面留多少，章节就落在那儿。
+   *
+   * 写进 --ui-content-offset：正文的 scroll-margin-top 用它，
+   * 锚点跳转（目录点击、别的页内链接、带 # 的网址进来）都不会被栏压住。
+   */
+  let contentOffset = MIN_INSET
+
+  function syncContentOffset() {
+    const bar = document.querySelector<HTMLElement>(`[${ATTR.floatMenu}]`)
+    const rect = bar?.getBoundingClientRect()
+    const box = rect && rect.height > 0 ? { top: rect.top, bottom: rect.bottom } : null
+    contentOffset = contentInset(box, window.innerHeight)
+    document.documentElement.style.setProperty('--ui-content-offset', `${contentOffset}px`)
+  }
+  syncContentOffset()
+  window.addEventListener('resize', syncContentOffset)
+  // 悬浮栏被拖走 —— 让位高度跟着变
+  window.addEventListener('pointerup', syncContentOffset, { passive: true })
+
+  /** 首屏带 #锚点进来的 —— 浏览器原生跳转不知道悬浮栏占多高，补一次 */
+  function fixHashTarget() {
+    let id = ''
+    try {
+      id = decodeURIComponent(location.hash.slice(1))
+    } catch {
+      id = location.hash.slice(1) // 手改坏的百分号编码 —— 别让整段挂掉
+    }
+    const target = id ? document.getElementById(id) : null
+    if (!target) return
+    const top = target.getBoundingClientRect().top + window.scrollY - contentOffset
+    // instant —— 首屏直接落到位，别再演一遍平滑滚动
+    window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
+  }
+
+  /** 目录是不是展开着 —— 没记过选择时按视口算（桌面展开、窄屏收起） */
+  const tocOpen = (): boolean => {
+    const state = toc?.getAttribute('data-open')
+    if (state === 'true') return true
+    if (state === 'false') return false
+    return isDesktop()
+  }
+
+  tocToggle?.setAttribute('aria-expanded', String(tocOpen()))
+
   tocToggle?.addEventListener('click', () => {
     if (!toc) return
-    const open = toc.hasAttribute('data-open')
-    toc.toggleAttribute('data-open', !open)
-    tocToggle.setAttribute('aria-expanded', String(!open))
+    const open = !tocOpen()
+    toc.setAttribute('data-open', String(open))
+    tocToggle.setAttribute('aria-expanded', String(open))
+    // 卡片高度变了 —— 固定卡那一摞要重排，别互相压着
+    relayoutDesks()
   })
 
   const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')]
   const tocHeadings = tocLinks
     .map((link) => document.getElementById(link.dataset.tocLink ?? ''))
     .filter((el): el is HTMLElement => el !== null)
-
-  /** 悬浮状态栏会盖住标题，判定「到达」时留出这段距离 */
-  const HEADING_OFFSET = 120
 
   /** 目录自己会滚 —— 当前章节滚出视野时把它带回来（只滚目录，不动页面） */
   function keepActiveVisible(link: HTMLAnchorElement) {
@@ -228,11 +275,13 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   }
 
   function syncActiveHeading() {
-    let active: string | undefined
-    for (const heading of tocHeadings) {
-      if (heading.getBoundingClientRect().top <= HEADING_OFFSET) active = heading.id
-      else break
-    }
+    const active = activeHeadingId(
+      tocHeadings.map((heading) => ({
+        id: heading.id,
+        top: heading.getBoundingClientRect().top,
+      })),
+      contentOffset,
+    )
     for (const link of tocLinks) {
       const isActive = link.dataset.tocLink === active
       link.classList.toggle('is-active', isActive)
@@ -256,6 +305,9 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     )
     syncActiveHeading()
   }
+
+  // 带 #锚点进来的 —— 等浏览器的原生跳转落地后补一次（它不知道悬浮栏占多高）
+  window.addEventListener('load', () => requestAnimationFrame(fixHashTarget))
 
   /* ---------- 代码块：语言标签 + 复制按钮 ---------- */
 

@@ -357,6 +357,12 @@ html[data-theme='liquid-glass'].dark .ui-widget {
   transform: translateY(-50%) rotate(-20deg) scale(1);
 }
 
+/* 固定态的底色 —— 卡片浮在正文之上，压着滚动的字，普通玻璃底读不清。
+   配方在主题里（浅色 / 深色 / 高对比各一套），这里只取色。 */
+.ui-widget.is-pinned {
+  background-color: var(--ui-widget-pinned-bg, var(--ui-card-bg));
+}
+
 /* 展开按钮：右上角，悬停才露出来 */
 .ui-widget__expand {
   position: absolute;

@@ -30,9 +30,12 @@ import {
   fromPct,
   restoreFromPct,
   scatterLayout,
+  stackPinned,
   toPct,
   DESK_GAP_X,
+  DESK_GAP_Y,
   type DeskCard,
+  type PinnedBox,
   type Position,
 } from './desk-layout'
 import { createFlowState, updateFlow, type FlowState } from './prose-flow'
@@ -408,6 +411,32 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     }
   }
 
+  /**
+   * 固定卡排成一摞 —— 同列的互不重叠。
+   *
+   * 卡片高度会变（目录折叠 / 展开），固定态的位置得跟着重排。
+   * 位置只在这里挪，不落盘 —— 存档记的是用户摆的那张，摞位是算出来的。
+   */
+  function stackPinnedCards() {
+    const boxes: PinnedBox[] = entries
+      .filter((entry) => entry.pinned && !entry.dragging && entry.el.getClientRects().length > 0)
+      .map((entry) => ({
+        id: entry.id,
+        x: entry.x,
+        y: entry.y,
+        width: entry.w,
+        height: entry.h,
+      }))
+    const spots = stackPinned(boxes, DESK_GAP_Y)
+    for (const entry of entries) {
+      const spot = spots.get(entry.id)
+      if (!spot || (spot.x === entry.x && spot.y === entry.y)) continue
+      entry.x = spot.x
+      entry.y = spot.y
+      placePinned(entry)
+    }
+  }
+
   /** 侧栏卡片里最宽的那张 —— 正文列要给它们让位 */
   function railCardWidth(): number {
     let w = 0
@@ -511,6 +540,7 @@ export function initDesk(desk: HTMLElement): DeskController | null {
     fitContentWidth()
     syncPinned()
     applyDefaultPins()
+    stackPinnedCards()
 
     if (contentEl) layoutContentAnchored(contentEl)
     else if (flow) layoutFlowLift()

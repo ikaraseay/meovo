@@ -9,6 +9,7 @@ import {
   fromPct,
   restoreFromPct,
   scatterLayout,
+  stackPinned,
   toPct,
   type DeskCard,
 } from '../frontend/lib/desk-layout.ts'
@@ -221,6 +222,47 @@ test('存档坐标还原 —— 百分比 → 像素，并夹回范围', () => {
   assert.deepEqual(restoreFromPct({ xPct: 200, yPct: 200 }, size, ref), { x: 800, y: 700 })
 })
 
+
+test('固定卡排成一摞 —— 同列的互不重叠', () => {
+  const boxes = [
+    { id: 'toc', x: 1000, y: 80, width: 300, height: 400 },
+    { id: 'outline', x: 1000, y: 200, width: 300, height: 200 },
+  ]
+  const spots = stackPinned(boxes, 44)
+  // 压住目录的那张让到它下面 + 间距
+  assert.deepEqual(spots.get('outline'), { x: 1000, y: 80 + 400 + 44 })
+  assert.deepEqual(spots.get('toc'), { x: 1000, y: 80 })
+})
+
+test('固定卡分属两列 —— 互不干涉', () => {
+  const boxes = [
+    { id: 'a', x: 1000, y: 80, width: 300, height: 400 },
+    { id: 'b', x: 1400, y: 100, width: 300, height: 200 },
+  ]
+  const spots = stackPinned(boxes, 44)
+  assert.deepEqual(spots.get('a'), { x: 1000, y: 80 })
+  assert.deepEqual(spots.get('b'), { x: 1400, y: 100 })
+})
+
+test('固定卡摞不下时 —— 顺序按纵向排，压上的往下让', () => {
+  const boxes = [
+    { id: 'a', x: 0, y: 300, width: 300, height: 100 },
+    { id: 'b', x: 0, y: 100, width: 300, height: 100 },
+    { id: 'c', x: 0, y: 150, width: 300, height: 100 },
+  ]
+  const spots = stackPinned(boxes, 44)
+  assert.deepEqual(spots.get('b'), { x: 0, y: 100 })
+  // c 压着 b → 让到 b 下面
+  assert.deepEqual(spots.get('c'), { x: 0, y: 100 + 100 + 44 })
+  // a 在最下面，c 让完之后才轮到它 —— 依次往下摞，互不重叠
+  assert.deepEqual(spots.get('a'), { x: 0, y: 100 + 100 + 44 + 100 + 44 })
+  const list = [...spots.values()]
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      assert.ok(list[i].y + 100 <= list[j].y || list[j].y + 100 <= list[i].y, '摞完还压着')
+    }
+  }
+})
 
 test('切换文章时按当前目录高度给默认侧卡留位；矮屏整组回退', () => {
   const layout = (tocHeight: number) => fitPinnedRail(60, 650, [180, 90], [{ top: 60, bottom: 60 + tocHeight }])
