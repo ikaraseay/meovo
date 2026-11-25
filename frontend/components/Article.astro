@@ -86,35 +86,35 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
           </button>
           <ul class="toc-list">
             {groups.map((group) => (
-              <li class="toc-group">
+              <li class="toc-group" data-toc-group={group.heading?.slug ?? ''}>
                 {group.heading ? (
-                  /* 一级章节自己可折叠 —— details/summary 是平台原生的，
-                     不用手搓状态：点章节名跳转，点行里别处收起 / 展开 */
-                  <details class="toc-details" open>
-                    <summary class="toc-summary">
-                      <a
-                        class="toc-link toc-link--section"
-                        href={`#${group.heading.slug}`}
-                        data-toc-link={group.heading.slug}
-                      >
-                        {group.heading.text}
-                      </a>
-                      <svg
-                        class="toc-chevron"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </summary>
-                    {group.children.length > 0 && (
+                  group.children.length > 0 ? (
+                    /* 一级章节自己可折叠 —— 默认收起：浏览位置到了自动展开，
+                       双击手动展开（这时右边才留那个箭头） */
+                    <details class="toc-details">
+                      <summary class="toc-summary">
+                        <a
+                          class="toc-link toc-link--section"
+                          href={`#${group.heading.slug}`}
+                          data-toc-link={group.heading.slug}
+                        >
+                          {group.heading.text}
+                        </a>
+                        <svg
+                          class="toc-chevron"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
+                        </svg>
+                      </summary>
                       <ul class="toc-sublist">
                         {group.children.map((item) => (
                           <li class="toc-item">
@@ -124,8 +124,19 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
                           </li>
                         ))}
                       </ul>
-                    )}
-                  </details>
+                    </details>
+                  ) : (
+                    /* 没有子章节 —— 不可折叠，就是一行链接 */
+                    <div class="toc-summary toc-summary--plain">
+                      <a
+                        class="toc-link toc-link--section"
+                        href={`#${group.heading.slug}`}
+                        data-toc-link={group.heading.slug}
+                      >
+                        {group.heading.text}
+                      </a>
+                    </div>
+                  )
                 ) : (
                   group.children.map((item) => (
                     <li class="toc-item toc-item--depth-3">
@@ -244,7 +255,14 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
   import { initImageZoom } from '../lib/image-zoom'
   import { initTextFold, type TextFoldLabels } from '../lib/text-fold'
   import { relayoutDesks } from '../lib/draggable'
-  import { activeHeadingId, contentInset, MIN_INSET } from '../lib/toc'
+  import {
+    activeHeadingId,
+    contentInset,
+    MIN_INSET,
+    openGroupIds,
+    toggleGroupMode,
+    type TocGroupMode,
+  } from '../lib/toc'
   import { ATTR } from '../lib/dom-contract'
 
   /* ---------- 目录：折叠 + 精确跳转 + 滚动高亮 ---------- */
@@ -295,9 +313,89 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
     tocToggle.setAttribute('aria-expanded', String(!open))
   })
 
-  /* 一级章节折叠 —— 卡片高度变了，固定卡那一摞要重排 */
-  for (const details of document.querySelectorAll<HTMLDetailsElement>('.toc-details')) {
+  /* ---------- 一级章节：默认全收起，位置自动展开，双击手动切换 ---------- */
+
+  /** 每个一级章节一组（data-toc-group = 章节 slug） */
+  const tocGroups = [...document.querySelectorAll<HTMLElement>('[data-toc-group]')]
+
+  /** 每组的状态 —— 双击过的就不再跟浏览位置走 */
+  const groupModes = new Map<string, TocGroupMode>()
+
+  /** 当前章节的链接 —— 位置驱动的展开跟着它 */
+  let activeLink: HTMLAnchorElement | null = null
+
+  /** 组里那对 details —— 没有子章节的组没有它，也就不可折叠 */
+  function groupDetails(group: HTMLElement): HTMLDetailsElement | null {
+    return group.querySelector('details')
+  }
+
+  /** 哪些组该展开 —— 位置规则 + 手动覆盖 */
+  function syncGroups() {
+    const activeGroupId =
+      activeLink?.closest<HTMLElement>('[data-toc-group]')?.dataset.tocGroup ?? ''
+    const open = new Set(
+      openGroupIds(
+        tocGroups.map((group) => ({
+          id: group.dataset.tocGroup ?? '',
+          collapsible: Boolean(groupDetails(group)),
+        })),
+        activeGroupId,
+        groupModes,
+      ),
+    )
+    for (const group of tocGroups) {
+      const id = group.dataset.tocGroup ?? ''
+      // 手动展开的才留右侧那个箭头
+      group.classList.toggle('is-manual', groupModes.get(id) === 'open')
+      const details = groupDetails(group)
+      if (!details) continue
+      const wantOpen = open.has(id)
+      if (details.open !== wantOpen) details.open = wantOpen
+    }
+  }
+
+  /** 双击切换 —— 当前开着就收起，收着就展开（手动过就不再跟位置走） */
+  function toggleGroup(group: HTMLElement, wasOpen: boolean) {
+    const id = group.dataset.tocGroup ?? ''
+    const details = groupDetails(group)
+    if (!details) return
+    const mode = groupModes.get(id) ?? 'auto'
+    groupModes.set(id, toggleGroupMode(mode, wasOpen))
+    syncGroups()
+  }
+
+  for (const group of tocGroups) {
+    const details = groupDetails(group)
+    const summary = group.querySelector('summary')
+    if (!details || !summary) continue
+
+    // 卡片高度变了，固定卡那一摞要重排
     details.addEventListener('toggle', () => relayoutDesks())
+
+    // 单击行里别处不切换 —— 折叠只认双击（点章节名是跳转）
+    summary.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('a')) return
+      event.preventDefault()
+    })
+
+    // 双击按「点下去那一刻」的状态算 —— 点章节名会跳转，
+    // 跳转可能顺手把这一组展开，那时再读就晚了
+    let openBeforeClick = false
+    summary.addEventListener('mousedown', () => {
+      openBeforeClick = details.open
+    })
+
+    summary.addEventListener('dblclick', (event) => {
+      event.preventDefault()
+      toggleGroup(group, openBeforeClick)
+    })
+
+    // 键盘：Enter / 空格等价于双击
+    summary.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      toggleGroup(group, details.open)
+    })
   }
 
   const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')]
@@ -325,11 +423,15 @@ const licensePost = variants.find((v) => getPostLocale(v) === defaultLocale) ?? 
       })),
       contentOffset,
     )
+    activeLink = null
     for (const link of tocLinks) {
       const isActive = link.dataset.tocLink === active
       link.classList.toggle('is-active', isActive)
-      if (isActive) keepActiveVisible(link)
+      if (isActive) activeLink = link
     }
+    // 先展开当前那组，再把它带进视野（收起的组里链接没有位置）
+    syncGroups()
+    if (activeLink) keepActiveVisible(activeLink)
   }
 
   if (tocHeadings.length > 0) {

@@ -102,11 +102,17 @@
     它们是「进正文前」要看的东西，隔一整个 gap 就跟标题分成两块不相干的卡片了
   - 窄屏的目录折叠头**不要自带边框**（`prose.css` 的 `.toc-toggle`）：卡本身已经有一圈，
     再套一层就是两层套着的描边 —— 跟关系图谱那行 `<summary>` 保持同一种素行样式
-  - **目录按一级章节分组，每组自己可折叠** —— 用平台原生的 `<details>` / `<summary>`
-    （别手搓展开状态）：分组在 `content-queries.ts` 的 `tocGroups()`，样式在 `prose.css`。
-    点章节名是跳转，点行里别处（箭头）才收起 —— summary 里的链接不会被 summary 的
-    激活行为接管。**收起时子章节要真藏掉**（`display: none`）—— details 自带的隐藏
-    只藏「画出来」，位置还留着，卡片不会矮一截
+  - **目录按一级章节分组，每组自己可折叠** —— 分组在 `content-queries.ts` 的
+    `tocGroups()`，样式在 `prose.css`
+    - **默认全收起** —— 浏览位置所在的那组自动展开，走过的自动收起
+      （`frontend/lib/toc.ts` 的 `openGroupIds()` 算哪些组该开）
+    - **折叠只认双击** —— 单击章节名是跳转，行里别处不切换
+      （summary 的 click 被 preventDefault 掉，别让 details 自己切）
+    - **手动展开的组留右侧那个箭头** —— 状态记在 `is-manual` 类上，
+      不跟着浏览位置走（目标离开屏幕也不折叠）
+    - **没有子章节的组不可折叠** —— 就是一行链接
+    - **收起时子章节要真藏掉**（`display: none`）—— details 自带的隐藏
+      只藏「画出来」，位置还留着，卡片不会矮一截
   - **窄屏那行折叠头仍是「整表收起」** —— 桌面看不到它（`prose.css` 的媒体查询）；
     状态记在 `data-open` 属性上（有属性就展开）
   - **章节跳转按悬浮栏实测的高度让位** —— 不写死 120px：`Article.astro` 量出悬浮栏
@@ -662,6 +668,15 @@
   - **构建期导出**到 `frontend/data/projects.ts`（生成的文件，跟 overrides.ts 一个道理），
     关于页直接 import —— 没有运行时接口，前台不查 D1
     （代价：后台改完项目要等下一次构建才出现在页面上）
+- **友链**：关于页那张「友情链接」卡片 —— 名称 / 地址 / 头像 / 简介，
+  后台 `/<lang>/admin/links` 可增删改
+  - 表在 `backend/db/migrations/0006_friend_links.sql`；校验在
+    `backend/lib/admin/friend-links.ts`（纯函数，地址只收 http / https）
+  - **构建期导出**到 `frontend/data/links.ts`（生成的文件，跟 projects.ts 一个道理），
+    关于页直接 import —— 前台不查 D1（代价：后台改完要等下一次构建）
+  - ⚠️ **导出拉不到表时保留旧文件** —— 别把站上的友链清空
+  - **交换友链走 mailto**：静态站没有服务端可发信，关于页那张卡里填完四项，
+    把 mailto 交给系统邮件客户端（拼链接的纯函数在 `frontend/lib/link-exchange.ts`）
 - **图库**：图片二进制进 R2，元数据进 D1，公开地址 `/media/<key>`，
   key 形如 `<年月>/<uuid>.<ext>`（带 uuid，所以可以永久缓存）。
   上传三重校验：类型白名单 + 5MB 上限 + 文件头 sniff 与声明类型一致。

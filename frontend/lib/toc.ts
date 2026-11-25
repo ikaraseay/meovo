@@ -29,6 +29,56 @@ export function contentInset(bar: BarBox | null, viewportHeight: number): number
   return Math.max(MIN_INSET, Math.ceil(bar.bottom) + 16)
 }
 
+/**
+ * 目录分组 —— 一级章节各成一组。
+ * ---------------------------------------------------------
+ * 组的 id 就是一级章节的 slug；没有子章节的组不可折叠。
+ */
+export interface TocGroupState {
+  /** 组的标识（一级章节的 slug） */
+  id: string
+  /** 有子章节才可折叠 */
+  collapsible: boolean
+}
+
+/**
+ * 一组的状态 ——
+ *   auto   跟着浏览位置走（当前那组展开，走过的收起）
+ *   open   用户手动展开的 —— 不跟着位置走
+ *   closed 用户手动收起的 —— 当前位置到了也不展开
+ */
+export type TocGroupMode = 'auto' | 'open' | 'closed'
+
+/**
+ * 双击切换 —— 当前开着就收起，收着就展开。
+ * 手动过一次就不再跟位置走。
+ */
+export function toggleGroupMode(mode: TocGroupMode, effectivelyOpen: boolean): TocGroupMode {
+  if (mode === 'auto') return effectivelyOpen ? 'closed' : 'open'
+  return mode === 'open' ? 'closed' : 'open'
+}
+
+/**
+ * 哪些组该展开。
+ *
+ * 默认全收起：浏览位置所在的那组自动展开，走过的自动收起；
+ * 用户手动展开的（open）留着 —— 右边那个箭头就是给它的。
+ */
+export function openGroupIds(
+  groups: TocGroupState[],
+  activeGroupId: string | null,
+  modes: Map<string, TocGroupMode>,
+): string[] {
+  const open: string[] = []
+  for (const group of groups) {
+    if (!group.collapsible) continue
+    const mode = modes.get(group.id) ?? 'auto'
+    if (mode === 'open') open.push(group.id)
+    else if (mode === 'auto' && group.id === activeGroupId) open.push(group.id)
+  }
+  return open
+}
+
 /** 一个标题：id + 它离视口顶部的距离 */
 export interface HeadingBox {
   id: string

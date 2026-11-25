@@ -408,6 +408,11 @@ html.dark .code-block pre.astro-code span {
   color: var(--ui-text-accent);
 }
 
+/* 没有子章节的组 —— 就是一行链接，不可折叠 */
+.toc-summary--plain {
+  cursor: default;
+}
+
 /* 章节名是链接（跳转用）—— 缩进跟描边交给摘要行 */
 .toc-summary .toc-link {
   flex: 1;
@@ -419,11 +424,18 @@ html.dark .code-block pre.astro-code span {
   font-weight: 600;
 }
 
+/* 右侧那个箭头只在「用户手动展开」时出现 ——
+   折叠只认双击，箭头是个记号，不是常驻按钮 */
 .toc-chevron {
+  display: none;
   flex: none;
   width: 14px;
   height: 14px;
   transition: rotate var(--ui-transition-fast);
+}
+
+.toc-group.is-manual .toc-chevron {
+  display: block;
 }
 
 .toc-details[open] > .toc-summary .toc-chevron {
