@@ -303,11 +303,35 @@ for (const row of settingRows) {
 }
 writeOverrides(overrides)
 
-/* ---- 项目：同步进本地 D1 ---- */
+/* ---- 项目与友链：先拉数据，本地再同步进本地 D1 ---- */
 
-/** 远端项目行（清单快照用） */
-let projectRows = []
+/**
+ * 项目 —— 拉得到就写，拉不到就**保留原来的文件**：
+ * 表还没建的时候别把站上的项目清空。
+ */
+let projectRows = null
+try {
+  projectRows = await query(
+    'SELECT id, name, description, url, sort_order, created_at FROM projects ' +
+      'ORDER BY sort_order ASC, created_at ASC',
+  )
+} catch (error) {
+  console.warn('[export] 项目拉不到（表还没建？）—— 保留原来的：' + error.message)
+}
 
+/**
+ * 友链 —— 拉得到就写，拉不到就**保留原来的文件**：
+ * 表还没建的时候别把站上的友链清空。
+ */
+let linkRows = null
+try {
+  linkRows = await query(
+    'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links ' +
+      'ORDER BY sort_order ASC, created_at ASC',
+  )
+} catch (error) {
+  console.warn('[export] 友链拉不到（表还没建？）—— 保留原来的：' + error.message)
+}
 
 /** 在本地 D1 上跑一条命令 —— 项目与友链共用 */
 function runLocalD1(commands) {
@@ -329,21 +353,9 @@ function runLocalD1(commands) {
 
 /**
  * 把远端的项目同步进**本地 D1**。
- *
- * 为什么单独同步：项目不是构建期导出的静态文件 —— 关于页是运行时去 /api/projects 拿的，
- * 而本地开发时那个接口读的是**本地库**（cloudflare/.wrangler/state）。
- * 不同步的话，后台改了项目，本地关于页还是旧的。
+ * 本地开发时后台页面读的是本地库，不同步就看不到线上那份。
  */
-async function syncProjects() {
-  let rows = []
-  try {
-    rows = await query('SELECT id, name, description, url, sort_order, created_at FROM projects')
-    projectRows = rows
-  } catch {
-    console.warn('[export] projects 表不存在，跳过项目同步（跑一次 d1 migrations apply）')
-    return
-  }
-
+function syncProjects(rows) {
   const now = new Date().toISOString()
   const values = rows.map((row) =>
     '(' +
@@ -375,17 +387,7 @@ async function syncProjects() {
  * 把远端的友链同步进**本地 D1** —— 与项目同理：
  * 本地开发时后台页面读的是本地库，不同步就看不到线上那份。
  */
-async function syncFriendLinks() {
-  let rows = []
-  try {
-    rows = await query(
-      'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links',
-    )
-  } catch {
-    console.warn('[export] friend_links 表不存在，跳过友链同步（跑一次 d1 migrations apply）')
-    return
-  }
-
+function syncFriendLinks(rows) {
   const now = new Date().toISOString()
   const values = rows.map((row) =>
     '(' +
@@ -426,10 +428,9 @@ const isBuildEnv =
   process.env.WORKERS_CI === '1' || /^(1|true)$/i.test(process.env.CI ?? '')
 
 // 远端导出时顺手把项目与友链同步进本地库 —— 本地开发才能看到后台的改动
-// （先同步再写清单：清单里的项目快照才拿得到远端那几行）
 if (!useLocal && !isBuildEnv) {
-  await syncProjects()
-  await syncFriendLinks()
+  if (projectRows) syncProjects(projectRows)
+  if (linkRows) syncFriendLinks(linkRows)
 }
 
 /**
@@ -447,7 +448,7 @@ const manifest = {
     updated_at: row.updated_at ?? '',
   })),
   settings: overrides,
-  projects: projectRows.map((row) => ({
+  projects: (projectRows ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
@@ -461,23 +462,11 @@ writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2), 'utf8')
  * 项目数据 —— 写成源码（跟 overrides.ts 一个道理）：
  * 静态页在构建期 import 它，运行时**完全不碰 D1**。
  */
-/**
- * 友链 —— 拉得到就写，拉不到就**保留原来的文件**：
- * 表还没建的时候别把站上的友链清空。
- */
-let linkRows = null
-try {
-  linkRows = await query(
-    'SELECT id, name, url, avatar, description, sort_order, created_at FROM friend_links ' +
-      'ORDER BY sort_order ASC, created_at ASC',
-  )
-} catch (error) {
-  console.warn('[export] 友链拉不到（表还没建？）—— 保留原来的：' + error.message)
-}
+if (projectRows) writeProjects(projectRows)
+else if (!existsSync(PROJECTS_FILE)) writeProjects([])
+
 if (linkRows) writeLinksFile(linkRows)
 else if (!existsSync(LINKS_FILE)) writeLinksFile([])
-
-writeProjects(projectRows)
 
 /**
  * 友链 —— 写成源码（跟 projects 一个道理）。
